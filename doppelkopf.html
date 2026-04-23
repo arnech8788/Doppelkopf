@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Doppelkopf Punktezettel</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=Space+Mono:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#111318;--bg2:#1a1d25;--bg3:#22262f;--bg4:#2d323e;
+--tx:#e8ecf4;--tx2:#9ba3b8;--tx3:#636b82;
+--acc:#1a9e8f;--acc2:#2ec4b6;--acc-bg:rgba(46,196,182,.1);
+--grn:#2ec4b6;--grn-bg:rgba(46,196,182,.12);--grn-bdr:#2ec4b6;
+--red:#e05252;--red-bg:rgba(224,82,82,.12);--red-bdr:#e05252;
+--warn:#f0a830;--warn-bg:rgba(240,168,48,.12);
+--bdr:rgba(255,255,255,.07);--r:14px;--r-sm:10px;
+--chart-grid:rgba(255,255,255,.06);--chart-tick:#636b82;--chart-lbl:#9ba3b8;
+--pattern-opacity:0.025;
+}
+[data-theme="light"]{
+--bg:#f0ede8;--bg2:#faf9f7;--bg3:#e8e5df;--bg4:#dbd7d0;
+--tx:#1a1c24;--tx2:#5a5e72;--tx3:#8b8fa6;
+--acc:#0e8577;--acc2:#1a9e8f;--acc-bg:rgba(14,133,119,.08);
+--grn:#0e8577;--grn-bg:rgba(14,133,119,.1);--grn-bdr:#0e8577;
+--red:#c0392b;--red-bg:rgba(192,57,43,.1);--red-bdr:#c0392b;
+--warn:#c88a20;--warn-bg:rgba(200,138,32,.1);
+--bdr:rgba(0,0,0,.08);
+--chart-grid:rgba(0,0,0,.06);--chart-tick:#8b8fa6;--chart-lbl:#5a5e72;
+--pattern-opacity:0.04;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent;overflow-x:hidden;min-height:100vh}
+body::before{content:'♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣';position:fixed;inset:0;font-size:28px;letter-spacing:24px;line-height:52px;word-spacing:16px;color:var(--tx);opacity:var(--pattern-opacity);pointer-events:none;z-index:0;transform:rotate(-15deg) scale(1.5);transform-origin:center}
+.app{max-width:420px;margin:0 auto;padding:12px 8px 70px;min-height:100vh;position:relative;z-index:1}
+.nav{display:flex;gap:2px;background:var(--bg2);border-radius:var(--r);padding:3px;margin-bottom:16px;position:sticky;top:0;z-index:10;border:1px solid var(--bdr)}
+.nav button{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--tx3);font-family:inherit;font-size:11px;font-weight:500;border-radius:var(--r-sm);cursor:pointer;transition:.2s}
+.nav button.active{background:var(--acc);color:#fff}
+.nav button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
+.screen{display:none}.screen.active{display:block}
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card-title{font-size:13px;color:var(--acc2);margin-bottom:12px;font-weight:500;letter-spacing:.3px;text-transform:uppercase}
+h2{font-family:'Space Mono',monospace;font-size:18px;margin-bottom:16px;color:var(--tx);display:flex;align-items:center;gap:8px}
+h2::before{content:'♠';color:var(--acc);font-size:16px}
+input[type=text],input[type=number]{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);color:var(--tx);font-family:inherit;font-size:15px;outline:none;transition:.2s}
+input:focus{border-color:var(--acc)}
+input[type=number]{-moz-appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none}
+.btn{padding:14px 20px;border:none;border-radius:var(--r-sm);font-family:inherit;font-size:15px;font-weight:500;cursor:pointer;transition:.15s;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--acc);color:#fff}
+.btn-secondary{background:var(--bg3);color:var(--tx2);border:1px solid var(--bdr)}
+.btn-danger{background:var(--red-bg);color:var(--red);border:1px solid rgba(224,82,82,.15)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0}
+.toggle-label{font-size:14px;color:var(--tx2)}
+.toggle{width:48px;height:28px;background:var(--bg4);border-radius:14px;cursor:pointer;position:relative;transition:.2s;border:none}
+.toggle.on{background:var(--acc)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on::after{left:23px}
+.table-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+.pos{color:var(--grn);font-weight:500}.neg{color:var(--red);font-weight:500}
+.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stat-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);padding:12px}
+.stat-val{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--tx)}
+.stat-label{font-size:11px;color:var(--tx3);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--tx3)}
+.empty-state svg{display:block;margin:0 auto 12px;width:32px;height:32px}
+.round-badge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:500}
+.badge-solo{background:var(--warn-bg);color:var(--warn)}.badge-bock{background:var(--acc-bg);color:var(--acc2)}
+.suggestions{position:absolute;left:0;right:0;top:100%;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);z-index:20;max-height:150px;overflow-y:auto;display:none;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.suggestions.show{display:block}
+.sug-item{padding:10px 14px;cursor:pointer;font-size:14px;color:var(--tx2)}
+.sug-item:active{background:var(--bg3);color:var(--tx)}
+.player-tag{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:20px;padding:6px 12px;font-size:14px;color:var(--tx)}
+.player-tag .remove{color:var(--tx3);cursor:pointer;font-size:14px;padding:2px;line-height:1}
+.input-wrap{position:relative}
+.chart-container{position:relative;width:100%;height:240px;margin:12px 0}
+.section-label{font-size:12px;color:var(--tx3);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+.player-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--bdr)}
+.player-row .name{flex:1;font-size:15px}.player-row .pts{font-family:'Space Mono',monospace;font-size:16px;font-weight:700}
+.rank{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'Space Mono',monospace}
+.rank-1{background:var(--warn-bg);color:var(--warn)}.rank-2{background:var(--bg4);color:var(--tx2)}.rank-3{background:var(--red-bg);color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border-radius:var(--r) var(--r) 0 0;width:100%;max-width:420px;max-height:85vh;overflow-y:auto;padding:20px;border:1px solid var(--bdr);border-bottom:none}
+.modal h3{font-size:16px;margin-bottom:16px}
+.my-player-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--acc-bg);border-radius:10px;font-size:11px;color:var(--acc2)}
+.player-chip{padding:12px 18px;background:var(--bg3);border:2px solid var(--bg4);border-radius:var(--r-sm);color:var(--tx3);font-size:15px;font-weight:500;cursor:pointer;transition:.15s;user-select:none;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.player-chip:active{transform:scale(.95)}
+.player-chip[data-state="lost"]{border-color:var(--red-bdr);color:var(--red);background:var(--red-bg)}
+.player-chip[data-state="won"]{border-color:var(--grn-bdr);color:var(--grn);background:var(--grn-bg)}
+.chip-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.chip-legend{display:flex;gap:16px;margin-bottom:12px;font-size:12px;color:var(--tx3)}
+.chip-legend span{display:flex;align-items:center;gap:4px}
+.chip-legend .dot{width:10px;height:10px;border-radius:3px}
+.numpad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:16px}
+.numpad-btn{padding:14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--tx);cursor:pointer;text-align:center;transition:.15s;user-select:none;display:flex;align-items:center;justify-content:center}
+.numpad-btn:active{transform:scale(.95);background:var(--bg4)}
+.numpad-btn.del{color:var(--red);background:var(--red-bg);border-color:rgba(224,82,82,.15)}
+.numpad-btn svg{width:20px;height:20px}
+.pts-display{font-family:'Space Mono',monospace;font-size:36px;font-weight:700;text-align:center;padding:12px;min-height:64px;display:flex;align-items:center;justify-content:center;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);margin-bottom:8px}
+.pts-display.empty{color:var(--tx3);font-size:18px;font-weight:400}
+.settings-link{display:flex;align-items:center;gap:6px;color:var(--tx3);font-size:12px;cursor:pointer;padding:8px 0;margin-top:4px}
+.settings-panel{display:none;padding:12px;background:var(--bg3);border-radius:var(--r-sm);margin-top:8px}
+.settings-panel.show{display:block}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:13px;color:var(--tx2)}
+.settings-row input[type=number]{width:60px;padding:6px 8px;font-size:13px;text-align:center}
+.bock-indicator{background:var(--acc-bg);color:var(--acc2);padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;text-align:center;margin-bottom:12px;border:1px solid rgba(46,196,182,.15)}
+.pair-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--bdr)}
+.pair-bar{height:8px;background:var(--acc);border-radius:4px;min-width:2px}
+.success-msg{background:var(--grn-bg);color:var(--grn);padding:12px;border-radius:var(--r-sm);text-align:center;font-weight:500;margin-bottom:12px;display:none;border:1px solid rgba(46,196,182,.15)}
+.icon-btn{background:none;border:none;color:var(--tx3);cursor:pointer;padding:4px;line-height:1;display:inline-flex;align-items:center}
+.icon-btn:active{color:var(--tx)}.icon-btn:disabled{opacity:.25;cursor:default}.icon-btn svg{width:16px;height:16px}
+.solo-chip{padding:8px 14px;background:var(--bg3);border:2px solid var(--bg4);border-radius:var(--r-sm);color:var(--tx2);font-size:13px;font-weight:500;cursor:pointer;transition:.15s;user-select:none;text-align:center}
+.solo-chip:active{transform:scale(.95)}
+.solo-chip.selected{border-color:var(--warn);color:var(--warn);background:var(--warn-bg)}
+.solo-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.row-menu-wrap{position:relative;display:inline-block}
+.row-menu-btn{background:none;border:none;color:var(--tx3);cursor:pointer;padding:4px 6px;font-size:16px;line-height:1;border-radius:var(--r-sm)}
+.row-menu-btn:active{background:var(--bg3)}
+.row-menu{display:none;position:absolute;right:0;top:100%;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:50;min-width:140px;overflow:hidden}
+.row-menu.show{display:block}
+.row-menu-item{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--tx2);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.row-menu-item:active{background:var(--bg3)}.row-menu-item svg{width:14px;height:14px;flex-shrink:0}.row-menu-item.danger{color:var(--red)}
+.theme-btn{position:fixed;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;background:var(--bg2);border:1px solid var(--bdr);color:var(--tx3);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.theme-btn:active{transform:scale(.9)}.theme-btn svg{width:18px;height:18px}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="nav">
+    <button class="active" onclick="showScreen('setup')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Setup</button>
+    <button onclick="showScreen('eingabe')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>Eingabe</button>
+    <button onclick="showScreen('tabelle')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Tabelle</button>
+    <button onclick="showScreen('stats')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Statistik</button>
+  </div>
+
+  <div class="screen active" id="screen-setup">
+    <h2>Einstellungen</h2>
+    <div class="card">
+      <div class="card-title">Mein Spieler</div>
+      <input type="text" id="myPlayer" placeholder="Dein Name eingeben..." value="">
+      <div style="margin-top:8px;font-size:12px;color:var(--tx3)">Wird gespeichert und ist immer dabei</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Mitspieler hinzufügen</div>
+      <div id="playerTags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+      <div class="input-wrap">
+        <input type="text" id="addPlayerInput" placeholder="Name eingeben..." autocomplete="off">
+        <div class="suggestions" id="suggestions"></div>
+      </div>
+      <button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Solo-Arten erfassen</div>
+      <div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle" id="soloTypesToggle" onclick="this.classList.toggle('on');save()"></button></div>
+      <div style="font-size:12px;color:var(--tx3);margin-top:4px">Bei einem Solo wird nach der Art gefragt</div>
+      <div class="settings-link" onclick="document.getElementById('soloSettings').classList.toggle('show')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Verfügbare Soli bearbeiten</div>
+      <div class="settings-panel" id="soloSettings">
+        <div id="soloTypesList"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="customSoloInput" placeholder="Eigenes Solo..." style="font-size:13px;padding:8px 10px">
+          <button class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="addCustomSolo()">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Bockrunden</div>
+      <div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Bockrunden aktiviert</span><button class="toggle" id="bockEnabledToggle" onclick="this.classList.toggle('on');save()"></button></div>
+      <div class="settings-link" onclick="document.getElementById('settingsPanel').classList.toggle('show')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Erweiterte Einstellungen</div>
+      <div class="settings-panel" id="settingsPanel">
+        <div class="settings-row"><span>Spiele pro Bockrunde</span><input type="number" id="bockCount" value="4" min="1" max="20" onchange="save()"></div>
+        <div style="font-size:11px;color:var(--tx3);padding:4px 0 8px">Standard: Anzahl der Mitspieler</div>
+        <div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle" id="bockSoloToggle" onclick="this.classList.toggle('on');save()"></button></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
+    <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
+  </div>
+
+  <div class="screen" id="screen-eingabe">
+    <div id="bockIndicator"></div>
+    <div id="successMsg" class="success-msg"></div>
+    <div id="eingabeContent"></div>
+  </div>
+
+  <div class="screen" id="screen-tabelle">
+    <h2>Spielverlauf</h2>
+    <div id="standsCard"></div>
+    <div class="card">
+      <div class="table-wrap" id="tableWrap"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-stats">
+    <h2>Statistiken</h2>
+    <div id="statsContent"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal"><div class="modal" id="editModalContent"></div></div>
+<div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
+
+<button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const COLORS=['#5b4cdb','#0a8f6a','#c0392b','#d68910','#2980b9','#7c6fef','#16a085','#e74c3c','#f39c12','#3498db'];
+const DEFAULT_SOLOS=[
+  {name:'Fleischlos',short:'FL',enabled:true},
+  {name:'Damensolo',short:'Da',enabled:true},
+  {name:'Bubensolo',short:'Bu',enabled:true},
+  {name:'Trumpfsolo',short:'Tr',enabled:true},
+  {name:'Stille Hochzeit',short:'SH',enabled:true},
+  {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
+];
+let state={myPlayer:'',players:[],rounds:[],gameStarted:false,knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS))};
+let currentPts='';
+let editingRound=null;
+let chartInstances=[];
+let pendingRound=null;
+
+// SVG icon helpers
+const ICO={
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  backspace:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
+};
+
+function load(){
+  try{const s=localStorage.getItem('doko-v4');if(s){const d=JSON.parse(s);Object.assign(state,d)}}catch(e){}
+  document.getElementById('myPlayer').value=state.myPlayer||'';
+  document.getElementById('bockEnabledToggle').classList.toggle('on',state.bockEnabled!==false);
+  document.getElementById('bockCount').value=state.bockCount||4;
+  document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
+  document.getElementById('soloTypesToggle').classList.toggle('on',!!state.soloTypesEnabled);
+  renderPlayerTags();renderSoloTypes();
+  if(state.gameStarted)showScreen('eingabe');
+}
+function save(){
+  state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
+  state.bockCount=parseInt(document.getElementById('bockCount').value)||4;
+  state.bockSolo=document.getElementById('bockSoloToggle').classList.contains('on');
+  state.soloTypesEnabled=document.getElementById('soloTypesToggle').classList.contains('on');
+  try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+  document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
+  if(id==='eingabe')renderEingabe();
+  if(id==='tabelle')renderTabelle();
+  if(id==='stats')renderStats();
+}
+
+// SOLO TYPES
+function renderSoloTypes(){
+  const c=document.getElementById('soloTypesList');
+  c.innerHTML=state.soloTypes.map((s,i)=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="toggleSoloType('+i+')"> '+s.name+' <span style="color:var(--tx3);font-size:11px">('+s.short+')</span></label><button class="icon-btn" onclick="removeSoloType('+i+')">'+ICO.x+'</button></div>'
+  ).join('');
+}
+function toggleSoloType(i){state.soloTypes[i].enabled=!state.soloTypes[i].enabled;save();renderSoloTypes()}
+function removeSoloType(i){state.soloTypes.splice(i,1);save();renderSoloTypes()}
+function addCustomSolo(){
+  const inp=document.getElementById('customSoloInput');
+  const name=inp.value.trim();if(!name)return;
+  const short=name.substring(0,2).toUpperCase();
+  state.soloTypes.push({name,short,enabled:true});
+  inp.value='';save();renderSoloTypes();
+}
+
+// PLAYERS
+function renderPlayerTags(){
+  document.getElementById('playerTags').innerHTML=state.players.map((p,i)=>
+    '<div class="player-tag">'+p+' <span class="remove" onclick="removePlayer('+i+')">'+ICO.x+'</span></div>'
+  ).join('');
+}
+function addPlayer(){
+  const inp=document.getElementById('addPlayerInput');
+  const name=inp.value.trim();
+  if(!name||state.players.includes(name)||(state.myPlayer&&name===state.myPlayer))return;
+  state.players.push(name);
+  if(!state.knownNames.includes(name))state.knownNames.push(name);
+  inp.value='';renderPlayerTags();
+  checkAutoStart();save();
+  document.getElementById('suggestions').classList.remove('show');
+  setTimeout(()=>{inp.focus()},50);
+}
+function removePlayer(i){state.players.splice(i,1);renderPlayerTags();save()}
+function checkAutoStart(){
+  const myName=document.getElementById('myPlayer').value.trim();
+  if(myName){state.myPlayer=myName;if(!state.knownNames.includes(myName))state.knownNames.push(myName)}
+  if(getAllPlayers().length>=4&&!state.gameStarted){
+    state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
+    state.gameStarted=true;state.rounds=[];state.bockQueue=0;
+  }
+}
+
+const addInp=document.getElementById('addPlayerInput');
+addInp.addEventListener('input',function(){
+  const v=this.value.trim().toLowerCase();
+  const sug=document.getElementById('suggestions');
+  if(!v){sug.classList.remove('show');return}
+  const all=getAllPlayers();
+  const matches=state.knownNames.filter(n=>n.toLowerCase().includes(v)&&!all.includes(n));
+  if(!matches.length){sug.classList.remove('show');return}
+  sug.innerHTML=matches.map(m=>'<div class="sug-item" onclick="pickSuggestion(\''+m.replace(/'/g,"\\'")+'\')">' +m+'</div>').join('');
+  sug.classList.add('show');
+});
+addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
+function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
+function getAllPlayers(){const ps=[...state.players];if(state.myPlayer)ps.unshift(state.myPlayer);return ps}
+
+function saveSettings(){
+  state.myPlayer=document.getElementById('myPlayer').value.trim();
+  if(state.myPlayer&&!state.knownNames.includes(state.myPlayer))state.knownNames.push(state.myPlayer);
+  checkAutoStart();save();
+  alert('Einstellungen gespeichert!');
+}
+function newGame(){
+  if(state.rounds.length>0){
+    if(!confirm('Alle '+state.rounds.length+' Spiele werden gelöscht. Wirklich neues Spiel starten?'))return;
+  }
+  state.myPlayer=document.getElementById('myPlayer').value.trim();
+  if(!state.myPlayer){alert('Bitte gib deinen Namen ein.');return}
+  if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
+  if(!state.knownNames.includes(state.myPlayer))state.knownNames.push(state.myPlayer);
+  state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
+  state.gameStarted=true;state.rounds=[];state.bockQueue=0;save();showScreen('eingabe');
+}
+
+// EINGABE
+function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
+
+function renderEingabe(){
+  document.getElementById('successMsg').style.display='none';
+  if(!state.gameStarted||getAllPlayers().length<4){
+    document.getElementById('eingabeContent').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>Trage mindestens 4 Spieler im Setup ein.</div>';
+    document.getElementById('bockIndicator').innerHTML='';return;
+  }
+  const bi=document.getElementById('bockIndicator');
+  if(isBockRound()){
+    bi.innerHTML='<div class="bock-indicator">&#9889; Bockrunde! Noch '+state.bockQueue+' Spiel'+(state.bockQueue>1?'e':'')+'</div>';
+  }else{bi.innerHTML=''}
+  const all=getAllPlayers();currentPts='';
+  let html='<div class="card"><div class="card-title">Spiel '+(state.rounds.length+1)+'</div>';
+  html+='<div class="section-label">Punkte</div>';
+  html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
+  html+='<div class="numpad">';
+  for(let i=1;i<=9;i++){html+='<div class="numpad-btn" onclick="numpadPress('+i+')">'+i+'</div>'}
+  html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
+  html+='<div class="numpad-btn" onclick="numpadPress(0)">0</div>';
+  html+='<div class="numpad-btn del" onclick="numpadDelete()">'+ICO.backspace+'</div>';
+  html+='</div>';
+  html+='<div class="section-label">Spieler antippen</div>';
+  html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
+  html+='<div class="chip-grid" id="playerChips">';
+  all.forEach(p=>{html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+'</div>'});
+  html+='</div>';
+  if(state.bockEnabled){
+    html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue Bockrunde auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
+  }
+  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' Spiel speichern</button></div></div>';
+  document.getElementById('eingabeContent').innerHTML=html;
+}
+
+function cycleState(el){
+  const cur=el.dataset.state;
+  let next=cur==='neutral'?'lost':cur==='lost'?'won':'neutral';
+  el.dataset.state=next;
+  const icon=el.querySelector('.chip-icon');
+  icon.innerHTML=next==='lost'?ICO.x:next==='won'?ICO.check:'';
+}
+
+function numpadPress(n){if(currentPts.length>=3)return;currentPts+=n;updatePtsDisplay()}
+function numpadDelete(){currentPts=currentPts.slice(0,-1);updatePtsDisplay()}
+function numpadClear(){currentPts='';updatePtsDisplay()}
+function updatePtsDisplay(){
+  const el=document.getElementById('ptsDisplay');if(!el)return;
+  if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
+  else{el.textContent='Punkte eingeben';el.classList.add('empty')}
+}
+
+function saveNewRound(){
+  const pts=parseInt(currentPts);
+  if(!pts||pts<=0){alert('Bitte Punkte eingeben.');return}
+  const chips=document.querySelectorAll('#playerChips .player-chip');
+  const playing=[];const winners=[];const losers=[];
+  chips.forEach(c=>{
+    const p=c.dataset.player;const s=c.dataset.state;
+    if(s==='lost'){playing.push(p);losers.push(p)}
+    else if(s==='won'){playing.push(p);winners.push(p)}
+  });
+  if(playing.length!==4){alert('Es müssen genau 4 Spieler mitspielen (rot oder grün). Aktuell: '+playing.length);return}
+  if(!winners.length){alert('Mindestens einen Gewinner auswählen (grün).');return}
+  if(!losers.length){alert('Mindestens einen Verlierer auswählen (rot).');return}
+  const solo=(winners.length===1)||(winners.length===3);
+  const bock=isBockRound();
+  const bockApplies=bock&&(!solo||state.bockSolo);
+  const multiplier=bockApplies?2:1;
+  const scores={};
+  playing.forEach(p=>{
+    const isWinner=winners.includes(p);
+    if(solo){scores[p]=isWinner?pts*3*multiplier:-pts*multiplier}
+    else{scores[p]=isWinner?pts*multiplier:-pts*multiplier}
+  });
+  const round={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:null};
+
+  if(solo&&state.soloTypesEnabled){
+    pendingRound=round;
+    openSoloModal();return;
+  }
+  finalizeRound(round);
+}
+
+function openSoloModal(){
+  const enabled=state.soloTypes.filter(s=>s.enabled);
+  let html='<h3>Welches Solo?</h3>';
+  html+='<div class="solo-type-grid">';
+  enabled.forEach(s=>{
+    html+='<div class="solo-chip" data-solo="'+s.name+'" onclick="selectSoloType(this)">'+s.name+'</div>';
+  });
+  html+='</div>';
+  html+='<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-secondary" onclick="skipSoloType()" style="flex:1">Überspringen</button><button class="btn btn-primary" onclick="confirmSoloType()" style="flex:1">'+ICO.check+' Bestätigen</button></div>';
+  document.getElementById('soloModalContent').innerHTML=html;
+  document.getElementById('soloModal').classList.add('show');
+}
+function selectSoloType(el){
+  document.querySelectorAll('#soloModalContent .solo-chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function confirmSoloType(){
+  const sel=document.querySelector('#soloModalContent .solo-chip.selected');
+  if(pendingRound){
+    pendingRound.soloType=sel?sel.dataset.solo:null;
+    finalizeRound(pendingRound);
+  }
+  document.getElementById('soloModal').classList.remove('show');pendingRound=null;
+}
+function skipSoloType(){
+  if(pendingRound)finalizeRound(pendingRound);
+  document.getElementById('soloModal').classList.remove('show');pendingRound=null;
+}
+document.getElementById('soloModal').addEventListener('click',function(e){if(e.target===this){skipSoloType()}});
+
+function finalizeRound(round){
+  state.rounds.push(round);
+  const bock=isBockRound();
+  if(bock&&state.bockQueue>0)state.bockQueue--;
+  const triggerBock=document.getElementById('triggerBockToggle');
+  if(triggerBock&&triggerBock.classList.contains('on'))state.bockQueue+=state.bockCount;
+  save();
+  const msg=document.getElementById('successMsg');
+  msg.innerHTML=ICO.check+' Spiel '+(state.rounds.length)+' gespeichert!';
+  msg.style.display='block';
+  setTimeout(()=>{msg.style.display='none'},2000);
+  renderEingabe();
+}
+
+// EDIT MODAL
+function openEditModal(i){
+  editingRound=i;const all=getAllPlayers();const r=state.rounds[i];currentPts=''+r.points;
+  let html='<h3>Spiel '+(i+1)+' bearbeiten</h3>';
+  html+='<div class="section-label">Punkte</div>';
+  html+='<div class="pts-display" id="ptsDisplay">'+r.points+'</div>';
+  html+='<div class="numpad">';
+  for(let n=1;n<=9;n++){html+='<div class="numpad-btn" onclick="numpadPress('+n+')">'+n+'</div>'}
+  html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
+  html+='<div class="numpad-btn" onclick="numpadPress(0)">0</div>';
+  html+='<div class="numpad-btn del" onclick="numpadDelete()">'+ICO.backspace+'</div>';
+  html+='</div>';
+  html+='<div class="section-label">Spieler antippen</div>';
+  html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
+  html+='<div class="chip-grid" id="editChips">';
+  all.forEach(p=>{
+    let st='neutral';if(r.winners.includes(p))st='won';else if(r.playing.includes(p))st='lost';
+    const ic=st==='won'?ICO.check:st==='lost'?ICO.x:'';
+    html+='<div class="player-chip" data-player="'+p+'" data-state="'+st+'" onclick="cycleState(this)"><span class="chip-icon">'+ic+'</span>'+p+'</div>';
+  });
+  html+='</div>';
+  html+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="saveEditRound()" style="flex:1">'+ICO.check+' Speichern</button></div>';
+  document.getElementById('editModalContent').innerHTML=html;
+  document.getElementById('editModal').classList.add('show');
+}
+function closeEditModal(){document.getElementById('editModal').classList.remove('show')}
+function saveEditRound(){
+  const pts=parseInt(currentPts);
+  if(!pts||pts<=0){alert('Bitte Punkte eingeben.');return}
+  const chips=document.querySelectorAll('#editChips .player-chip');
+  const playing=[];const winners=[];const losers=[];
+  chips.forEach(c=>{const p=c.dataset.player;const s=c.dataset.state;if(s==='lost'){playing.push(p);losers.push(p)}else if(s==='won'){playing.push(p);winners.push(p)}});
+  if(playing.length!==4){alert('Es müssen genau 4 Spieler mitspielen. Aktuell: '+playing.length);return}
+  if(!winners.length){alert('Mindestens einen Gewinner auswählen.');return}
+  if(!losers.length){alert('Mindestens einen Verlierer auswählen.');return}
+  const solo=(winners.length===1)||(winners.length===3);
+  const oldBock=state.rounds[editingRound].bock;
+  const bockApplies=oldBock&&(!solo||state.bockSolo);
+  const mult=bockApplies?2:1;
+  const scores={};
+  playing.forEach(p=>{const isW=winners.includes(p);if(solo){scores[p]=isW?pts*3*mult:-pts*mult}else{scores[p]=isW?pts*mult:-pts*mult}});
+  const oldSoloType=state.rounds[editingRound].soloType;
+  state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
+  save();closeEditModal();renderTabelle();
+}
+function deleteRound(i){if(!confirm('Spiel '+(i+1)+' löschen?'))return;state.rounds.splice(i,1);save();renderTabelle()}
+function moveRound(i,dir){const j=i+dir;if(j<0||j>=state.rounds.length)return;const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;save();renderTabelle()}
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal()});
+
+function toggleRowMenu(e,i){
+  e.stopPropagation();
+  const menu=document.getElementById('rowMenu'+i);
+  const wasOpen=menu.classList.contains('show');
+  closeAllMenus();
+  if(!wasOpen)menu.classList.add('show');
+}
+function closeAllMenus(){document.querySelectorAll('.row-menu.show').forEach(m=>m.classList.remove('show'))}
+document.addEventListener('click',closeAllMenus);
+
+// TABELLE
+function renderTabelle(){
+  const all=getAllPlayers();
+  if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
+  const totals={};all.forEach(p=>totals[p]=0);
+  state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
+  const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
+  let shtml='<div class="card" style="margin-bottom:12px">';
+  sorted.forEach((p,i)=>{
+    const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
+    const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
+    const isMy=p===state.myPlayer?'<span class="my-player-badge">&#9733; Ich</span>':'';
+    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+' '+isMy+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
+  });
+  shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
+
+  // Solo type lookup
+  const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
+
+  let html='<table><thead><tr><th>#</th>';
+  all.forEach(p=>html+='<th>'+p.substring(0,5)+'</th>');
+  html+='<th></th></tr></thead><tbody>';
+  state.rounds.forEach((r,i)=>{
+    html+='<tr><td style="color:var(--tx3)">'+(i+1);
+    if(r.solo){
+      const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';
+      html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>';
+    }
+    if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
+    html+='</td>';
+    all.forEach(p=>{const s=r.scores[p]||0;const cls=s>0?'pos':s<0?'neg':'';html+='<td class="'+cls+'">'+(s!==0?((s>0?'+':'')+s):'')+'</td>'});
+    html+='<td style="white-space:nowrap;position:relative">';
+    html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="toggleRowMenu(event,'+i+')">&#8942;</button>';
+    html+='<div class="row-menu" id="rowMenu'+i+'">';
+    if(i>0)html+='<button class="row-menu-item" onclick="moveRound('+i+',-1);closeAllMenus()">'+ICO.up+' Nach oben</button>';
+    if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="moveRound('+i+',1);closeAllMenus()">'+ICO.down+' Nach unten</button>';
+    html+='<button class="row-menu-item" onclick="openEditModal('+i+');closeAllMenus()">'+ICO.edit+' Bearbeiten</button>';
+    html+='<button class="row-menu-item danger" onclick="deleteRound('+i+');closeAllMenus()">'+ICO.trash+' Löschen</button>';
+    html+='</div></div></td></tr>';
+  });
+  let running={};all.forEach(p=>running[p]=0);
+  state.rounds.forEach(r=>{all.forEach(p=>{running[p]+=(r.scores[p]||0)})});
+  html+='<tr style="border-top:2px solid var(--bdr);font-weight:700"><td style="color:var(--tx3)">Ges.</td>';
+  all.forEach(p=>{const t=running[p];const cls=t>0?'pos':t<0?'neg':'';html+='<td class="'+cls+'">'+(t>0?'+':'')+t+'</td>'});
+  html+='<td></td></tr></tbody></table>';
+  document.getElementById('tableWrap').innerHTML=html;
+}
+
+// STATS
+function renderStats(){
+  chartInstances.forEach(c=>c.destroy());chartInstances=[];
+  const all=getAllPlayers();const c=document.getElementById('statsContent');
+  if(!state.rounds.length){c.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele für Statistiken.</div>';return}
+  const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
+  all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
+  state.rounds.forEach(r=>{all.forEach(p=>{
+    if(r.playing.includes(p)){gamesPlayed[p]++;totals[p]+=(r.scores[p]||0);
+      if(r.winners.includes(p)){wins[p]++;if(r.solo)soloWins[p]++}
+      else{losses[p]++;if(r.solo)soloLosses[p]++}
+    }
+  })});
+  const soloKing=all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b);
+  const bestPlayer=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
+
+  let html='<div class="stat-grid">';
+  html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
+  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+'</div><div class="stat-label">Bester Spieler</div></div>';
+  html+='<div class="stat-card"><div class="stat-val">'+state.rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
+  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">&#128081; Solokönig</div></div>';
+  html+='</div>';
+
+  html+='<div class="section-label" style="margin-top:20px">Spieler</div><div class="card">';
+  all.forEach(p=>{
+    const avg=gamesPlayed[p]?Math.round(totals[p]/gamesPlayed[p]*10)/10:0;
+    const winRate=gamesPlayed[p]?Math.round(wins[p]/gamesPlayed[p]*100):0;
+    html+='<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500">'+p+'</span><span class="'+(totals[p]>=0?'pos':'neg')+'" style="font-family:\'Space Mono\',monospace;font-weight:700">'+(totals[p]>0?'+':'')+totals[p]+'</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)"><span>Siege: '+winRate+'%</span><span>Schnitt: '+(avg>0?'+':'')+avg+'</span><span>Soli: '+soloWins[p]+'/'+(soloWins[p]+soloLosses[p])+'</span></div></div>';
+  });
+  html+='</div>';
+
+  html+='<div class="section-label" style="margin-top:20px">Punkteverlauf</div>';
+  html+='<div class="card"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Gewonnene Spiele</div>';
+  html+='<div class="card"><div class="chart-container"><canvas id="winsChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Punkteschnitt je Spiel</div>';
+  html+='<div class="card"><div class="chart-container"><canvas id="avgChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Soli (gewonnen / verloren)</div>';
+  html+='<div class="card"><div class="chart-container"><canvas id="soloChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Wer hat mit wem gespielt?</div>';
+  html+='<div class="card" id="pairCard"></div>';
+  c.innerHTML=html;
+  buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed);
+  buildPairings(all);
+}
+
+function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
+  const cumulative={};all.forEach(p=>cumulative[p]=[]);
+  let running={};all.forEach(p=>running[p]=0);
+  state.rounds.forEach(r=>{all.forEach(p=>{running[p]+=(r.scores[p]||0);cumulative[p].push(running[p])})});
+  const labels=state.rounds.map((_,i)=>''+(i+1));
+  const cOpts={responsive:true,maintainAspectRatio:false};
+  const cc=getChartColors();const gridC=cc.grid;const tickC=cc.tick;const lblC=cc.lbl;
+
+  chartInstances.push(new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:all.map((p,i)=>({label:p,data:cumulative[p],borderColor:COLORS[i%COLORS.length],backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3}))},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12,padding:8}}},scales:{x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}}}}}));
+  chartInstances.push(new Chart(document.getElementById('winsChart'),{type:'bar',data:{labels:all,datasets:[{label:'Gewonnen',data:all.map(p=>wins[p]),backgroundColor:'#0a8f6a'},{label:'Verloren',data:all.map(p=>losses[p]),backgroundColor:'#c0392b'}]},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:lblC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11},stepSize:1}}}}}));
+  const avgs=all.map(p=>gamesPlayed[p]?Math.round(totals[p]/gamesPlayed[p]*10)/10:0);
+  chartInstances.push(new Chart(document.getElementById('avgChart'),{type:'bar',data:{labels:all,datasets:[{label:'Schnitt',data:avgs,backgroundColor:avgs.map(v=>v>=0?'#0a8f6a':'#c0392b')}]},options:{...cOpts,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},y:{grid:{display:false},ticks:{color:lblC,font:{size:12}}}}}}));
+  chartInstances.push(new Chart(document.getElementById('soloChart'),{type:'bar',data:{labels:all,datasets:[{label:'Gewonnen',data:all.map(p=>soloWins[p]),backgroundColor:'#0a8f6a'},{label:'Verloren',data:all.map(p=>soloLosses[p]),backgroundColor:'#c0392b'}]},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:lblC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11},stepSize:1}}}}}));
+}
+
+function buildPairings(all){
+  const pairs={};
+  for(let i=0;i<all.length;i++){for(let j=i+1;j<all.length;j++){pairs[all[i]+'|'+all[j]]=0}}
+  state.rounds.forEach(r=>{for(let i=0;i<r.playing.length;i++){for(let j=i+1;j<r.playing.length;j++){
+    const a=r.playing[i],b=r.playing[j];
+    const key=all.indexOf(a)<all.indexOf(b)?a+'|'+b:b+'|'+a;
+    if(pairs[key]!==undefined)pairs[key]++;
+  }}});
+  const maxP=Math.max(...Object.values(pairs),1);
+  const sorted=Object.entries(pairs).sort((a,b)=>b[1]-a[1]);
+  let html='';
+  sorted.forEach(([key,count])=>{
+    const [a,b]=key.split('|');const pct=Math.round(count/maxP*100);
+    html+='<div class="pair-row"><span>'+a+' & '+b+'</span><div style="display:flex;align-items:center;gap:8px"><div class="pair-bar" style="width:'+Math.max(pct,2)+'px"></div><span style="font-family:\'Space Mono\',monospace;font-size:13px;font-weight:500;min-width:20px;text-align:right">'+count+'</span></div></div>';
+  });
+  document.getElementById('pairCard').innerHTML=html;
+}
+
+// THEME
+function toggleTheme(){
+  const html=document.documentElement;
+  const isLight=html.getAttribute('data-theme')==='light';
+  html.setAttribute('data-theme',isLight?'dark':'light');
+  localStorage.setItem('doko-theme',isLight?'dark':'light');
+  updateThemeIcon();
+}
+function updateThemeIcon(){
+  const isLight=document.documentElement.getAttribute('data-theme')==='light';
+  document.getElementById('themeIcon').innerHTML=isLight?'<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+}
+(function(){
+  const saved=localStorage.getItem('doko-theme');
+  if(saved)document.documentElement.setAttribute('data-theme',saved);
+  else document.documentElement.setAttribute('data-theme','light');
+  updateThemeIcon();
+})();
+
+function getChartColors(){
+  const s=getComputedStyle(document.documentElement);
+  return{grid:s.getPropertyValue('--chart-grid').trim(),tick:s.getPropertyValue('--chart-tick').trim(),lbl:s.getPropertyValue('--chart-lbl').trim()};
+}
+
+load();
+</script>
+</body>
+</html>
