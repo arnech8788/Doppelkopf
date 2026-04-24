@@ -1,0 +1,38 @@
+name: Deploy DEV to /dev folder
+
+on:
+  push:
+    branches: ["dev"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
+
+      - name: Deploy to dev folder
+        run: |
+          mkdir public
+          cp -r * public/
+          mkdir -p public/dev
+          cp -r * public/dev/ || true
+
+      - name: Push to main
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git fetch origin main
+          git checkout main
+
+          mkdir -p dev
+          cp -r public/dev/* dev/
+
+          git add dev/
+          git commit -m "Update dev version" || echo "No changes"
+          git push
