@@ -56,9 +56,9 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .toggle.on{background:var(--acc)}
 .toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .toggle.on::after{left:23px}
-.table-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
+.table-wrap{overflow:auto;margin:0 -16px;padding:0 16px;max-height:60vh}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+th{text-align:left;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;top:0;background:var(--bg2);z-index:2}
 td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
 .pos{color:var(--grn);font-weight:500}.neg{color:var(--red);font-weight:500}
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -200,6 +200,8 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
   </div>
 </div>
 
+<div id="setupSuccessMsg" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:6px 12px;background:var(--grn-bg);color:var(--grn);border-radius:var(--r-sm);font-size:12px;font-weight:500;border:1px solid rgba(46,196,182,.15);z-index:200;align-items:center;gap:8px;backdrop-filter:blur(8px);white-space:nowrap"><span id="setupSuccessText"></span><button onclick="document.getElementById('setupSuccessMsg').style.display='none'" style="background:none;border:none;color:var(--grn);cursor:pointer;padding:0;line-height:1;font-size:14px">&times;</button></div>
+
 <div class="modal-overlay" id="editModal"><div class="modal" id="editModalContent"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 
@@ -322,7 +324,10 @@ function saveSettings(){
   state.myPlayer=document.getElementById('myPlayer').value.trim();
   if(state.myPlayer&&!state.knownNames.includes(state.myPlayer))state.knownNames.push(state.myPlayer);
   checkAutoStart();save();
-  alert('Einstellungen gespeichert!');
+  const msg=document.getElementById('setupSuccessMsg');
+  document.getElementById('setupSuccessText').innerHTML=ICO.check+' Einstellungen gespeichert';
+  msg.style.display='flex';
+  setTimeout(()=>{msg.style.display='none'},2000);
 }
 function newGame(){
   if(state.rounds.length>0){
@@ -406,11 +411,24 @@ function saveNewRound(){
   const bockApplies=bock&&(!solo||state.bockSolo);
   const multiplier=bockApplies?2:1;
   const scores={};
-  playing.forEach(p=>{
-    const isWinner=winners.includes(p);
-    if(solo){scores[p]=isWinner?pts*3*multiplier:-pts*multiplier}
-    else{scores[p]=isWinner?pts*multiplier:-pts*multiplier}
-  });
+  if(solo){
+    // Solist = der Einzelne (1 Gewinner oder 1 Verlierer)
+    const solist=winners.length===1?winners[0]:losers[0];
+    const solistWon=winners.includes(solist);
+    playing.forEach(p=>{
+      if(p===solist){
+        // Solist bekommt IMMER dreifache Punkte
+        scores[p]=solistWon? pts*3*multiplier : -pts*3*multiplier;
+      }else{
+        // Andere drei bekommen einfache Punkte (umgekehrtes Vorzeichen)
+        scores[p]=solistWon? -pts*multiplier : pts*multiplier;
+      }
+    });
+  }else{
+    playing.forEach(p=>{
+      scores[p]=winners.includes(p)?pts*multiplier:-pts*multiplier;
+    });
+  }
   const round={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:null};
 
   if(solo&&state.soloTypesEnabled){
@@ -469,12 +487,12 @@ function openEditModal(i){
   editingRound=i;const all=getAllPlayers();const r=state.rounds[i];currentPts=''+r.points;
   let html='<h3>Spiel '+(i+1)+' bearbeiten</h3>';
   html+='<div class="section-label">Punkte</div>';
-  html+='<div class="pts-display" id="ptsDisplay">'+r.points+'</div>';
+  html+='<div class="pts-display" id="editPtsDisplay">'+r.points+'</div>';
   html+='<div class="numpad">';
-  for(let n=1;n<=9;n++){html+='<div class="numpad-btn" onclick="numpadPress('+n+')">'+n+'</div>'}
-  html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
-  html+='<div class="numpad-btn" onclick="numpadPress(0)">0</div>';
-  html+='<div class="numpad-btn del" onclick="numpadDelete()">'+ICO.backspace+'</div>';
+  for(let n=1;n<=9;n++){html+='<div class="numpad-btn" onclick="editNumpadPress('+n+')">'+n+'</div>'}
+  html+='<div class="numpad-btn del" onclick="editNumpadClear()">'+ICO.trash+'</div>';
+  html+='<div class="numpad-btn" onclick="editNumpadPress(0)">0</div>';
+  html+='<div class="numpad-btn del" onclick="editNumpadDelete()">'+ICO.backspace+'</div>';
   html+='</div>';
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
@@ -490,6 +508,14 @@ function openEditModal(i){
   document.getElementById('editModal').classList.add('show');
 }
 function closeEditModal(){document.getElementById('editModal').classList.remove('show')}
+function editNumpadPress(n){if(currentPts.length>=3)return;currentPts+=n;updateEditPtsDisplay()}
+function editNumpadDelete(){currentPts=currentPts.slice(0,-1);updateEditPtsDisplay()}
+function editNumpadClear(){currentPts='';updateEditPtsDisplay()}
+function updateEditPtsDisplay(){
+  const el=document.getElementById('editPtsDisplay');if(!el)return;
+  if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
+  else{el.textContent='Punkte eingeben';el.classList.add('empty')}
+}
 function saveEditRound(){
   const pts=parseInt(currentPts);
   if(!pts||pts<=0){alert('Bitte Punkte eingeben.');return}
@@ -504,7 +530,16 @@ function saveEditRound(){
   const bockApplies=oldBock&&(!solo||state.bockSolo);
   const mult=bockApplies?2:1;
   const scores={};
-  playing.forEach(p=>{const isW=winners.includes(p);if(solo){scores[p]=isW?pts*3*mult:-pts*mult}else{scores[p]=isW?pts*mult:-pts*mult}});
+  if(solo){
+    const solist=winners.length===1?winners[0]:losers[0];
+    const solistWon=winners.includes(solist);
+    playing.forEach(p=>{
+      if(p===solist){scores[p]=solistWon?pts*3*mult:-pts*3*mult}
+      else{scores[p]=solistWon?-pts*mult:pts*mult}
+    });
+  }else{
+    playing.forEach(p=>{scores[p]=winners.includes(p)?pts*mult:-pts*mult});
+  }
   const oldSoloType=state.rounds[editingRound].soloType;
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
   save();closeEditModal();renderTabelle();
@@ -557,10 +592,10 @@ function renderTabelle(){
     html+='<td style="white-space:nowrap;position:relative">';
     html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="toggleRowMenu(event,'+i+')">&#8942;</button>';
     html+='<div class="row-menu" id="rowMenu'+i+'">';
-    if(i>0)html+='<button class="row-menu-item" onclick="moveRound('+i+',-1);closeAllMenus()">'+ICO.up+' Nach oben</button>';
-    if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="moveRound('+i+',1);closeAllMenus()">'+ICO.down+' Nach unten</button>';
-    html+='<button class="row-menu-item" onclick="openEditModal('+i+');closeAllMenus()">'+ICO.edit+' Bearbeiten</button>';
-    html+='<button class="row-menu-item danger" onclick="deleteRound('+i+');closeAllMenus()">'+ICO.trash+' Löschen</button>';
+    if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
+    if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',1)">'+ICO.down+' Nach unten</button>';
+    html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
+    html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
     html+='</div></div></td></tr>';
   });
   let running={};all.forEach(p=>running[p]=0);
