@@ -178,6 +178,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v1.2 · 24.04.2026 22:40</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -202,7 +203,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
 
 <div id="setupSuccessMsg" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:6px 12px;background:var(--grn-bg);color:var(--grn);border-radius:var(--r-sm);font-size:12px;font-weight:500;border:1px solid rgba(46,196,182,.15);z-index:200;align-items:center;gap:8px;backdrop-filter:blur(8px);white-space:nowrap"><span id="setupSuccessText"></span><button onclick="document.getElementById('setupSuccessMsg').style.display='none'" style="background:none;border:none;color:var(--grn);cursor:pointer;padding:0;line-height:1;font-size:14px">&times;</button></div>
 
-<div class="modal-overlay" id="editModal"><div class="modal" id="editModalContent"></div></div>
+<div class="modal-overlay" id="editModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="editModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 
 <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
@@ -394,8 +395,8 @@ function updatePtsDisplay(){
 }
 
 function saveNewRound(){
-  const pts=parseInt(currentPts);
-  if(!pts||pts<=0){alert('Bitte Punkte eingeben.');return}
+  const pts=parseInt(currentPts||'0');
+  if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
   const chips=document.querySelectorAll('#playerChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{
@@ -517,8 +518,8 @@ function updateEditPtsDisplay(){
   else{el.textContent='Punkte eingeben';el.classList.add('empty')}
 }
 function saveEditRound(){
-  const pts=parseInt(currentPts);
-  if(!pts||pts<=0){alert('Bitte Punkte eingeben.');return}
+  const pts=parseInt(currentPts||'0');
+  if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
   const chips=document.querySelectorAll('#editChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{const p=c.dataset.player;const s=c.dataset.state;if(s==='lost'){playing.push(p);losers.push(p)}else if(s==='won'){playing.push(p);winners.push(p)}});
