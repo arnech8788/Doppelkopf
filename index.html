@@ -8,7 +8,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=Space+Mono:wght@400;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
---bg:#111318;--bg2:#1a1d25;--bg3:#22262f;--bg4:#2d323e;
+--bg:#0f1310;--bg2:#181d19;--bg3:#1f2621;--bg4:#2a332c;
 --tx:#e8ecf4;--tx2:#9ba3b8;--tx3:#636b82;
 --acc:#1a9e8f;--acc2:#2ec4b6;--acc-bg:rgba(46,196,182,.1);
 --grn:#2ec4b6;--grn-bg:rgba(46,196,182,.12);--grn-bdr:#2ec4b6;
@@ -19,7 +19,7 @@
 --pattern-opacity:0.025;
 }
 [data-theme="light"]{
---bg:#f0ede8;--bg2:#faf9f7;--bg3:#e8e5df;--bg4:#dbd7d0;
+--bg:#eceee8;--bg2:#f8f9f5;--bg3:#e3e6dd;--bg4:#d6d9cf;
 --tx:#1a1c24;--tx2:#5a5e72;--tx3:#8b8fa6;
 --acc:#0e8577;--acc2:#1a9e8f;--acc-bg:rgba(14,133,119,.08);
 --grn:#0e8577;--grn-bg:rgba(14,133,119,.1);--grn-bdr:#0e8577;
@@ -30,7 +30,7 @@
 --pattern-opacity:0.04;
 }
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);-webkit-tap-highlight-color:transparent;overflow-x:hidden;min-height:100vh}
-body::before{content:'♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣ ♠ ♥ ♦ ♣';position:fixed;inset:0;font-size:28px;letter-spacing:24px;line-height:52px;word-spacing:16px;color:var(--tx);opacity:var(--pattern-opacity);pointer-events:none;z-index:0;transform:rotate(-15deg) scale(1.5);transform-origin:center}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:var(--pattern-opacity);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Ctext x='10' y='30' font-size='24' fill='%23888' font-family='serif'%3E♠%3C/text%3E%3Ctext x='60' y='70' font-size='20' fill='%23888' font-family='serif'%3E♥%3C/text%3E%3Ctext x='120' y='40' font-size='28' fill='%23888' font-family='serif'%3E♦%3C/text%3E%3Ctext x='160' y='90' font-size='22' fill='%23888' font-family='serif'%3E♣%3C/text%3E%3Ctext x='30' y='120' font-size='18' fill='%23888' font-family='serif'%3E♦%3C/text%3E%3Ctext x='90' y='150' font-size='26' fill='%23888' font-family='serif'%3E♠%3C/text%3E%3Ctext x='150' y='170' font-size='20' fill='%23888' font-family='serif'%3E♥%3C/text%3E%3Ctext x='40' y='180' font-size='16' fill='%23888' font-family='serif'%3E♣%3C/text%3E%3Crect x='95' y='85' width='30' height='42' rx='3' fill='none' stroke='%23888' stroke-width='.7'/%3E%3Ctext x='100' y='105' font-size='14' fill='%23888' font-family='serif'%3ED%3C/text%3E%3Ctext x='115' y='100' font-size='10' fill='%23888' font-family='serif'%3E♣%3C/text%3E%3C/svg%3E");background-size:200px 200px}
 .app{max-width:420px;margin:0 auto;padding:12px 8px 70px;min-height:100vh;position:relative;z-index:1}
 .nav{display:flex;gap:2px;background:var(--bg2);border-radius:var(--r);padding:3px;margin-bottom:16px;position:sticky;top:0;z-index:10;border:1px solid var(--bdr)}
 .nav button{flex:1;padding:10px 4px;border:none;background:transparent;color:var(--tx3);font-family:inherit;font-size:11px;font-weight:500;border-radius:var(--r-sm);cursor:pointer;transition:.2s}
@@ -56,7 +56,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .toggle.on{background:var(--acc)}
 .toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .toggle.on::after{left:23px}
-.table-wrap{overflow:auto;margin:0 -16px;padding:0 16px;max-height:60vh}
+.table-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;top:0;background:var(--bg2);z-index:2}
 td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
@@ -120,12 +120,32 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
 .row-menu-wrap{position:relative;display:inline-block}
 .row-menu-btn{background:none;border:none;color:var(--tx3);cursor:pointer;padding:4px 6px;font-size:16px;line-height:1;border-radius:var(--r-sm)}
 .row-menu-btn:active{background:var(--bg3)}
-.row-menu{display:none;position:absolute;right:0;top:100%;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:50;min-width:140px;overflow:hidden}
+.row-menu{display:none;position:fixed;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:50;min-width:140px;overflow:hidden}
 .row-menu.show{display:block}
 .row-menu-item{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13px;color:var(--tx2);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit}
 .row-menu-item:active{background:var(--bg3)}.row-menu-item svg{width:14px;height:14px;flex-shrink:0}.row-menu-item.danger{color:var(--red)}
 .theme-btn{position:fixed;bottom:16px;right:16px;width:40px;height:40px;border-radius:50%;background:var(--bg2);border:1px solid var(--bdr);color:var(--tx3);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.2)}
 .theme-btn:active{transform:scale(.9)}.theme-btn svg{width:18px;height:18px}
+.info-btn{position:fixed;bottom:16px;left:16px;width:40px;height:40px;border-radius:50%;background:var(--bg2);border:1px solid var(--bdr);color:var(--tx3);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.2);font-family:'Space Mono',monospace;font-size:16px;font-weight:700}
+.info-btn:active{transform:scale(.9)}
+.expand-row{display:none;background:var(--bg3)}
+.expand-row.show{display:table-row}
+.expand-row td{padding:6px;font-size:11px;color:var(--tx3)}
+.expand-detail{display:flex;flex-wrap:wrap;gap:8px}
+.expand-score{font-size:11px}
+tr.clickable{cursor:pointer}
+tr.clickable:active{background:var(--bg3)}
+.player-manage{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)}
+.player-manage .pm-name{flex:1;font-size:14px}
+.player-manage .pm-actions{display:flex;gap:2px}
+.changelog-entry{padding:8px 0;border-bottom:1px solid var(--bdr);font-size:13px}
+.changelog-entry .cl-ver{font-family:'Space Mono',monospace;font-size:11px;color:var(--acc2)}
+.changelog-entry .cl-date{font-size:11px;color:var(--tx3);margin-left:8px}
+.changelog-entry .cl-text{margin-top:4px;color:var(--tx2);font-size:12px;line-height:1.4}
+.dealer-badge{font-size:10px;color:var(--acc2);margin-left:2px}
+.share-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);color:var(--tx2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:.15s}
+.share-btn:active{transform:scale(.97);background:var(--bg4)}
+.share-btn svg{width:14px;height:14px}
 </style>
 </head>
 <body>
@@ -140,15 +160,11 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
   <div class="screen active" id="screen-setup">
     <h2>Einstellungen</h2>
     <div class="card">
-      <div class="card-title">Mein Spieler</div>
-      <input type="text" id="myPlayer" placeholder="Dein Name eingeben..." value="">
-      <div style="margin-top:8px;font-size:12px;color:var(--tx3)">Wird gespeichert und ist immer dabei</div>
-    </div>
-    <div class="card">
-      <div class="card-title">Mitspieler hinzufügen</div>
-      <div id="playerTags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
-      <div class="input-wrap">
-        <input type="text" id="addPlayerInput" placeholder="Name eingeben..." autocomplete="off">
+      <div class="card-title">Spieler</div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Der erste Spieler gibt zuerst die Karten. Nach jedem Spiel rotiert der Geber automatisch in der Reihenfolge der Liste.</div>
+      <div id="playerManageList"></div>
+      <div class="input-wrap" style="margin-top:8px">
+        <input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off">
         <div class="suggestions" id="suggestions"></div>
       </div>
       <button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>
@@ -178,7 +194,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v1.4 · 25.04.2026 09:25</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.4 · 30.04.2026 11:55</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -188,7 +204,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
   </div>
 
   <div class="screen" id="screen-tabelle">
-    <h2>Spielverlauf</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="margin-bottom:0">Spielverlauf</h2><button class="share-btn" onclick="shareTabelle()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Teilen</button></div>
     <div id="standsCard"></div>
     <div class="card">
       <div class="table-wrap" id="tableWrap"></div>
@@ -196,7 +212,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
   </div>
 
   <div class="screen" id="screen-stats">
-    <h2>Statistiken</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h2 style="margin-bottom:0">Statistiken</h2><button class="share-btn" onclick="shareStats()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Teilen</button></div>
     <div id="statsContent"></div>
   </div>
 </div>
@@ -204,10 +220,14 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
 <div id="setupSuccessMsg" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:6px 12px;background:var(--grn-bg);color:var(--grn);border-radius:var(--r-sm);font-size:12px;font-weight:500;border:1px solid rgba(46,196,182,.15);z-index:200;align-items:center;gap:8px;backdrop-filter:blur(8px);white-space:nowrap"><span id="setupSuccessText"></span><button onclick="document.getElementById('setupSuccessMsg').style.display='none'" style="background:none;border:none;color:var(--grn);cursor:pointer;padding:0;line-height:1;font-size:14px">&times;</button></div>
 
 <div class="modal-overlay" id="editModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="editModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
+<div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
+<div class="modal-overlay" id="infoModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="infoModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 
+<button class="info-btn" onclick="openInfoModal()">i</button>
 <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 const COLORS=['#5b4cdb','#0a8f6a','#c0392b','#d68910','#2980b9','#7c6fef','#16a085','#e74c3c','#f39c12','#3498db'];
 const DEFAULT_SOLOS=[
@@ -237,7 +257,6 @@ const ICO={
 
 function load(){
   try{const s=localStorage.getItem('doko-v4');if(s){const d=JSON.parse(s);Object.assign(state,d)}}catch(e){}
-  document.getElementById('myPlayer').value=state.myPlayer||'';
   document.getElementById('bockEnabledToggle').classList.toggle('on',state.bockEnabled!==false);
   document.getElementById('bockCount').value=state.bockCount||4;
   document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
@@ -254,11 +273,14 @@ function save(){
 }
 
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    s.style.transform='';s.style.opacity='';s.style.transition='';
+  });
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
   if(id==='eingabe')renderEingabe();
-  if(id==='tabelle')renderTabelle();
+  if(id==='tabelle')renderTabelle(true);
   if(id==='stats')renderStats();
 }
 
@@ -281,14 +303,55 @@ function addCustomSolo(){
 
 // PLAYERS
 function renderPlayerTags(){
-  document.getElementById('playerTags').innerHTML=state.players.map((p,i)=>
-    '<div class="player-tag">'+p+' <span class="remove" onclick="removePlayer('+i+')">'+ICO.x+'</span></div>'
+  const c=document.getElementById('playerManageList');
+  if(!state.players.length){c.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Noch keine Mitspieler</div>';return}
+  c.innerHTML=state.players.map((p,i)=>
+    '<div class="player-manage"><span class="pm-name">'+p+'</span><div class="pm-actions">'
+    +'<button class="icon-btn" onclick="movePlayer('+i+',-1)"'+(i===0?' disabled':'')+'>'+ICO.up+'</button>'
+    +'<button class="icon-btn" onclick="movePlayer('+i+',1)"'+(i===state.players.length-1?' disabled':'')+'>'+ICO.down+'</button>'
+    +'<button class="icon-btn" onclick="editPlayerName('+i+')">'+ICO.edit+'</button>'
+    +'<button class="icon-btn" onclick="removePlayer('+i+')">'+ICO.trash+'</button>'
+    +'</div></div>'
   ).join('');
 }
+function movePlayer(i,dir){
+  const j=i+dir;if(j<0||j>=state.players.length)return;
+  const tmp=state.players[i];state.players[i]=state.players[j];state.players[j]=tmp;
+  save();renderPlayerTags();
+}
+let editingPlayerIdx=null;
+function editPlayerName(i){
+  editingPlayerIdx=i;
+  const oldName=state.players[i];
+  let html='<h3>Spieler umbenennen</h3>';
+  html+='<div class="section-label">Neuer Name</div>';
+  html+='<input type="text" id="editPlayerInput" value="'+oldName+'" style="margin-bottom:16px">';
+  html+='<div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="closeRenameModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="savePlayerName()" style="flex:1">'+ICO.check+' Speichern</button></div>';
+  document.getElementById('renameModalContent').innerHTML=html;
+  document.getElementById('renameModal').classList.add('show');
+  setTimeout(()=>{const inp=document.getElementById('editPlayerInput');inp.focus();inp.select()},50);
+}
+function closeRenameModal(){document.getElementById('renameModal').classList.remove('show')}
+function savePlayerName(){
+  const inp=document.getElementById('editPlayerInput');
+  const trimmed=inp.value.trim();
+  const oldName=state.players[editingPlayerIdx];
+  if(!trimmed||trimmed===oldName){closeRenameModal();return}
+  if(state.players.includes(trimmed)){alert('Dieser Name existiert bereits.');return}
+  state.rounds.forEach(r=>{
+    const idx=r.playing.indexOf(oldName);if(idx>=0)r.playing[idx]=trimmed;
+    const wIdx=r.winners.indexOf(oldName);if(wIdx>=0)r.winners[wIdx]=trimmed;
+    if(r.scores[oldName]!==undefined){r.scores[trimmed]=r.scores[oldName];delete r.scores[oldName]}
+  });
+  state.players[editingPlayerIdx]=trimmed;
+  if(!state.knownNames.includes(trimmed))state.knownNames.push(trimmed);
+  save();renderPlayerTags();closeRenameModal();
+}
+document.getElementById('renameModal').addEventListener('click',function(e){if(e.target===this)closeRenameModal()});
 function addPlayer(){
   const inp=document.getElementById('addPlayerInput');
   const name=inp.value.trim();
-  if(!name||state.players.includes(name)||(state.myPlayer&&name===state.myPlayer))return;
+  if(!name||state.players.includes(name))return;
   state.players.push(name);
   if(!state.knownNames.includes(name))state.knownNames.push(name);
   inp.value='';renderPlayerTags();
@@ -298,8 +361,6 @@ function addPlayer(){
 }
 function removePlayer(i){state.players.splice(i,1);renderPlayerTags();save()}
 function checkAutoStart(){
-  const myName=document.getElementById('myPlayer').value.trim();
-  if(myName){state.myPlayer=myName;if(!state.knownNames.includes(myName))state.knownNames.push(myName)}
   if(getAllPlayers().length>=4&&!state.gameStarted){
     state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
     state.gameStarted=true;state.rounds=[];state.bockQueue=0;
@@ -319,11 +380,9 @@ addInp.addEventListener('input',function(){
 });
 addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
 function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
-function getAllPlayers(){const ps=[...state.players];if(state.myPlayer)ps.unshift(state.myPlayer);return ps}
+function getAllPlayers(){return [...state.players]}
 
 function saveSettings(){
-  state.myPlayer=document.getElementById('myPlayer').value.trim();
-  if(state.myPlayer&&!state.knownNames.includes(state.myPlayer))state.knownNames.push(state.myPlayer);
   checkAutoStart();save();
   const msg=document.getElementById('setupSuccessMsg');
   document.getElementById('setupSuccessText').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -334,10 +393,7 @@ function newGame(){
   if(state.rounds.length>0){
     if(!confirm('Alle '+state.rounds.length+' Spiele werden gelöscht. Wirklich neues Spiel starten?'))return;
   }
-  state.myPlayer=document.getElementById('myPlayer').value.trim();
-  if(!state.myPlayer){alert('Bitte gib deinen Namen ein.');return}
   if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
-  if(!state.knownNames.includes(state.myPlayer))state.knownNames.push(state.myPlayer);
   state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
   state.gameStarted=true;state.rounds=[];state.bockQueue=0;save();showScreen('eingabe');
 }
@@ -356,7 +412,9 @@ function renderEingabe(){
     bi.innerHTML='<div class="bock-indicator">&#9889; Bockrunde! Noch '+state.bockQueue+' Spiel'+(state.bockQueue>1?'e':'')+'</div>';
   }else{bi.innerHTML=''}
   const all=getAllPlayers();currentPts='';
-  let html='<div class="card"><div class="card-title">Spiel '+(state.rounds.length+1)+'</div>';
+  const dealerIdx=state.rounds.length%all.length;
+  const dealer=all[dealerIdx];
+  let html='<div class="card"><div class="card-title">Spiel '+(state.rounds.length+1)+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
   html+='<div class="numpad">';
@@ -476,11 +534,8 @@ function finalizeRound(round){
   const triggerBock=document.getElementById('triggerBockToggle');
   if(triggerBock&&triggerBock.classList.contains('on'))state.bockQueue+=state.bockCount;
   save();
-  const msg=document.getElementById('successMsg');
-  msg.innerHTML=ICO.check+' Spiel '+(state.rounds.length)+' gespeichert!';
-  msg.style.display='block';
-  setTimeout(()=>{msg.style.display='none'},2000);
-  renderEingabe();
+  showScreen('tabelle');
+  renderTabelle(true);
 }
 
 // EDIT MODAL
@@ -543,10 +598,10 @@ function saveEditRound(){
   }
   const oldSoloType=state.rounds[editingRound].soloType;
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
-  save();closeEditModal();renderTabelle();
+  save();closeEditModal();renderTabelle(false);
 }
-function deleteRound(i){if(!confirm('Spiel '+(i+1)+' löschen?'))return;state.rounds.splice(i,1);save();renderTabelle()}
-function moveRound(i,dir){const j=i+dir;if(j<0||j>=state.rounds.length)return;const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;save();renderTabelle()}
+function deleteRound(i){if(!confirm('Spiel '+(i+1)+' löschen?'))return;state.rounds.splice(i,1);save();renderTabelle(false)}
+function moveRound(i,dir){const j=i+dir;if(j<0||j>=state.rounds.length)return;const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;save();renderTabelle(false)}
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal()});
 
 function toggleRowMenu(e,i){
@@ -554,13 +609,19 @@ function toggleRowMenu(e,i){
   const menu=document.getElementById('rowMenu'+i);
   const wasOpen=menu.classList.contains('show');
   closeAllMenus();
-  if(!wasOpen)menu.classList.add('show');
+  if(!wasOpen){
+    const btn=e.currentTarget;
+    const rect=btn.getBoundingClientRect();
+    menu.style.top=rect.bottom+'px';
+    menu.style.right=(window.innerWidth-rect.right)+'px';
+    menu.classList.add('show');
+  }
 }
 function closeAllMenus(){document.querySelectorAll('.row-menu.show').forEach(m=>m.classList.remove('show'))}
 document.addEventListener('click',closeAllMenus);
 
 // TABELLE
-function renderTabelle(){
+function renderTabelle(scrollToBottom){
   const all=getAllPlayers();
   if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
   const totals={};all.forEach(p=>totals[p]=0);
@@ -570,41 +631,73 @@ function renderTabelle(){
   sorted.forEach((p,i)=>{
     const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
-    const isMy=p===state.myPlayer?'<span class="my-player-badge">&#9733; Ich</span>':'';
-    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+' '+isMy+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
+    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
 
-  // Solo type lookup
   const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
 
-  let html='<table><thead><tr><th>#</th>';
+  // Build cumulative scores
+  const cumul={};all.forEach(p=>cumul[p]=[]);
+  let run={};all.forEach(p=>run[p]=0);
+  state.rounds.forEach(r=>{
+    all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])});
+  });
+
+  let html='<table><thead><tr><th>#</th><th>Pkt</th>';
   all.forEach(p=>html+='<th>'+p.substring(0,5)+'</th>');
   html+='<th></th></tr></thead><tbody>';
   state.rounds.forEach((r,i)=>{
-    html+='<tr><td style="color:var(--tx3)">'+(i+1);
+    // Main row with cumulative scores
+    html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
+    html+='<td style="color:var(--tx3)">'+(i+1);
     if(r.solo){
       const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';
       html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>';
     }
     if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
     html+='</td>';
-    all.forEach(p=>{const s=r.scores[p];const played=r.playing.includes(p);const cls=s>0?'pos':s<0?'neg':'';html+='<td class="'+cls+'">'+(played?(s>0?'+'+s:s):'')+'</td>'});
+    html+='<td style="color:var(--tx3)">'+r.points+'</td>';
+    all.forEach(p=>{
+      const c=cumul[p][i];const cls=c>0?'pos':c<0?'neg':'';
+      html+='<td class="'+cls+'">'+(c>0?'+':'')+c+'</td>';
+    });
     html+='<td style="white-space:nowrap;position:relative">';
-    html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="toggleRowMenu(event,'+i+')">&#8942;</button>';
+    html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
     html+='<div class="row-menu" id="rowMenu'+i+'">';
     if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
     if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',1)">'+ICO.down+' Nach unten</button>';
     html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
     html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
     html+='</div></div></td></tr>';
+
+    // Expandable detail row
+    const dealerForRound=all[i%all.length];
+    html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'">';
+    html+='<div class="expand-detail">';
+    html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
+    all.forEach(p=>{
+      const s=r.scores[p];const played=r.playing.includes(p);
+      if(played){
+        const cls=s>0?'pos':s<0?'neg':'';
+        html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>';
+      }
+    });
+    html+='</div></td></tr>';
   });
-  let running={};all.forEach(p=>running[p]=0);
-  state.rounds.forEach(r=>{all.forEach(p=>{running[p]+=(r.scores[p]||0)})});
-  html+='<tr style="border-top:2px solid var(--bdr);font-weight:700"><td style="color:var(--tx3)">Ges.</td>';
-  all.forEach(p=>{const t=running[p];const cls=t>0?'pos':t<0?'neg':'';html+='<td class="'+cls+'">'+(t>0?'+':'')+t+'</td>'});
-  html+='<td></td></tr></tbody></table>';
+  html+='</tbody></table>';
   document.getElementById('tableWrap').innerHTML=html;
+
+  if(scrollToBottom){
+    setTimeout(()=>{
+      const tw=document.getElementById('tableWrap');
+      tw.scrollTop=tw.scrollHeight;
+    },50);
+  }
+}
+function toggleExpand(i){
+  const row=document.getElementById('expandRow'+i);
+  if(row)row.classList.toggle('show');
 }
 
 // STATS
@@ -614,16 +707,27 @@ function renderStats(){
   if(!state.rounds.length){c.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele für Statistiken.</div>';return}
   const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
   all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
-  state.rounds.forEach(r=>{all.forEach(p=>{
-    if(r.playing.includes(p)){gamesPlayed[p]++;totals[p]+=(r.scores[p]||0);
-      if(r.winners.includes(p)){wins[p]++;if(r.solo)soloWins[p]++}
-      else{losses[p]++;if(r.solo)soloLosses[p]++}
+  state.rounds.forEach(r=>{
+    // Determine solist for solo rounds
+    let solist=null;
+    if(r.solo){
+      if(r.winners.length===1)solist=r.winners[0];
+      else if(r.winners.length===3){
+        solist=r.playing.find(p=>!r.winners.includes(p));
+      }
     }
-  })});
+    all.forEach(p=>{
+      if(r.playing.includes(p)){gamesPlayed[p]++;totals[p]+=(r.scores[p]||0);
+        if(r.winners.includes(p)){wins[p]++;if(r.solo&&p===solist)soloWins[p]++}
+        else{losses[p]++;if(r.solo&&p===solist)soloLosses[p]++}
+      }
+    });
+  });
   const soloKing=all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b);
   const bestPlayer=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
 
-  let html='<div class="stat-grid">';
+  let html='<div id="shareableStats">';
+  html+='<div class="stat-grid">';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+'</div><div class="stat-label">Bester Spieler</div></div>';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
@@ -637,6 +741,7 @@ function renderStats(){
     html+='<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500">'+p+'</span><span class="'+(totals[p]>=0?'pos':'neg')+'" style="font-family:\'Space Mono\',monospace;font-weight:700">'+(totals[p]>0?'+':'')+totals[p]+'</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)"><span>Siege: '+winRate+'%</span><span>Schnitt: '+(avg>0?'+':'')+avg+'</span><span>Soli: '+soloWins[p]+'/'+(soloWins[p]+soloLosses[p])+'</span></div></div>';
   });
   html+='</div>';
+  html+='</div>'; // close shareableStats
 
   html+='<div class="section-label" style="margin-top:20px">Punkteverlauf</div>';
   html+='<div class="card"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>';
@@ -685,6 +790,124 @@ function buildPairings(all){
   });
   document.getElementById('pairCard').innerHTML=html;
 }
+
+// SHARE
+async function captureAndShare(element,filename){
+  try{
+    const canvas=await html2canvas(element,{backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),scale:2,useCORS:true});
+    canvas.toBlob(async function(blob){
+      const file=new File([blob],filename,{type:'image/png'});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:'Doppelkopf Ergebnis'});
+      }else{
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;a.download=filename;a.click();
+        URL.revokeObjectURL(url);
+      }
+    },'image/png');
+  }catch(e){console.error('Share failed:',e)}
+}
+function shareStats(){
+  const el=document.getElementById('shareableStats');
+  if(el)captureAndShare(el,'doppelkopf-statistik.png');
+}
+function shareTabelle(){
+  const el=document.getElementById('standsCard');
+  if(el)captureAndShare(el,'doppelkopf-tabelle.png');
+}
+
+// INFO MODAL
+function openInfoModal(){
+  let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
+  html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
+  const log=[
+    {v:'2.4',d:'30.04.2026 11:55',t:'Swipen auf der Statistik-Seite deaktiviert, da es beim Scrollen stört.'},
+    {v:'2.3',d:'30.04.2026 11:50',t:'Swipe von Eingabe zu Tabelle gefixt. Dropdown-Menü wird nicht mehr abgeschnitten bei wenigen Spielen.'},
+    {v:'2.2',d:'30.04.2026 11:44',t:'Swipe-Bug behoben: keine leere Seite mehr. Uhrzeiten im Changelog korrigiert.'},
+    {v:'2.1',d:'30.04.2026 11:44',t:'Hintergrund thematisch angepasst: Kartensymbole-Pattern mit Kreuz-Dame, Spieltisch-grüner Farbton in Light und Dark Mode.'},
+    {v:'2.0',d:'30.04.2026 11:30',t:'Swipe-Navigation mit echtem Drag-Feeling: Seite bewegt sich beim Ziehen mit und gleitet sanft zur nächsten. Changelog-Daten korrigiert.'},
+    {v:'1.9',d:'30.04.2026 11:20',t:'Feature-Wunsch umbenannt zu Feedback & Bugs. Swipe-Navigation zwischen Tabs.'},
+    {v:'1.8',d:'30.04.2026 11:10',t:'Teilen-Funktion: Statistik und Tabelle als Bild teilen (nativ auf dem Handy) oder herunterladen.'},
+    {v:'1.7',d:'30.04.2026 11:00',t:'Kein "Mein Spieler" mehr – alle Spieler gleich eintragen. Kartengeber rotiert automatisch nach Spielerreihenfolge. Geber wird in der Eingabe und aufklappbar in der Tabelle angezeigt.'},
+    {v:'1.6',d:'30.04.2026 10:50',t:'Spieler umbenennen im App-eigenen Design. Tabelle scrollt immer nach unten. Solo-Statistik zählt nur noch für den Solisten.'},
+    {v:'1.5',d:'30.04.2026 10:40',t:'Tabelle zeigt kumulierte Punkte, Einzelpunkte aufklappbar. Punkte-Spalte hinzugefügt. Nach Eingabe automatisch zur Tabelle. Info-Button mit Changelog. Feature-Wünsche per E-Mail. Spieler im Setup umbenennen, umsortieren, entfernen.'},
+    {v:'1.4',d:'22.04.2026',t:'0-Punkte-Spiele erlaubt. Punkte-Feld springt nicht mehr. Toast für Einstellungen dezenter.'},
+    {v:'1.3',d:'22.04.2026',t:'0 Punkte werden in Tabelle angezeigt für Mitspieler.'},
+    {v:'1.2',d:'22.04.2026',t:'Edit-Modal oben platziert statt am unteren Rand.'},
+    {v:'1.1',d:'22.04.2026',t:'Solo-Punkteverteilung korrigiert: Solist bekommt dreifach. Numpad im Edit-Modal gefixt.'},
+    {v:'1.0',d:'22.04.2026',t:'Erste Version: Eingabe, Tabelle, Statistiken, Dark/Light Mode, Solo-Arten, Bockrunden, Spieler-Verwaltung.'}
+  ];
+  log.forEach(e=>{
+    html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>';
+  });
+  html+='</div>';
+  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
+  html+='<a href="mailto:Info@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
+  html+='<button class="btn btn-secondary" onclick="closeInfoModal()">Schließen</button>';
+  document.getElementById('infoModalContent').innerHTML=html;
+  document.getElementById('infoModal').classList.add('show');
+}
+function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
+document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
+
+// SWIPE
+const screens=['setup','eingabe','tabelle','stats'];
+let swipeStartX=0,swipeCurrentX=0,isSwiping=false,swipeScreen=null;
+function getCurrentScreenIdx(){return screens.findIndex(s=>document.getElementById('screen-'+s).classList.contains('active'))}
+
+document.addEventListener('touchstart',function(e){
+  // Don't swipe on modals, numpads, interactive elements, or stats screen
+  if(e.target.closest('.modal-overlay,.numpad,.toggle,.row-menu,#screen-stats'))return;
+  swipeStartX=e.changedTouches[0].clientX;
+  swipeCurrentX=swipeStartX;
+  isSwiping=true;
+  const idx=getCurrentScreenIdx();
+  swipeScreen=document.getElementById('screen-'+screens[idx]);
+},{passive:true});
+
+document.addEventListener('touchmove',function(e){
+  if(!isSwiping||!swipeScreen)return;
+  swipeCurrentX=e.changedTouches[0].clientX;
+  const diff=swipeCurrentX-swipeStartX;
+  const idx=getCurrentScreenIdx();
+  if(diff>0&&idx===0){isSwiping=false;return}
+  if(diff<0&&idx===screens.length-1){isSwiping=false;return}
+  if(Math.abs(diff)>15){
+    swipeScreen.style.transition='none';
+    swipeScreen.style.transform='translateX('+diff+'px)';
+    swipeScreen.style.opacity=Math.max(1-Math.abs(diff)/400,0.4);
+  }
+},{passive:true});
+
+document.addEventListener('touchend',function(e){
+  if(!isSwiping||!swipeScreen){isSwiping=false;return}
+  isSwiping=false;
+  const diff=swipeCurrentX-swipeStartX;
+  const idx=getCurrentScreenIdx();
+
+  if(Math.abs(diff)>60){
+    const newIdx=diff<0?idx+1:idx-1;
+    if(newIdx>=0&&newIdx<screens.length){
+      // Reset old screen instantly
+      swipeScreen.style.transition='none';
+      swipeScreen.style.transform='';
+      swipeScreen.style.opacity='';
+      // Switch screen
+      showScreen(screens[newIdx]);
+      swipeScreen=null;
+      return;
+    }
+  }
+  // Snap back
+  swipeScreen.style.transition='transform .2s ease,opacity .2s ease';
+  swipeScreen.style.transform='translateX(0)';
+  swipeScreen.style.opacity='1';
+  setTimeout(()=>{
+    if(swipeScreen){swipeScreen.style.transition='';swipeScreen.style.transform='';swipeScreen.style.opacity=''}
+  },220);
+  swipeScreen=null;
+},{passive:true});
 
 // THEME
 function toggleTheme(){
