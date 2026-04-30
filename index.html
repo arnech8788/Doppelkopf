@@ -153,6 +153,9 @@ tr.clickable:active{background:var(--bg3)}
 .share-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);color:var(--tx2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:.15s}
 .share-btn:active{transform:scale(.97);background:var(--bg4)}
 .share-btn svg{width:14px;height:14px}
+.confetti-container{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden}
+.confetti{position:absolute;width:8px;height:8px;opacity:.9;animation:confettiFall linear forwards}
+@keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
 </style>
 </head>
 <body>
@@ -201,7 +204,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.6 · 30.04.2026 12:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.2 · 30.04.2026 13:00</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -245,11 +248,13 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
-let state={myPlayer:'',players:[],rounds:[],gameStarted:false,knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS))};
+let state={myPlayer:'',players:[],rounds:[],gameStarted:false,knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null};
 let currentPts='';
 let editingRound=null;
 let chartInstances=[];
 let pendingRound=null;
+let lastUndo=null;
+let timerInterval=null;
 
 // SVG icon helpers
 const ICO={
@@ -278,6 +283,7 @@ function save(){
   state.soloTypesEnabled=document.getElementById('soloTypesToggle').classList.contains('on');
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
 }
+
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>{
@@ -370,7 +376,7 @@ function removePlayer(i){state.players.splice(i,1);renderPlayerTags();save()}
 function checkAutoStart(){
   if(getAllPlayers().length>=4&&!state.gameStarted){
     state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-    state.gameStarted=true;state.rounds=[];state.bockQueue=0;
+    state.gameStarted=true;state.rounds=[];state.bockQueue=0;state.gameStartTime=null;
   }
 }
 
@@ -402,7 +408,7 @@ function newGame(){
   }
   if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
   state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-  state.gameStarted=true;state.rounds=[];state.bockQueue=0;save();showScreen('eingabe');
+  state.gameStarted=true;state.rounds=[];state.bockQueue=0;state.gameStartTime=null;save();showScreen('eingabe');
 }
 
 // EINGABE
@@ -415,13 +421,23 @@ function renderEingabe(){
     document.getElementById('bockIndicator').innerHTML='';return;
   }
   const bi=document.getElementById('bockIndicator');
+  let biHtml='';
+  const all=getAllPlayers();
+  // Check if a round just completed
+  if(state.rounds.length>0&&state.rounds.length%all.length===0){
+    const completedRunde=Math.floor(state.rounds.length/all.length);
+    biHtml+='<div style="background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;text-align:center;margin-bottom:8px;border:1px solid rgba(240,168,48,.15)">&#127183; Runde '+completedRunde+' beendet!</div>';
+  }
   if(isBockRound()){
-    bi.innerHTML='<div class="bock-indicator">&#9889; Bockrunde! Noch '+state.bockQueue+' Spiel'+(state.bockQueue>1?'e':'')+'</div>';
-  }else{bi.innerHTML=''}
-  const all=getAllPlayers();currentPts='';
+    biHtml+='<div class="bock-indicator">&#9889; Bockrunde! Noch '+state.bockQueue+' Spiel'+(state.bockQueue>1?'e':'')+'</div>';
+  }
+  bi.innerHTML=biHtml;
+  currentPts='';
   const dealerIdx=state.rounds.length%all.length;
   const dealer=all[dealerIdx];
-  let html='<div class="card"><div class="card-title">Spiel '+(state.rounds.length+1)+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
+  const rundeNr=Math.floor(state.rounds.length/all.length)+1;
+  const spielInRunde=(state.rounds.length%all.length)+1;
+  let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · Spiel '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
   html+='<div class="numpad">';
@@ -433,13 +449,73 @@ function renderEingabe(){
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
   html+='<div class="chip-grid" id="playerChips">';
-  all.forEach(p=>{html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+'</div>'});
+  const streaks=getWinStreaks();
+  all.forEach(p=>{
+    const flames=getFlames(streaks[p]);
+    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+(flames?' <span style="font-size:12px">'+flames+'</span>':'')+'</div>';
+  });
   html+='</div>';
   if(state.bockEnabled){
     html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue Bockrunde auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
   }
-  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' Spiel speichern</button></div></div>';
+  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' Spiel speichern</button></div>';
+  if(lastUndo){
+    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Letztes Spiel rückgängig</button></div>';
+  }
+  html+='</div>';
+  // Timer
+  if(state.gameStartTime){
+    html+='<div id="gameTimer" style="text-align:center;padding:8px;font-size:11px;color:var(--tx3);font-family:\'Space Mono\',monospace"></div>';
+  }
   document.getElementById('eingabeContent').innerHTML=html;
+  startTimerUpdate();
+}
+
+function getWinStreaks(){
+  const all=getAllPlayers();
+  const streaks={};all.forEach(p=>streaks[p]=0);
+  // Count backwards from last round
+  for(let i=state.rounds.length-1;i>=0;i--){
+    const r=state.rounds[i];
+    all.forEach(p=>{
+      if(!r.playing.includes(p))return; // didn't play, streak unchanged
+      if(streaks[p]===-1)return; // already broken
+      if(r.winners.includes(p)){streaks[p]++}
+      else{streaks[p]=-1} // lost, mark as broken
+    });
+  }
+  // Fix -1 back to 0
+  all.forEach(p=>{if(streaks[p]===-1)streaks[p]=0});
+  return streaks;
+}
+function getFlames(streak){
+  if(streak>=6)return '🔥🔥🔥';
+  if(streak>=4)return '🔥🔥';
+  if(streak>=2)return '🔥';
+  return '';
+}
+
+function formatDuration(ms){
+  const s=Math.floor(ms/1000);
+  const h=Math.floor(s/3600);
+  const m=Math.floor((s%3600)/60);
+  const sec=s%60;
+  if(h>0)return h+'h '+String(m).padStart(2,'0')+'m';
+  return m+'m '+String(sec).padStart(2,'0')+'s';
+}
+function updateTimerDisplay(){
+  const el=document.getElementById('gameTimer');
+  if(!el||!state.gameStartTime)return;
+  const elapsed=Date.now()-state.gameStartTime;
+  const avgPerGame=state.rounds.length?elapsed/state.rounds.length:0;
+  el.textContent='&#9202; '+formatDuration(elapsed)+(state.rounds.length?' · \u00d8 '+formatDuration(avgPerGame)+'/Spiel':'');
+}
+function startTimerUpdate(){
+  if(timerInterval)clearInterval(timerInterval);
+  if(state.gameStartTime){
+    updateTimerDisplay();
+    timerInterval=setInterval(updateTimerDisplay,1000);
+  }
 }
 
 function cycleState(el){
@@ -457,6 +533,33 @@ function updatePtsDisplay(){
   const el=document.getElementById('ptsDisplay');if(!el)return;
   if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
   else{el.textContent='Punkte eingeben';el.classList.add('empty')}
+}
+
+function undoLastRound(){
+  if(!lastUndo)return;
+  // Remove last round
+  state.rounds.pop();
+  state.bockQueue=lastUndo.bockQueueBefore;
+  save();
+  // Restore eingabe with the undone round's data
+  renderEingabe();
+  // Fill in the points
+  currentPts=''+lastUndo.round.points;
+  updatePtsDisplay();
+  // Set player states
+  const chips=document.querySelectorAll('#playerChips .player-chip');
+  chips.forEach(c=>{
+    const p=c.dataset.player;
+    const ps=lastUndo.playerStates.find(s=>s.name===p);
+    if(ps){
+      c.dataset.state=ps.won?'won':'lost';
+      c.querySelector('.chip-icon').innerHTML=ps.won?ICO.check:ICO.x;
+    }
+  });
+  lastUndo=null;
+  // Re-render to hide undo button
+  const undoBtn=document.getElementById('undoBtn');
+  if(undoBtn)undoBtn.style.display='none';
 }
 
 function saveNewRound(){
@@ -535,12 +638,30 @@ function skipSoloType(){
 document.getElementById('soloModal').addEventListener('click',function(e){if(e.target===this){skipSoloType()}});
 
 function finalizeRound(round){
+  // Start game timer on first round
+  if(!state.gameStartTime)state.gameStartTime=Date.now();
+  // Add timestamp to round
+  round.timestamp=Date.now();
+  // Save undo state
+  lastUndo={round:JSON.parse(JSON.stringify(round)),bockQueueBefore:state.bockQueue,playerStates:round.playing.map(p=>({name:p,won:round.winners.includes(p)}))};
   state.rounds.push(round);
   const bock=isBockRound();
   if(bock&&state.bockQueue>0)state.bockQueue--;
   const triggerBock=document.getElementById('triggerBockToggle');
   if(triggerBock&&triggerBock.classList.contains('on'))state.bockQueue+=state.bockCount;
   save();
+  // Confetti on solo win or new points leader
+  const soloWin=round.solo&&round.winners.length===1;
+  if(soloWin)setTimeout(launchConfetti,300);
+  else{
+    // Check if someone took the lead
+    const all=getAllPlayers();const totals={};all.forEach(p=>totals[p]=0);
+    state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
+    const prevTotals={};all.forEach(p=>prevTotals[p]=totals[p]-(round.scores[p]||0));
+    const prevLeader=all.reduce((a,b)=>prevTotals[a]>=prevTotals[b]?a:b);
+    const newLeader=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
+    if(state.rounds.length>1&&newLeader!==prevLeader)setTimeout(launchConfetti,300);
+  }
   showScreen('tabelle');
   renderTabelle(true);
 }
@@ -635,10 +756,12 @@ function renderTabelle(scrollToBottom){
   state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
   const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
   let shtml='<div class="card" style="margin-bottom:12px">';
+  const tStreaks=getWinStreaks();
   sorted.forEach((p,i)=>{
     const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
-    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
+    const flames=getFlames(tStreaks[p]);
+    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+(flames?' <span style="font-size:12px">'+flames+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
 
@@ -680,9 +803,20 @@ function renderTabelle(scrollToBottom){
 
     // Expandable detail row
     const dealerForRound=all[i%all.length];
+    const rundeForRound=Math.floor(i/all.length)+1;
+    const spielInRundeFor=(i%all.length)+1;
     html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'">';
     html+='<div class="expand-detail">';
+    html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
     html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
+    // Game duration
+    if(r.timestamp&&i>0&&state.rounds[i-1].timestamp){
+      const dur=r.timestamp-state.rounds[i-1].timestamp;
+      html+='<span style="font-size:10px;color:var(--tx3)">&#9202; '+formatDuration(dur)+'</span> ';
+    } else if(r.timestamp&&i===0&&state.gameStartTime){
+      const dur=r.timestamp-state.gameStartTime;
+      html+='<span style="font-size:10px;color:var(--tx3)">&#9202; '+formatDuration(dur)+'</span> ';
+    }
     all.forEach(p=>{
       const s=r.scores[p];const played=r.playing.includes(p);
       if(played){
@@ -690,6 +824,9 @@ function renderTabelle(scrollToBottom){
         html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>';
       }
     });
+    if(r.absagen&&r.absagen.length){
+      html+='<span style="font-size:10px;color:var(--warn);margin-left:4px">'+r.absagen.join(', ')+'</span>';
+    }
     html+='</div></td></tr>';
   });
   html+='</tbody></table>';
@@ -798,6 +935,31 @@ function buildPairings(all){
   document.getElementById('pairCard').innerHTML=html;
 }
 
+// CONFETTI
+function launchConfetti(){
+  const container=document.createElement('div');
+  container.className='confetti-container';
+  document.body.appendChild(container);
+  const colors=['#2ec4b6','#e05252','#f0a830','#5b4cdb','#ff6b6b','#48dbfb','#ff9ff3','#feca57'];
+  const shapes=['&#9824;','&#9829;','&#9830;','&#9827;'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.innerHTML=Math.random()>0.5?shapes[Math.floor(Math.random()*shapes.length)]:'';
+    c.style.left=Math.random()*100+'%';
+    c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];
+    c.style.borderRadius=Math.random()>0.5?'50%':'2px';
+    c.style.width=(4+Math.random()*8)+'px';
+    c.style.height=(4+Math.random()*8)+'px';
+    c.style.animationDuration=(1.5+Math.random()*2)+'s';
+    c.style.animationDelay=(Math.random()*0.5)+'s';
+    c.style.fontSize=(10+Math.random()*10)+'px';
+    c.style.color=colors[Math.floor(Math.random()*colors.length)];
+    container.appendChild(c);
+  }
+  setTimeout(()=>container.remove(),4000);
+}
+
 // SHARE
 async function captureAndShare(element,filename){
   try{
@@ -829,6 +991,12 @@ function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
   const log=[
+    {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander. Sichtbar bei der Eingabe und in der Rangliste. Verschwindet bei einer Niederlage.'},
+    {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel! Kartensymbole regnen vom Himmel. Absagen aus Setup und Eingabe entfernt. Hilfeseite-Text zu Ansagen korrigiert.'},
+    {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit läuft ab dem ersten Spiel, zeigt Gesamtzeit und Durchschnittszeit pro Spiel. Zeit pro Spiel in der Tabelle aufklappbar. Hilfeseite korrigiert: Ansagen verdoppeln Punkte, Vorab gibt Extra-Punkt (nicht bei Solo), Solo gibt Solopunkt.'},
+    {v:'2.9',d:'30.04.2026 12:30',t:'Absagen (Re, Kontra, keine 90/60/30, schwarz) erfassbar. Setup-Option: Nie/Optional/Immer. Absagen in Tabelle aufklappbar und im Undo wiederherstellbar. Hilfeseite mit Anleitung zur Punktezählung im Info-Modal. E-Mail auf doppelkopf@arne-chudobba.de geändert.'},
+    {v:'2.8',d:'30.04.2026 12:20',t:'Rundenzähler: Anzeige von Runde und Spiel-Nummer in der Eingabe. Hinweis wenn eine Runde beendet ist. Runden-Info auch in der Tabelle aufklappbar.'},
+    {v:'2.7',d:'30.04.2026 12:15',t:'Rückgängig-Button: nach dem Speichern erscheint unter dem Speichern-Button ein dezenter Undo-Button. Stellt Punkte und Spieler-Auswahl wieder her.'},
     {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App ist jetzt installierbar auf dem Homescreen, funktioniert offline. Eigenes App-Icon (Kreuz Dame).'},
     {v:'2.5',d:'30.04.2026 12:00',t:'Swipe-Navigation komplett entfernt.'},
     {v:'2.4',d:'30.04.2026 11:55',t:'Swipen auf der Statistik-Seite deaktiviert, da es beim Scrollen stört.'},
@@ -851,8 +1019,29 @@ function openInfoModal(){
     html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>';
   });
   html+='</div>';
+  html+='<div class="section-label" style="margin-top:16px">Punkte zählen – Anleitung</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Gegen die Alten (Re verliert): <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Solo: <strong>+1 Solopunkt</strong>, Solist bekommt <strong>dreifache</strong> Punkte</div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Ansagen</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>angesagt</strong>: Punkte werden <strong>verdoppelt</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>vorab</strong> angesagt (vor der 1. Karte): <strong>+1 extra Punkt</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Vorab gibt es beim Solo <strong>nicht</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 90 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 60 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 30 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Schwarz angesagt: <strong>+1</strong></div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Sonderpunkte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 90/60/30/schwarz gespielt: jeweils <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Fuchs gefangen (Karo Ass): <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Doppelkopf (Stich mit 40+ Augen): <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Charlie (Kreuz Bube letzter Stich): <strong>+1</strong></div>';
+  html+='<div style="margin-top:12px;font-size:11px;color:var(--tx3)">Hinweis: Die Punktewerte können je nach Hausregeln abweichen. Diese App berechnet keine Punkte automatisch – alle Werte werden manuell eingetragen.</div>';
+  html+='</div>';
   html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
-  html+='<a href="mailto:Info@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
+  html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<button class="btn btn-secondary" onclick="closeInfoModal()">Schließen</button>';
   document.getElementById('infoModalContent').innerHTML=html;
   document.getElementById('infoModal').classList.add('show');
