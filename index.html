@@ -204,7 +204,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.2 · 30.04.2026 13:00</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.3 · 30.04.2026 13:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -292,7 +292,14 @@ function showScreen(id){
   });
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
-  if(id==='eingabe')renderEingabe();
+  if(id==='eingabe'){
+    // Only re-render if round count changed (new save/undo/first load)
+    const el=document.getElementById('eingabeContent');
+    if(!el.dataset.roundCount||parseInt(el.dataset.roundCount)!==state.rounds.length){
+      renderEingabe();
+      el.dataset.roundCount=state.rounds.length;
+    }
+  }
   if(id==='tabelle')renderTabelle(true);
   if(id==='stats')renderStats();
 }
@@ -468,6 +475,7 @@ function renderEingabe(){
     html+='<div id="gameTimer" style="text-align:center;padding:8px;font-size:11px;color:var(--tx3);font-family:\'Space Mono\',monospace"></div>';
   }
   document.getElementById('eingabeContent').innerHTML=html;
+  document.getElementById('eingabeContent').dataset.roundCount=state.rounds.length;
   startTimerUpdate();
 }
 
@@ -560,6 +568,7 @@ function undoLastRound(){
   // Re-render to hide undo button
   const undoBtn=document.getElementById('undoBtn');
   if(undoBtn)undoBtn.style.display='none';
+  document.getElementById('eingabeContent').dataset.roundCount=state.rounds.length;
 }
 
 function saveNewRound(){
@@ -991,6 +1000,7 @@ function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
   const log=[
+    {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel. Punkte und Spieler-Auswahl gehen nicht mehr verloren.'},
     {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander. Sichtbar bei der Eingabe und in der Rangliste. Verschwindet bei einer Niederlage.'},
     {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel! Kartensymbole regnen vom Himmel. Absagen aus Setup und Eingabe entfernt. Hilfeseite-Text zu Ansagen korrigiert.'},
     {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit läuft ab dem ersten Spiel, zeigt Gesamtzeit und Durchschnittszeit pro Spiel. Zeit pro Spiel in der Tabelle aufklappbar. Hilfeseite korrigiert: Ansagen verdoppeln Punkte, Vorab gibt Extra-Punkt (nicht bei Solo), Solo gibt Solopunkt.'},
