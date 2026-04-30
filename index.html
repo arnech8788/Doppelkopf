@@ -194,7 +194,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.4 · 30.04.2026 11:55</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.5 · 30.04.2026 12:00</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -822,6 +822,7 @@ function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
   const log=[
+    {v:'2.5',d:'30.04.2026 12:00',t:'Swipe-Navigation komplett entfernt.'},
     {v:'2.4',d:'30.04.2026 11:55',t:'Swipen auf der Statistik-Seite deaktiviert, da es beim Scrollen stört.'},
     {v:'2.3',d:'30.04.2026 11:50',t:'Swipe von Eingabe zu Tabelle gefixt. Dropdown-Menü wird nicht mehr abgeschnitten bei wenigen Spielen.'},
     {v:'2.2',d:'30.04.2026 11:44',t:'Swipe-Bug behoben: keine leere Seite mehr. Uhrzeiten im Changelog korrigiert.'},
@@ -850,64 +851,6 @@ function openInfoModal(){
 }
 function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
 document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
-
-// SWIPE
-const screens=['setup','eingabe','tabelle','stats'];
-let swipeStartX=0,swipeCurrentX=0,isSwiping=false,swipeScreen=null;
-function getCurrentScreenIdx(){return screens.findIndex(s=>document.getElementById('screen-'+s).classList.contains('active'))}
-
-document.addEventListener('touchstart',function(e){
-  // Don't swipe on modals, numpads, interactive elements, or stats screen
-  if(e.target.closest('.modal-overlay,.numpad,.toggle,.row-menu,#screen-stats'))return;
-  swipeStartX=e.changedTouches[0].clientX;
-  swipeCurrentX=swipeStartX;
-  isSwiping=true;
-  const idx=getCurrentScreenIdx();
-  swipeScreen=document.getElementById('screen-'+screens[idx]);
-},{passive:true});
-
-document.addEventListener('touchmove',function(e){
-  if(!isSwiping||!swipeScreen)return;
-  swipeCurrentX=e.changedTouches[0].clientX;
-  const diff=swipeCurrentX-swipeStartX;
-  const idx=getCurrentScreenIdx();
-  if(diff>0&&idx===0){isSwiping=false;return}
-  if(diff<0&&idx===screens.length-1){isSwiping=false;return}
-  if(Math.abs(diff)>15){
-    swipeScreen.style.transition='none';
-    swipeScreen.style.transform='translateX('+diff+'px)';
-    swipeScreen.style.opacity=Math.max(1-Math.abs(diff)/400,0.4);
-  }
-},{passive:true});
-
-document.addEventListener('touchend',function(e){
-  if(!isSwiping||!swipeScreen){isSwiping=false;return}
-  isSwiping=false;
-  const diff=swipeCurrentX-swipeStartX;
-  const idx=getCurrentScreenIdx();
-
-  if(Math.abs(diff)>60){
-    const newIdx=diff<0?idx+1:idx-1;
-    if(newIdx>=0&&newIdx<screens.length){
-      // Reset old screen instantly
-      swipeScreen.style.transition='none';
-      swipeScreen.style.transform='';
-      swipeScreen.style.opacity='';
-      // Switch screen
-      showScreen(screens[newIdx]);
-      swipeScreen=null;
-      return;
-    }
-  }
-  // Snap back
-  swipeScreen.style.transition='transform .2s ease,opacity .2s ease';
-  swipeScreen.style.transform='translateX(0)';
-  swipeScreen.style.opacity='1';
-  setTimeout(()=>{
-    if(swipeScreen){swipeScreen.style.transition='';swipeScreen.style.transform='';swipeScreen.style.opacity=''}
-  },220);
-  swipeScreen=null;
-},{passive:true});
 
 // THEME
 function toggleTheme(){
