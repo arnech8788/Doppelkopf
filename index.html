@@ -204,7 +204,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.3 · 30.04.2026 13:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.5 · 30.04.2026 13:20</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -379,7 +379,14 @@ function addPlayer(){
   document.getElementById('suggestions').classList.remove('show');
   setTimeout(()=>{inp.focus()},50);
 }
-function removePlayer(i){state.players.splice(i,1);renderPlayerTags();save()}
+function removePlayer(i){
+  const name=state.players[i];
+  const hasGames=state.rounds.some(r=>r.playing.includes(name));
+  if(hasGames){
+    if(!confirm(name+' hat bereits Spiele. Wirklich löschen?'))return;
+  }
+  state.players.splice(i,1);renderPlayerTags();save();
+}
 function checkAutoStart(){
   if(getAllPlayers().length>=4&&!state.gameStarted){
     state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
@@ -904,7 +911,7 @@ function renderStats(){
   html+='<div class="card"><div class="chart-container"><canvas id="avgChart"></canvas></div></div>';
   html+='<div class="section-label" style="margin-top:20px">Soli (gewonnen / verloren)</div>';
   html+='<div class="card"><div class="chart-container"><canvas id="soloChart"></canvas></div></div>';
-  html+='<div class="section-label" style="margin-top:20px">Wer hat mit wem gespielt?</div>';
+  html+='<div class="section-label" style="margin-top:20px">Wer war im Team?</div>';
   html+='<div class="card" id="pairCard"></div>';
   c.innerHTML=html;
   buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed);
@@ -929,11 +936,20 @@ function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
 function buildPairings(all){
   const pairs={};
   for(let i=0;i<all.length;i++){for(let j=i+1;j<all.length;j++){pairs[all[i]+'|'+all[j]]=0}}
-  state.rounds.forEach(r=>{for(let i=0;i<r.playing.length;i++){for(let j=i+1;j<r.playing.length;j++){
-    const a=r.playing[i],b=r.playing[j];
-    const key=all.indexOf(a)<all.indexOf(b)?a+'|'+b:b+'|'+a;
-    if(pairs[key]!==undefined)pairs[key]++;
-  }}});
+  state.rounds.forEach(r=>{
+    // Skip solo rounds - no real teams
+    if(r.solo)return;
+    // Only count players who were on the same team (both won or both lost)
+    const teamWin=r.winners;
+    const teamLose=r.playing.filter(p=>!r.winners.includes(p));
+    [teamWin,teamLose].forEach(team=>{
+      for(let i=0;i<team.length;i++){for(let j=i+1;j<team.length;j++){
+        const a=team[i],b=team[j];
+        const key=all.indexOf(a)<all.indexOf(b)?a+'|'+b:b+'|'+a;
+        if(pairs[key]!==undefined)pairs[key]++;
+      }}
+    });
+  });
   const maxP=Math.max(...Object.values(pairs),1);
   const sorted=Object.entries(pairs).sort((a,b)=>b[1]-a[1]);
   let html='';
@@ -1000,6 +1016,8 @@ function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
   const log=[
+    {v:'3.5',d:'30.04.2026 13:20',t:'Team-Statistik: Solo-Spiele werden ignoriert (kein echtes Team).'},
+    {v:'3.4',d:'30.04.2026 13:15',t:'Spieler löschen: Bestätigung wenn der Spieler bereits Spiele hat. Team-Statistik: zählt jetzt nur Paarungen im gleichen Team (beide gewonnen oder beide verloren), nicht mehr alle am Tisch.'},
     {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel. Punkte und Spieler-Auswahl gehen nicht mehr verloren.'},
     {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander. Sichtbar bei der Eingabe und in der Rangliste. Verschwindet bei einer Niederlage.'},
     {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel! Kartensymbole regnen vom Himmel. Absagen aus Setup und Eingabe entfernt. Hilfeseite-Text zu Ansagen korrigiert.'},
