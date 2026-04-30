@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#1a9e8f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Doppelkopf">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Doppelkopf Punktezettel</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=Space+Mono:wght@400;700&display=swap');
@@ -194,7 +201,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.5 · 30.04.2026 12:00</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v2.6 · 30.04.2026 12:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -822,6 +829,7 @@ function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
   const log=[
+    {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App ist jetzt installierbar auf dem Homescreen, funktioniert offline. Eigenes App-Icon (Kreuz Dame).'},
     {v:'2.5',d:'30.04.2026 12:00',t:'Swipe-Navigation komplett entfernt.'},
     {v:'2.4',d:'30.04.2026 11:55',t:'Swipen auf der Statistik-Seite deaktiviert, da es beim Scrollen stört.'},
     {v:'2.3',d:'30.04.2026 11:50',t:'Swipe von Eingabe zu Tabelle gefixt. Dropdown-Menü wird nicht mehr abgeschnitten bei wenigen Spielen.'},
@@ -875,6 +883,9 @@ function getChartColors(){
   const s=getComputedStyle(document.documentElement);
   return{grid:s.getPropertyValue('--chart-grid').trim(),tick:s.getPropertyValue('--chart-tick').trim(),lbl:s.getPropertyValue('--chart-lbl').trim()};
 }
+
+// PWA
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 
 load();
 </script>
