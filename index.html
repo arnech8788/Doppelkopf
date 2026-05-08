@@ -204,7 +204,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.0 · 30.04.2026 14:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.1 · 30.04.2026 17:08</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -233,7 +233,6 @@ tr.clickable:active{background:var(--bg3)}
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 <div class="modal-overlay" id="infoModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="infoModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
-
 <div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 
 <button class="info-btn" onclick="openInfoModal()">i</button>
@@ -250,7 +249,8 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
-let state={myPlayer:'',players:[],rounds:[],gameStarted:false,knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null};
+// gameStarted entfernt – App prüft direkt ob >=4 Spieler vorhanden sind
+let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null};
 let currentPts='';
 let editingRound=null;
 let chartInstances=[];
@@ -258,7 +258,6 @@ let pendingRound=null;
 let lastUndo=null;
 let timerInterval=null;
 
-// SVG icon helpers
 const ICO={
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>',
   down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
@@ -276,7 +275,8 @@ function load(){
   document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
   document.getElementById('soloTypesToggle').classList.toggle('on',!!state.soloTypesEnabled);
   renderPlayerTags();renderSoloTypes();
-  if(state.gameStarted)showScreen('eingabe');
+  // Direkt auf Spieleranzahl prüfen – kein gameStarted mehr nötig
+  if(getAllPlayers().length>=4)showScreen('eingabe');
 }
 function save(){
   state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
@@ -286,16 +286,11 @@ function save(){
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
 }
 
-
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>{
-    s.classList.remove('active');
-    s.style.transform='';s.style.opacity='';s.style.transition='';
-  });
+  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active')});
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
   if(id==='eingabe'){
-    // Only re-render if round count changed (new save/undo/first load)
     const el=document.getElementById('eingabeContent');
     if(!el.dataset.roundCount||parseInt(el.dataset.roundCount)!==state.rounds.length){
       renderEingabe();
@@ -306,7 +301,6 @@ function showScreen(id){
   if(id==='stats')renderStats();
 }
 
-// SOLO TYPES
 function renderSoloTypes(){
   const c=document.getElementById('soloTypesList');
   c.innerHTML=state.soloTypes.map((s,i)=>
@@ -323,7 +317,6 @@ function addCustomSolo(){
   inp.value='';save();renderSoloTypes();
 }
 
-// PLAYERS
 function renderPlayerTags(){
   const c=document.getElementById('playerManageList');
   if(!state.players.length){c.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Noch keine Mitspieler</div>';return}
@@ -370,6 +363,7 @@ function savePlayerName(){
   save();renderPlayerTags();closeRenameModal();
 }
 document.getElementById('renameModal').addEventListener('click',function(e){if(e.target===this)closeRenameModal()});
+
 function addPlayer(){
   const inp=document.getElementById('addPlayerInput');
   const name=inp.value.trim();
@@ -384,15 +378,13 @@ function addPlayer(){
 function removePlayer(i){
   const name=state.players[i];
   const hasGames=state.rounds.some(r=>r.playing.includes(name));
-  if(hasGames){
-    if(!confirm(name+' hat bereits Spiele. Wirklich löschen?'))return;
-  }
+  if(hasGames){if(!confirm(name+' hat bereits Spiele. Wirklich löschen?'))return}
   state.players.splice(i,1);renderPlayerTags();save();
 }
+// checkAutoStart setzt nur noch bockCount – kein gameStarted mehr
 function checkAutoStart(){
-  if(getAllPlayers().length>=4&&!state.gameStarted){
+  if(getAllPlayers().length>=4){
     state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-    state.gameStarted=true;state.rounds=[];state.bockQueue=0;state.gameStartTime=null;
   }
 }
 
@@ -414,7 +406,7 @@ function getAllPlayers(){return [...state.players]}
 function saveSettings(){
   checkAutoStart();save();
   const msg=document.getElementById('setupSuccessMsg');
-  document.getElementById('setupSuccessText').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>';
+  document.getElementById('setupSuccessText').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg> Gespeichert';
   msg.style.display='flex';
   setTimeout(()=>{msg.style.display='none'},2000);
 }
@@ -424,22 +416,22 @@ function newGame(){
   }
   if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
   state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-  state.gameStarted=true;state.rounds=[];state.bockQueue=0;state.gameStartTime=null;save();showScreen('eingabe');
+  // gameStarted entfernt
+  state.rounds=[];state.bockQueue=0;state.gameStartTime=null;save();showScreen('eingabe');
 }
 
-// EINGABE
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
 
 function renderEingabe(){
   document.getElementById('successMsg').style.display='none';
-  if(!state.gameStarted||getAllPlayers().length<4){
+  // Direkt auf Spieleranzahl prüfen – kein gameStarted mehr
+  if(getAllPlayers().length<4){
     document.getElementById('eingabeContent').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>Trage mindestens 4 Spieler im Setup ein.</div>';
     document.getElementById('bockIndicator').innerHTML='';return;
   }
   const bi=document.getElementById('bockIndicator');
   let biHtml='';
   const all=getAllPlayers();
-  // Check if a round just completed
   if(state.rounds.length>0&&state.rounds.length%all.length===0){
     const completedRunde=Math.floor(state.rounds.length/all.length);
     biHtml+='<div style="background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;text-align:center;margin-bottom:8px;border:1px solid rgba(240,168,48,.15)">&#127183; Runde '+completedRunde+' beendet!</div>';
@@ -480,7 +472,6 @@ function renderEingabe(){
     html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Letztes Spiel rückgängig</button></div>';
   }
   html+='</div>';
-  // Timer
   if(state.gameStartTime){
     html+='<div id="gameTimer" style="text-align:center;padding:8px;font-size:11px;color:var(--tx3);font-family:\'Space Mono\',monospace"></div>';
   }
@@ -492,17 +483,15 @@ function renderEingabe(){
 function getWinStreaks(){
   const all=getAllPlayers();
   const streaks={};all.forEach(p=>streaks[p]=0);
-  // Count backwards from last round
   for(let i=state.rounds.length-1;i>=0;i--){
     const r=state.rounds[i];
     all.forEach(p=>{
-      if(!r.playing.includes(p))return; // didn't play, streak unchanged
-      if(streaks[p]===-1)return; // already broken
+      if(!r.playing.includes(p))return;
+      if(streaks[p]===-1)return;
       if(r.winners.includes(p)){streaks[p]++}
-      else{streaks[p]=-1} // lost, mark as broken
+      else{streaks[p]=-1}
     });
   }
-  // Fix -1 back to 0
   all.forEach(p=>{if(streaks[p]===-1)streaks[p]=0});
   return streaks;
 }
@@ -512,7 +501,6 @@ function getFlames(streak){
   if(streak>=2)return '🔥';
   return '';
 }
-
 function formatDuration(ms){
   const s=Math.floor(ms/1000);
   const h=Math.floor(s/3600);
@@ -526,16 +514,12 @@ function updateTimerDisplay(){
   if(!el||!state.gameStartTime)return;
   const elapsed=Date.now()-state.gameStartTime;
   const avgPerGame=state.rounds.length?elapsed/state.rounds.length:0;
-  el.textContent='&#9202; '+formatDuration(elapsed)+(state.rounds.length?' · \u00d8 '+formatDuration(avgPerGame)+'/Spiel':'');
+  el.textContent='⏱ '+formatDuration(elapsed)+(state.rounds.length?' · Ø '+formatDuration(avgPerGame)+'/Spiel':'');
 }
 function startTimerUpdate(){
   if(timerInterval)clearInterval(timerInterval);
-  if(state.gameStartTime){
-    updateTimerDisplay();
-    timerInterval=setInterval(updateTimerDisplay,1000);
-  }
+  if(state.gameStartTime){updateTimerDisplay();timerInterval=setInterval(updateTimerDisplay,1000)}
 }
-
 function cycleState(el){
   const cur=el.dataset.state;
   let next=cur==='neutral'?'lost':cur==='lost'?'won':'neutral';
@@ -543,7 +527,6 @@ function cycleState(el){
   const icon=el.querySelector('.chip-icon');
   icon.innerHTML=next==='lost'?ICO.x:next==='won'?ICO.check:'';
 }
-
 function numpadPress(n){if(currentPts.length>=3)return;currentPts+=n;updatePtsDisplay()}
 function numpadDelete(){currentPts=currentPts.slice(0,-1);updatePtsDisplay()}
 function numpadClear(){currentPts='';updatePtsDisplay()}
@@ -552,35 +535,25 @@ function updatePtsDisplay(){
   if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
   else{el.textContent='Punkte eingeben';el.classList.add('empty')}
 }
-
 function undoLastRound(){
   if(!lastUndo)return;
-  // Remove last round
   state.rounds.pop();
   state.bockQueue=lastUndo.bockQueueBefore;
   save();
-  // Restore eingabe with the undone round's data
   renderEingabe();
-  // Fill in the points
   currentPts=''+lastUndo.round.points;
   updatePtsDisplay();
-  // Set player states
   const chips=document.querySelectorAll('#playerChips .player-chip');
   chips.forEach(c=>{
     const p=c.dataset.player;
     const ps=lastUndo.playerStates.find(s=>s.name===p);
-    if(ps){
-      c.dataset.state=ps.won?'won':'lost';
-      c.querySelector('.chip-icon').innerHTML=ps.won?ICO.check:ICO.x;
-    }
+    if(ps){c.dataset.state=ps.won?'won':'lost';c.querySelector('.chip-icon').innerHTML=ps.won?ICO.check:ICO.x}
   });
   lastUndo=null;
-  // Re-render to hide undo button
   const undoBtn=document.getElementById('undoBtn');
   if(undoBtn)undoBtn.style.display='none';
   document.getElementById('eingabeContent').dataset.roundCount=state.rounds.length;
 }
-
 function saveNewRound(){
   const pts=parseInt(currentPts||'0');
   if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
@@ -600,80 +573,50 @@ function saveNewRound(){
   const multiplier=bockApplies?2:1;
   const scores={};
   if(solo){
-    // Solist = der Einzelne (1 Gewinner oder 1 Verlierer)
     const solist=winners.length===1?winners[0]:losers[0];
     const solistWon=winners.includes(solist);
     playing.forEach(p=>{
-      if(p===solist){
-        // Solist bekommt IMMER dreifache Punkte
-        scores[p]=solistWon? pts*3*multiplier : -pts*3*multiplier;
-      }else{
-        // Andere drei bekommen einfache Punkte (umgekehrtes Vorzeichen)
-        scores[p]=solistWon? -pts*multiplier : pts*multiplier;
-      }
+      if(p===solist){scores[p]=solistWon?pts*3*multiplier:-pts*3*multiplier}
+      else{scores[p]=solistWon?-pts*multiplier:pts*multiplier}
     });
   }else{
-    playing.forEach(p=>{
-      scores[p]=winners.includes(p)?pts*multiplier:-pts*multiplier;
-    });
+    playing.forEach(p=>{scores[p]=winners.includes(p)?pts*multiplier:-pts*multiplier});
   }
   const round={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:null};
-
-  if(solo&&state.soloTypesEnabled){
-    pendingRound=round;
-    openSoloModal();return;
-  }
+  if(solo&&state.soloTypesEnabled){pendingRound=round;openSoloModal();return}
   finalizeRound(round);
 }
-
 function openSoloModal(){
   const enabled=state.soloTypes.filter(s=>s.enabled);
   let html='<h3>Welches Solo?</h3>';
   html+='<div class="solo-type-grid">';
-  enabled.forEach(s=>{
-    html+='<div class="solo-chip" data-solo="'+s.name+'" onclick="selectSoloType(this)">'+s.name+'</div>';
-  });
+  enabled.forEach(s=>{html+='<div class="solo-chip" data-solo="'+s.name+'" onclick="selectSoloType(this)">'+s.name+'</div>'});
   html+='</div>';
   html+='<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-secondary" onclick="skipSoloType()" style="flex:1">Überspringen</button><button class="btn btn-primary" onclick="confirmSoloType()" style="flex:1">'+ICO.check+' Bestätigen</button></div>';
   document.getElementById('soloModalContent').innerHTML=html;
   document.getElementById('soloModal').classList.add('show');
 }
-function selectSoloType(el){
-  document.querySelectorAll('#soloModalContent .solo-chip').forEach(c=>c.classList.remove('selected'));
-  el.classList.add('selected');
-}
+function selectSoloType(el){document.querySelectorAll('#soloModalContent .solo-chip').forEach(c=>c.classList.remove('selected'));el.classList.add('selected')}
 function confirmSoloType(){
   const sel=document.querySelector('#soloModalContent .solo-chip.selected');
-  if(pendingRound){
-    pendingRound.soloType=sel?sel.dataset.solo:null;
-    finalizeRound(pendingRound);
-  }
+  if(pendingRound){pendingRound.soloType=sel?sel.dataset.solo:null;finalizeRound(pendingRound)}
   document.getElementById('soloModal').classList.remove('show');pendingRound=null;
 }
-function skipSoloType(){
-  if(pendingRound)finalizeRound(pendingRound);
-  document.getElementById('soloModal').classList.remove('show');pendingRound=null;
-}
-document.getElementById('soloModal').addEventListener('click',function(e){if(e.target===this){skipSoloType()}});
+function skipSoloType(){if(pendingRound)finalizeRound(pendingRound);document.getElementById('soloModal').classList.remove('show');pendingRound=null}
+document.getElementById('soloModal').addEventListener('click',function(e){if(e.target===this)skipSoloType()});
 
 function finalizeRound(round){
-  // Start game timer on first round
   if(!state.gameStartTime)state.gameStartTime=Date.now();
-  // Add timestamp to round
   round.timestamp=Date.now();
-  // Save undo state
   lastUndo={round:JSON.parse(JSON.stringify(round)),bockQueueBefore:state.bockQueue,playerStates:round.playing.map(p=>({name:p,won:round.winners.includes(p)}))};
   state.rounds.push(round);
-  const bock=isBockRound();
-  if(bock&&state.bockQueue>0)state.bockQueue--;
+  if(isBockRound()&&state.bockQueue>0)state.bockQueue--;
   const triggerBock=document.getElementById('triggerBockToggle');
   if(triggerBock&&triggerBock.classList.contains('on'))state.bockQueue+=state.bockCount;
   save();
-  // Confetti on solo win or new points leader
   const soloWin=round.solo&&round.winners.length===1;
   if(soloWin)setTimeout(launchConfetti,300);
   else{
-    // Check if someone took the lead
     const all=getAllPlayers();const totals={};all.forEach(p=>totals[p]=0);
     state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
     const prevTotals={};all.forEach(p=>prevTotals[p]=totals[p]-(round.scores[p]||0));
@@ -681,11 +624,9 @@ function finalizeRound(round){
     const newLeader=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
     if(state.rounds.length>1&&newLeader!==prevLeader)setTimeout(launchConfetti,300);
   }
-  showScreen('tabelle');
-  renderTabelle(true);
+  showScreen('tabelle');renderTabelle(true);
 }
 
-// EDIT MODAL
 function openEditModal(i){
   editingRound=i;const all=getAllPlayers();const r=state.rounds[i];currentPts=''+r.points;
   let html='<h3>Spiel '+(i+1)+' bearbeiten</h3>';
@@ -736,10 +677,7 @@ function saveEditRound(){
   if(solo){
     const solist=winners.length===1?winners[0]:losers[0];
     const solistWon=winners.includes(solist);
-    playing.forEach(p=>{
-      if(p===solist){scores[p]=solistWon?pts*3*mult:-pts*3*mult}
-      else{scores[p]=solistWon?-pts*mult:pts*mult}
-    });
+    playing.forEach(p=>{if(p===solist){scores[p]=solistWon?pts*3*mult:-pts*3*mult}else{scores[p]=solistWon?-pts*mult:pts*mult}});
   }else{
     playing.forEach(p=>{scores[p]=winners.includes(p)?pts*mult:-pts*mult});
   }
@@ -756,18 +694,11 @@ function toggleRowMenu(e,i){
   const menu=document.getElementById('rowMenu'+i);
   const wasOpen=menu.classList.contains('show');
   closeAllMenus();
-  if(!wasOpen){
-    const btn=e.currentTarget;
-    const rect=btn.getBoundingClientRect();
-    menu.style.top=rect.bottom+'px';
-    menu.style.right=(window.innerWidth-rect.right)+'px';
-    menu.classList.add('show');
-  }
+  if(!wasOpen){const btn=e.currentTarget;const rect=btn.getBoundingClientRect();menu.style.top=rect.bottom+'px';menu.style.right=(window.innerWidth-rect.right)+'px';menu.classList.add('show')}
 }
 function closeAllMenus(){document.querySelectorAll('.row-menu.show').forEach(m=>m.classList.remove('show'))}
 document.addEventListener('click',closeAllMenus);
 
-// TABELLE
 function renderTabelle(scrollToBottom){
   const all=getAllPlayers();
   if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
@@ -783,91 +714,49 @@ function renderTabelle(scrollToBottom){
     shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+(flames?' <span style="font-size:12px">'+flames+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
-
   const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
-
-  // Build cumulative scores
   const cumul={};all.forEach(p=>cumul[p]=[]);
   let run={};all.forEach(p=>run[p]=0);
-  state.rounds.forEach(r=>{
-    all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])});
-  });
-
+  state.rounds.forEach(r=>{all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])})});
   let html='<table><thead><tr><th>#</th><th>Pkt</th>';
   all.forEach(p=>html+='<th>'+p.substring(0,5)+'</th>');
   html+='<th></th></tr></thead><tbody>';
   state.rounds.forEach((r,i)=>{
-    // Main row with cumulative scores
     html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
     html+='<td style="color:var(--tx3)">'+(i+1);
-    if(r.solo){
-      const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';
-      html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>';
-    }
+    if(r.solo){const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>'}
     if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
-    html+='</td>';
-    html+='<td style="color:var(--tx3)">'+r.points+'</td>';
+    html+='</td><td style="color:var(--tx3)">'+r.points+'</td>';
     all.forEach(p=>{
       const c=cumul[p][i];const cls=c>0?'pos':c<0?'neg':'';
-      const played=r.playing.includes(p);
-      const won=r.winners.includes(p);
-      const lost=played&&!won;
+      const played=r.playing.includes(p);const won=r.winners.includes(p);const lost=played&&!won;
       const bg=won?'background:var(--grn-bg)':lost?'background:var(--red-bg)':'';
       html+='<td class="'+cls+'" style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
     });
-    html+='<td style="white-space:nowrap;position:relative">';
-    html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
+    html+='<td style="white-space:nowrap;position:relative"><div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
     html+='<div class="row-menu" id="rowMenu'+i+'">';
     if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
     if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',1)">'+ICO.down+' Nach unten</button>';
     html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
     html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
     html+='</div></div></td></tr>';
-
-    // Expandable detail row
     const dealerForRound=all[i%all.length];
     const rundeForRound=Math.floor(i/all.length)+1;
     const spielInRundeFor=(i%all.length)+1;
-    html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'">';
-    html+='<div class="expand-detail">';
+    html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'"><div class="expand-detail">';
     html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
     html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
-    // Game duration
-    if(r.timestamp&&i>0&&state.rounds[i-1].timestamp){
-      const dur=r.timestamp-state.rounds[i-1].timestamp;
-      html+='<span style="font-size:10px;color:var(--tx3)">&#9202; '+formatDuration(dur)+'</span> ';
-    } else if(r.timestamp&&i===0&&state.gameStartTime){
-      const dur=r.timestamp-state.gameStartTime;
-      html+='<span style="font-size:10px;color:var(--tx3)">&#9202; '+formatDuration(dur)+'</span> ';
-    }
-    all.forEach(p=>{
-      const s=r.scores[p];const played=r.playing.includes(p);
-      if(played){
-        const cls=s>0?'pos':s<0?'neg':'';
-        html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>';
-      }
-    });
-    if(r.absagen&&r.absagen.length){
-      html+='<span style="font-size:10px;color:var(--warn);margin-left:4px">'+r.absagen.join(', ')+'</span>';
-    }
+    if(r.timestamp&&i>0&&state.rounds[i-1].timestamp){const dur=r.timestamp-state.rounds[i-1].timestamp;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
+    else if(r.timestamp&&i===0&&state.gameStartTime){const dur=r.timestamp-state.gameStartTime;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
+    all.forEach(p=>{const s=r.scores[p];if(r.playing.includes(p)){const cls=s>0?'pos':s<0?'neg':'';html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>'}});
     html+='</div></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('tableWrap').innerHTML=html;
-
-  if(scrollToBottom){
-    setTimeout(()=>{
-      const tw=document.getElementById('tableWrap');
-      tw.scrollTop=tw.scrollHeight;
-    },50);
-  }
+  if(scrollToBottom)setTimeout(()=>{const tw=document.getElementById('tableWrap');tw.scrollTop=tw.scrollHeight},50);
 }
-function toggleExpand(i){
-  const row=document.getElementById('expandRow'+i);
-  if(row)row.classList.toggle('show');
-}
+function toggleExpand(i){const row=document.getElementById('expandRow'+i);if(row)row.classList.toggle('show')}
 
-// STATS
 function renderStats(){
   chartInstances.forEach(c=>c.destroy());chartInstances=[];
   const all=getAllPlayers();const c=document.getElementById('statsContent');
@@ -875,14 +764,8 @@ function renderStats(){
   const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
   all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
   state.rounds.forEach(r=>{
-    // Determine solist for solo rounds
     let solist=null;
-    if(r.solo){
-      if(r.winners.length===1)solist=r.winners[0];
-      else if(r.winners.length===3){
-        solist=r.playing.find(p=>!r.winners.includes(p));
-      }
-    }
+    if(r.solo){if(r.winners.length===1)solist=r.winners[0];else if(r.winners.length===3)solist=r.playing.find(p=>!r.winners.includes(p))}
     all.forEach(p=>{
       if(r.playing.includes(p)){gamesPlayed[p]++;totals[p]+=(r.scores[p]||0);
         if(r.winners.includes(p)){wins[p]++;if(r.solo&&p===solist)soloWins[p]++}
@@ -892,39 +775,29 @@ function renderStats(){
   });
   const soloKing=all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b);
   const bestPlayer=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
-
   let html='<div id="shareableStats">';
   html+='<div class="stat-grid">';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+'</div><div class="stat-label">Bester Spieler</div></div>';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
-  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">&#128081; Solokönig</div></div>';
+  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">👑 Solokönig</div></div>';
   html+='</div>';
-
   html+='<div class="section-label" style="margin-top:20px">Spieler</div><div class="card">';
   all.forEach(p=>{
     const avg=gamesPlayed[p]?Math.round(totals[p]/gamesPlayed[p]*10)/10:0;
     const winRate=gamesPlayed[p]?Math.round(wins[p]/gamesPlayed[p]*100):0;
     html+='<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500">'+p+'</span><span class="'+(totals[p]>=0?'pos':'neg')+'" style="font-family:\'Space Mono\',monospace;font-weight:700">'+(totals[p]>0?'+':'')+totals[p]+'</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--tx3)"><span>Siege: '+winRate+'%</span><span>Schnitt: '+(avg>0?'+':'')+avg+'</span><span>Soli: '+soloWins[p]+'/'+(soloWins[p]+soloLosses[p])+'</span></div></div>';
   });
-  html+='</div>';
-  html+='</div>'; // close shareableStats
-
-  html+='<div class="section-label" style="margin-top:20px">Punkteverlauf</div>';
-  html+='<div class="card"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>';
-  html+='<div class="section-label" style="margin-top:20px">Gewonnene Spiele</div>';
-  html+='<div class="card"><div class="chart-container"><canvas id="winsChart"></canvas></div></div>';
-  html+='<div class="section-label" style="margin-top:20px">Punkteschnitt je Spiel</div>';
-  html+='<div class="card"><div class="chart-container"><canvas id="avgChart"></canvas></div></div>';
-  html+='<div class="section-label" style="margin-top:20px">Soli (gewonnen / verloren)</div>';
-  html+='<div class="card"><div class="chart-container"><canvas id="soloChart"></canvas></div></div>';
-  html+='<div class="section-label" style="margin-top:20px">Wer war im Team?</div>';
-  html+='<div class="card" id="pairCard"></div>';
+  html+='</div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Punkteverlauf</div><div class="card"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Gewonnene Spiele</div><div class="card"><div class="chart-container"><canvas id="winsChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Punkteschnitt je Spiel</div><div class="card"><div class="chart-container"><canvas id="avgChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Soli (gewonnen / verloren)</div><div class="card"><div class="chart-container"><canvas id="soloChart"></canvas></div></div>';
+  html+='<div class="section-label" style="margin-top:20px">Wer war im Team?</div><div class="card" id="pairCard"></div>';
   c.innerHTML=html;
   buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed);
   buildPairings(all);
 }
-
 function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
   const cumulative={};all.forEach(p=>cumulative[p]=[]);
   let running={};all.forEach(p=>running[p]=0);
@@ -932,23 +805,18 @@ function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
   const labels=state.rounds.map((_,i)=>''+(i+1));
   const cOpts={responsive:true,maintainAspectRatio:false};
   const cc=getChartColors();const gridC=cc.grid;const tickC=cc.tick;const lblC=cc.lbl;
-
   chartInstances.push(new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:all.map((p,i)=>({label:p,data:cumulative[p],borderColor:COLORS[i%COLORS.length],backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3}))},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12,padding:8}}},scales:{x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}}}}}));
   chartInstances.push(new Chart(document.getElementById('winsChart'),{type:'bar',data:{labels:all,datasets:[{label:'Gewonnen',data:all.map(p=>wins[p]),backgroundColor:'#0a8f6a'},{label:'Verloren',data:all.map(p=>losses[p]),backgroundColor:'#c0392b'}]},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:lblC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11},stepSize:1}}}}}));
   const avgs=all.map(p=>gamesPlayed[p]?Math.round(totals[p]/gamesPlayed[p]*10)/10:0);
   chartInstances.push(new Chart(document.getElementById('avgChart'),{type:'bar',data:{labels:all,datasets:[{label:'Schnitt',data:avgs,backgroundColor:avgs.map(v=>v>=0?'#0a8f6a':'#c0392b')}]},options:{...cOpts,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},y:{grid:{display:false},ticks:{color:lblC,font:{size:12}}}}}}));
   chartInstances.push(new Chart(document.getElementById('soloChart'),{type:'bar',data:{labels:all,datasets:[{label:'Gewonnen',data:all.map(p=>soloWins[p]),backgroundColor:'#0a8f6a'},{label:'Verloren',data:all.map(p=>soloLosses[p]),backgroundColor:'#c0392b'}]},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{color:lblC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11},stepSize:1}}}}}));
 }
-
 function buildPairings(all){
   const pairs={};
   for(let i=0;i<all.length;i++){for(let j=i+1;j<all.length;j++){pairs[all[i]+'|'+all[j]]=0}}
   state.rounds.forEach(r=>{
-    // Skip solo rounds - no real teams
     if(r.solo)return;
-    // Only count players who were on the same team (both won or both lost)
-    const teamWin=r.winners;
-    const teamLose=r.playing.filter(p=>!r.winners.includes(p));
+    const teamWin=r.winners;const teamLose=r.playing.filter(p=>!r.winners.includes(p));
     [teamWin,teamLose].forEach(team=>{
       for(let i=0;i<team.length;i++){for(let j=i+1;j<team.length;j++){
         const a=team[i],b=team[j];
@@ -967,25 +835,16 @@ function buildPairings(all){
   document.getElementById('pairCard').innerHTML=html;
 }
 
-// CALCULATOR
 function openCalcModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5"><h3 style="margin:0">Punkte zählen</h3><div id="calcResultSticky" style="font-family:\'Space Mono\',monospace;font-size:28px;font-weight:700;color:var(--acc)">0</div></div>';
-  // Game type
   html+='<div class="section-label">Spielart</div>';
-  html+='<div style="display:flex;gap:6px;margin-bottom:12px">';
-  html+='<div class="solo-chip selected" data-calc="normal" onclick="setCalcType(\'normal\',this)" style="flex:1;text-align:center">Normalspiel</div>';
-  html+='<div class="solo-chip" data-calc="solo" onclick="setCalcType(\'solo\',this)" style="flex:1;text-align:center">Solo</div>';
-  html+='</div>';
-  // Result
+  html+='<div style="display:flex;gap:6px;margin-bottom:12px"><div class="solo-chip selected" data-calc="normal" onclick="setCalcType(\'normal\',this)" style="flex:1;text-align:center">Normalspiel</div><div class="solo-chip" data-calc="solo" onclick="setCalcType(\'solo\',this)" style="flex:1;text-align:center">Solo</div></div>';
   html+='<div class="section-label">Ergebnis</div>';
   html+='<div class="card" style="padding:8px 10px">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="c120" onchange="calcAutoCheck(\'result\')"> Gewonnen (120+)</label></div>';
-  ['90','60','30'].forEach(v=>{
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="c'+v+'" onchange="calcAutoCheck(\'result\')"> Keine '+v+'</label><label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3);cursor:pointer"><input type="checkbox" id="c'+v+'A" onchange="calcAutoCheck(\'ansage\')"> angesagt</label></div>';
-  });
+  ['90','60','30'].forEach(v=>{html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="c'+v+'" onchange="calcAutoCheck(\'result\')"> Keine '+v+'</label><label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3);cursor:pointer"><input type="checkbox" id="c'+v+'A" onchange="calcAutoCheck(\'ansage\')"> angesagt</label></div>'});
   html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cSchwarz" onchange="calcAutoCheck(\'result\')"> Schwarz</label><label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3);cursor:pointer"><input type="checkbox" id="cSchwarzA" onchange="calcAutoCheck(\'ansage\')"> angesagt</label></div>';
   html+='</div>';
-  // Ansagen (verdoppeln)
   html+='<div class="section-label">Ansagen <span style="font-size:10px;color:var(--tx3)">(verdoppeln die Punkte)</span></div>';
   html+='<div class="card" style="padding:8px 10px">';
   html+='<div style="padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cRe" onchange="calcPoints()"> Re angesagt</label></div>';
@@ -993,19 +852,14 @@ function openCalcModal(){
   html+='<div id="calcVorabRow" style="padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cVorab" onchange="calcPoints()"> Vorab</label></div>';
   html+='<div id="calcGegenAlte" style="padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cGegenAlte" onchange="calcPoints()"> Gegen die Alten</label></div>';
   html+='</div>';
-  // Sonderpunkte (nicht verdoppelt)
   html+='<div id="calcSonderNormal" class="section-label">Sonderpunkte <span style="font-size:10px;color:var(--tx3)">(werden nicht verdoppelt)</span></div>';
   html+='<div id="calcSonderNormalCard" class="card" style="padding:8px 10px">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cFuchs" onchange="calcPoints()"> Fuchs gefangen</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cFuchsN\',-1)">−</button><span id="cFuchsN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cFuchsN\',1)">+</button></div></div>';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cDoko" onchange="calcPoints()"> Doppelkopf</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cDokoN\',-1)">−</button><span id="cDokoN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cDokoN\',1)">+</button></div></div>';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cCharlie" onchange="calcPoints()"> Charlie</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cCharlieN\',-1)">−</button><span id="cCharlieN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cCharlieN\',1)">+</button></div></div>';
   html+='</div>';
-  // Solo sonderpunkte
   html+='<div id="calcSonderSolo" class="section-label" style="display:none">Sonderpunkte</div>';
-  html+='<div id="calcSonderSoloCard" class="card" style="padding:8px 10px;display:none">';
-  html+='<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cSoloPkt" onchange="calcPoints()" checked> Solopunkt (+1)</label></div>';
-  html+='</div>';
-  // Buttons
+  html+='<div id="calcSonderSoloCard" class="card" style="padding:8px 10px;display:none"><div style="padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cSoloPkt" onchange="calcPoints()" checked> Solopunkt (+1)</label></div></div>';
   html+='<div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg2);padding:8px 0 0"><button class="btn btn-secondary" onclick="closeCalcModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="applyCalcPoints()" style="flex:1">'+ICO.check+' Übernehmen</button></div>';
   document.getElementById('calcModalContent').innerHTML=html;
   document.getElementById('calcModal').classList.add('show');
@@ -1013,44 +867,21 @@ function openCalcModal(){
 }
 let calcGameType='normal';
 const calcCounterMax={cFuchsN:2,cDokoN:9,cCharlieN:2};
-function calcCounter(id,dir){
-  const el=document.getElementById(id);
-  let v=parseInt(el.textContent)||1;
-  v=Math.max(1,Math.min(calcCounterMax[id]||9,v+dir));
-  el.textContent=v;
-  calcPoints();
-}
+function calcCounter(id,dir){const el=document.getElementById(id);let v=parseInt(el.textContent)||1;v=Math.max(1,Math.min(calcCounterMax[id]||9,v+dir));el.textContent=v;calcPoints()}
 function calcAutoCheck(type){
-  // Cascade: result levels (120 > 90 > 60 > 30 > Schwarz)
   const levels=['c120','c90','c60','c30','cSchwarz'];
   const levelsA=['','c90A','c60A','c30A','cSchwarzA'];
   if(type==='result'){
-    // If checking a lower level, check all higher ones
-    // If unchecking a higher level, uncheck all lower ones
     let foundChecked=false;
-    for(let i=levels.length-1;i>=0;i--){
-      if(document.getElementById(levels[i]).checked){foundChecked=true}
-      if(foundChecked)document.getElementById(levels[i]).checked=true;
-    }
-    // Also uncheck: if a higher one is unchecked, uncheck all below
+    for(let i=levels.length-1;i>=0;i--){if(document.getElementById(levels[i]).checked)foundChecked=true;if(foundChecked)document.getElementById(levels[i]).checked=true}
     let foundUnchecked=false;
-    for(let i=0;i<levels.length;i++){
-      if(!document.getElementById(levels[i]).checked)foundUnchecked=true;
-      if(foundUnchecked)document.getElementById(levels[i]).checked=false;
-    }
+    for(let i=0;i<levels.length;i++){if(!document.getElementById(levels[i]).checked)foundUnchecked=true;if(foundUnchecked)document.getElementById(levels[i]).checked=false}
   }
   if(type==='ansage'){
-    // Same logic for "angesagt" checkboxes (skip 120 which has no ansage)
     let foundChecked=false;
-    for(let i=levelsA.length-1;i>=1;i--){
-      if(document.getElementById(levelsA[i]).checked){foundChecked=true}
-      if(foundChecked)document.getElementById(levelsA[i]).checked=true;
-    }
+    for(let i=levelsA.length-1;i>=1;i--){if(document.getElementById(levelsA[i]).checked)foundChecked=true;if(foundChecked)document.getElementById(levelsA[i]).checked=true}
     let foundUnchecked=false;
-    for(let i=1;i<levelsA.length;i++){
-      if(!document.getElementById(levelsA[i]).checked)foundUnchecked=true;
-      if(foundUnchecked)document.getElementById(levelsA[i]).checked=false;
-    }
+    for(let i=1;i<levelsA.length;i++){if(!document.getElementById(levelsA[i]).checked)foundUnchecked=true;if(foundUnchecked)document.getElementById(levelsA[i]).checked=false}
   }
   calcPoints();
 }
@@ -1076,15 +907,12 @@ function calcPoints(){
     if(document.getElementById(id).checked)base+=1;
     if(document.getElementById(id+'A').checked)base+=1;
   });
-  // Verdopplung
   let multiplier=1;
   if(document.getElementById('cRe').checked)multiplier*=2;
   if(document.getElementById('cKontra').checked)multiplier*=2;
-  // Vorab and Gegen die Alten are also doubled
   if(calcGameType!=='solo'&&document.getElementById('cVorab').checked)base+=1;
   if(calcGameType!=='solo'&&document.getElementById('cGegenAlte').checked)base+=1;
   let total=base*multiplier;
-  // Sonderpunkte (not doubled)
   if(calcGameType!=='solo'){
     if(document.getElementById('cFuchs').checked)total+=parseInt(document.getElementById('cFuchsN').textContent)||1;
     if(document.getElementById('cDoko').checked)total+=parseInt(document.getElementById('cDokoN').textContent)||1;
@@ -1094,67 +922,39 @@ function calcPoints(){
   }
   document.getElementById('calcResultSticky').textContent=total;
 }
-function applyCalcPoints(){
-  const total=document.getElementById('calcResultSticky').textContent;
-  currentPts=total;
-  updatePtsDisplay();
-  closeCalcModal();
-}
+function applyCalcPoints(){currentPts=document.getElementById('calcResultSticky').textContent;updatePtsDisplay();closeCalcModal()}
 function closeCalcModal(){document.getElementById('calcModal').classList.remove('show')}
 document.getElementById('calcModal').addEventListener('click',function(e){if(e.target===this)closeCalcModal()});
 
-// CONFETTI
 function launchConfetti(){
-  const container=document.createElement('div');
-  container.className='confetti-container';
-  document.body.appendChild(container);
+  const container=document.createElement('div');container.className='confetti-container';document.body.appendChild(container);
   const colors=['#2ec4b6','#e05252','#f0a830','#5b4cdb','#ff6b6b','#48dbfb','#ff9ff3','#feca57'];
   const shapes=['&#9824;','&#9829;','&#9830;','&#9827;'];
   for(let i=0;i<60;i++){
-    const c=document.createElement('div');
-    c.className='confetti';
+    const c=document.createElement('div');c.className='confetti';
     c.innerHTML=Math.random()>0.5?shapes[Math.floor(Math.random()*shapes.length)]:'';
-    c.style.left=Math.random()*100+'%';
-    c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];
-    c.style.borderRadius=Math.random()>0.5?'50%':'2px';
-    c.style.width=(4+Math.random()*8)+'px';
-    c.style.height=(4+Math.random()*8)+'px';
-    c.style.animationDuration=(1.5+Math.random()*2)+'s';
-    c.style.animationDelay=(Math.random()*0.5)+'s';
-    c.style.fontSize=(10+Math.random()*10)+'px';
-    c.style.color=colors[Math.floor(Math.random()*colors.length)];
+    c.style.left=Math.random()*100+'%';c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];
+    c.style.borderRadius=Math.random()>0.5?'50%':'2px';c.style.width=(4+Math.random()*8)+'px';c.style.height=(4+Math.random()*8)+'px';
+    c.style.animationDuration=(1.5+Math.random()*2)+'s';c.style.animationDelay=(Math.random()*0.5)+'s';
+    c.style.fontSize=(10+Math.random()*10)+'px';c.style.color=colors[Math.floor(Math.random()*colors.length)];
     container.appendChild(c);
   }
   setTimeout(()=>container.remove(),4000);
 }
 
-// SHARE
 async function captureAndShare(element,filename){
   try{
     const canvas=await html2canvas(element,{backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),scale:2,useCORS:true});
     canvas.toBlob(async function(blob){
       const file=new File([blob],filename,{type:'image/png'});
-      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title:'Doppelkopf Ergebnis'});
-      }else{
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');
-        a.href=url;a.download=filename;a.click();
-        URL.revokeObjectURL(url);
-      }
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Doppelkopf Ergebnis'})}
+      else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url)}
     },'image/png');
   }catch(e){console.error('Share failed:',e)}
 }
-function shareStats(){
-  const el=document.getElementById('shareableStats');
-  if(el)captureAndShare(el,'doppelkopf-statistik.png');
-}
-function shareTabelle(){
-  const el=document.getElementById('standsCard');
-  if(el)captureAndShare(el,'doppelkopf-tabelle.png');
-}
+function shareStats(){const el=document.getElementById('shareableStats');if(el)captureAndShare(el,'doppelkopf-statistik.png')}
+function shareTabelle(){const el=document.getElementById('standsCard');if(el)captureAndShare(el,'doppelkopf-tabelle.png')}
 
-// INFO MODAL
 function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
   html+='<div class="section-label">Punkte zählen – Normalspiel</div>';
@@ -1196,55 +996,43 @@ function openInfoModal(){
   html+='<div style="margin-bottom:4px">&#9679; Solo gewonnen: Solist <strong>+3×</strong>, Gegner je <strong>−1×</strong></div>';
   html+='<div style="margin-bottom:4px">&#9679; Solo verloren: Solist <strong>−3×</strong>, Gegner je <strong>+1×</strong></div>';
   html+='</div>';
-  html+='<div style="margin-top:8px;font-size:11px;color:var(--tx3);padding:0 4px">Hinweis: Die Punktewerte können je nach Hausregeln abweichen. Diese App berechnet keine Punkte automatisch – alle Werte werden manuell eingetragen.</div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:var(--tx3);padding:0 4px">Hinweis: Die Punktewerte können je nach Hausregeln abweichen.</div>';
   html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.1',d:'30.04.2026 17:08',t:'Bugfix: Eingabe zeigte "mind. 4 Spieler" obwohl genug Spieler eingetragen waren. gameStarted-Flag entfernt – App prüft jetzt direkt die Spieleranzahl.'},
     {v:'4.0',d:'30.04.2026 14:10',t:'Punkterechner: Intelligente Kaskade – keine 60 ankreuzen setzt automatisch auch keine 90 und 120. Gleiches für Ansagen. Fuchs und Charlie maximal 2, Doppelkopf bis 9.'},
     {v:'3.9',d:'30.04.2026 14:00',t:'Punkterechner überarbeitet: Vorab und Gegen die Alten werden jetzt verdoppelt. Fuchs/Doppelkopf/Charlie mit Zähler (±) für mehrere. Solo zeigt nur Solopunkt als Sonderpunkt. Rechner im Vollbild mit sticky Ergebnis-Anzeige oben. Hilfeseite korrigiert.'},
     {v:'3.8',d:'30.04.2026 13:45',t:'Punkterechner: Button bei der Eingabe öffnet Dialog zum interaktiven Punkte zählen.'},
     {v:'3.7',d:'30.04.2026 13:30',t:'Hilfeseite: Punktezählung getrennt nach Normalspiel und Solo mit jeweils eigener Anleitung inkl. Verteilung.'},
     {v:'3.6',d:'30.04.2026 13:25',t:'Tabelle: Gewinner/Verlierer pro Spiel auf einen Blick erkennbar durch dezenten grünen/roten Hintergrund in der Zelle.'},
     {v:'3.5',d:'30.04.2026 13:20',t:'Team-Statistik: Solo-Spiele werden ignoriert (kein echtes Team).'},
-    {v:'3.4',d:'30.04.2026 13:15',t:'Spieler löschen: Bestätigung wenn der Spieler bereits Spiele hat. Team-Statistik: zählt jetzt nur Paarungen im gleichen Team (beide gewonnen oder beide verloren), nicht mehr alle am Tisch.'},
-    {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel. Punkte und Spieler-Auswahl gehen nicht mehr verloren.'},
-    {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander. Sichtbar bei der Eingabe und in der Rangliste. Verschwindet bei einer Niederlage.'},
-    {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel! Kartensymbole regnen vom Himmel. Absagen aus Setup und Eingabe entfernt. Hilfeseite-Text zu Ansagen korrigiert.'},
-    {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit läuft ab dem ersten Spiel, zeigt Gesamtzeit und Durchschnittszeit pro Spiel. Zeit pro Spiel in der Tabelle aufklappbar. Hilfeseite korrigiert: Ansagen verdoppeln Punkte, Vorab gibt Extra-Punkt (nicht bei Solo), Solo gibt Solopunkt.'},
-    {v:'2.9',d:'30.04.2026 12:30',t:'Absagen (Re, Kontra, keine 90/60/30, schwarz) erfassbar. Setup-Option: Nie/Optional/Immer. Absagen in Tabelle aufklappbar und im Undo wiederherstellbar. Hilfeseite mit Anleitung zur Punktezählung im Info-Modal. E-Mail auf doppelkopf@arne-chudobba.de geändert.'},
-    {v:'2.8',d:'30.04.2026 12:20',t:'Rundenzähler: Anzeige von Runde und Spiel-Nummer in der Eingabe. Hinweis wenn eine Runde beendet ist. Runden-Info auch in der Tabelle aufklappbar.'},
-    {v:'2.7',d:'30.04.2026 12:15',t:'Rückgängig-Button: nach dem Speichern erscheint unter dem Speichern-Button ein dezenter Undo-Button. Stellt Punkte und Spieler-Auswahl wieder her.'},
-    {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App ist jetzt installierbar auf dem Homescreen, funktioniert offline. Eigenes App-Icon (Kreuz Dame).'},
+    {v:'3.4',d:'30.04.2026 13:15',t:'Spieler löschen: Bestätigung wenn der Spieler bereits Spiele hat. Team-Statistik: zählt jetzt nur Paarungen im gleichen Team.'},
+    {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel.'},
+    {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander.'},
+    {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel.'},
+    {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit läuft ab dem ersten Spiel, zeigt Gesamtzeit und Durchschnittszeit pro Spiel.'},
+    {v:'2.9',d:'30.04.2026 12:30',t:'Absagen (Re, Kontra, keine 90/60/30, schwarz) erfassbar.'},
+    {v:'2.8',d:'30.04.2026 12:20',t:'Rundenzähler: Anzeige von Runde und Spiel-Nummer in der Eingabe.'},
+    {v:'2.7',d:'30.04.2026 12:15',t:'Rückgängig-Button nach dem Speichern.'},
+    {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App ist jetzt installierbar auf dem Homescreen, funktioniert offline.'},
     {v:'2.5',d:'30.04.2026 12:00',t:'Swipe-Navigation komplett entfernt.'},
-    {v:'2.4',d:'30.04.2026 11:55',t:'Swipen auf der Statistik-Seite deaktiviert, da es beim Scrollen stört.'},
-    {v:'2.3',d:'30.04.2026 11:50',t:'Swipe von Eingabe zu Tabelle gefixt. Dropdown-Menü wird nicht mehr abgeschnitten bei wenigen Spielen.'},
-    {v:'2.2',d:'30.04.2026 11:44',t:'Swipe-Bug behoben: keine leere Seite mehr. Uhrzeiten im Changelog korrigiert.'},
-    {v:'2.1',d:'30.04.2026 11:44',t:'Hintergrund thematisch angepasst: Kartensymbole-Pattern mit Kreuz-Dame, Spieltisch-grüner Farbton in Light und Dark Mode.'},
-    {v:'2.0',d:'30.04.2026 11:30',t:'Swipe-Navigation mit echtem Drag-Feeling: Seite bewegt sich beim Ziehen mit und gleitet sanft zur nächsten. Changelog-Daten korrigiert.'},
-    {v:'1.9',d:'30.04.2026 11:20',t:'Feature-Wunsch umbenannt zu Feedback & Bugs. Swipe-Navigation zwischen Tabs.'},
-    {v:'1.8',d:'30.04.2026 11:10',t:'Teilen-Funktion: Statistik und Tabelle als Bild teilen (nativ auf dem Handy) oder herunterladen.'},
-    {v:'1.7',d:'30.04.2026 11:00',t:'Kein "Mein Spieler" mehr – alle Spieler gleich eintragen. Kartengeber rotiert automatisch nach Spielerreihenfolge. Geber wird in der Eingabe und aufklappbar in der Tabelle angezeigt.'},
-    {v:'1.6',d:'30.04.2026 10:50',t:'Spieler umbenennen im App-eigenen Design. Tabelle scrollt immer nach unten. Solo-Statistik zählt nur noch für den Solisten.'},
-    {v:'1.5',d:'30.04.2026 10:40',t:'Tabelle zeigt kumulierte Punkte, Einzelpunkte aufklappbar. Punkte-Spalte hinzugefügt. Nach Eingabe automatisch zur Tabelle. Info-Button mit Changelog. Feature-Wünsche per E-Mail. Spieler im Setup umbenennen, umsortieren, entfernen.'},
-    {v:'1.4',d:'22.04.2026',t:'0-Punkte-Spiele erlaubt. Punkte-Feld springt nicht mehr. Toast für Einstellungen dezenter.'},
-    {v:'1.3',d:'22.04.2026',t:'0 Punkte werden in Tabelle angezeigt für Mitspieler.'},
-    {v:'1.2',d:'22.04.2026',t:'Edit-Modal oben platziert statt am unteren Rand.'},
-    {v:'1.1',d:'22.04.2026',t:'Solo-Punkteverteilung korrigiert: Solist bekommt dreifach. Numpad im Edit-Modal gefixt.'},
-    {v:'1.0',d:'22.04.2026',t:'Erste Version: Eingabe, Tabelle, Statistiken, Dark/Light Mode, Solo-Arten, Bockrunden, Spieler-Verwaltung.'}
+    {v:'2.1',d:'30.04.2026 11:44',t:'Hintergrund thematisch angepasst: Kartensymbole-Pattern.'},
+    {v:'2.0',d:'30.04.2026 11:30',t:'Swipe-Navigation mit echtem Drag-Feeling.'},
+    {v:'1.8',d:'30.04.2026 11:10',t:'Teilen-Funktion: Statistik und Tabelle als Bild teilen.'},
+    {v:'1.7',d:'30.04.2026 11:00',t:'Kein "Mein Spieler" mehr – alle Spieler gleich. Kartengeber rotiert automatisch.'},
+    {v:'1.5',d:'30.04.2026 10:40',t:'Tabelle zeigt kumulierte Punkte, Einzelpunkte aufklappbar.'},
+    {v:'1.0',d:'22.04.2026',t:'Erste Version.'}
   ];
-  log.forEach(e=>{
-    html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>';
-  });
-  html+='</div>';
-  html+='<button class="btn btn-secondary" onclick="closeInfoModal()">Schließen</button>';
+  log.forEach(e=>{html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>'});
+  html+='</div><button class="btn btn-secondary" style="margin-top:12px" onclick="closeInfoModal()">Schließen</button>';
   document.getElementById('infoModalContent').innerHTML=html;
   document.getElementById('infoModal').classList.add('show');
 }
 function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
 document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
 
-// THEME
 function toggleTheme(){
   const html=document.documentElement;
   const isLight=html.getAttribute('data-theme')==='light';
@@ -1268,7 +1056,6 @@ function getChartColors(){
   return{grid:s.getPropertyValue('--chart-grid').trim(),tick:s.getPropertyValue('--chart-tick').trim(),lbl:s.getPropertyValue('--chart-lbl').trim()};
 }
 
-// PWA
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 
 load();
