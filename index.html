@@ -57,9 +57,8 @@
         <div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle" id="bockSoloToggle" onclick="this.classList.toggle('on');save()"></button></div>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.2 · 30.04.2026 17:20</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.3 · 30.04.2026 17:35</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -81,8 +80,6 @@
     <div id="statsContent"></div>
   </div>
 </div>
-
-<div id="setupSuccessMsg" style="display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:6px 12px;background:var(--grn-bg);color:var(--grn);border-radius:var(--r-sm);font-size:12px;font-weight:500;border:1px solid rgba(46,196,182,.15);z-index:200;align-items:center;gap:8px;backdrop-filter:blur(8px);white-space:nowrap"><span id="setupSuccessText"></span><button onclick="document.getElementById('setupSuccessMsg').style.display='none'" style="background:none;border:none;color:var(--grn);cursor:pointer;padding:0;line-height:1;font-size:14px">&times;</button></div>
 
 <div class="modal-overlay" id="editModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="editModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
@@ -255,13 +252,6 @@ addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefau
 function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 function getAllPlayers(){return [...state.players]}
 
-function saveSettings(){
-  checkAutoStart();save();
-  const msg=document.getElementById('setupSuccessMsg');
-  document.getElementById('setupSuccessText').innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg> Gespeichert';
-  msg.style.display='flex';
-  setTimeout(()=>{msg.style.display='none'},2000);
-}
 function newGame(){
   if(state.rounds.length>0){
     if(!confirm('Alle '+state.rounds.length+' Spiele werden gelöscht. Wirklich neues Spiel starten?'))return;
@@ -851,6 +841,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.3',d:'30.04.2026 17:35',t:'"Einstellungen speichern"-Button entfernt – alle Einstellungen werden bereits beim Ändern automatisch gespeichert. Weniger Klicks, weniger UI-Rauschen.'},
     {v:'4.2',d:'30.04.2026 17:20',t:'Refactoring: CSS in eigene Datei styles.css ausgelagert. index.html ist jetzt deutlich übersichtlicher.'},
     {v:'4.1',d:'30.04.2026 17:08',t:'Bugfix: Eingabe zeigte "mind. 4 Spieler" obwohl genug Spieler eingetragen waren. gameStarted-Flag entfernt – App prüft jetzt direkt die Spieleranzahl.'},
     {v:'4.0',d:'30.04.2026 14:10',t:'Punkterechner: Intelligente Kaskade – keine 60 ankreuzen setzt automatisch auch keine 90 und 120. Gleiches für Ansagen. Fuchs und Charlie maximal 2, Doppelkopf bis 9.'},
