@@ -1,4 +1,4 @@
-const CACHE_NAME = 'doko-v3.5';
+const CACHE_NAME = 'doko-v4.0';
 const ASSETS = [
   '/',
   '/index.html',

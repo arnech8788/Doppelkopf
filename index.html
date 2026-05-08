@@ -65,8 +65,8 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .toggle.on::after{left:23px}
 .table-wrap{overflow-x:auto;margin:0 -16px;padding:0 16px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;top:0;background:var(--bg2);z-index:2}
-td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap}
+th{text-align:center;padding:8px 6px;color:var(--tx3);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bdr);white-space:nowrap;position:sticky;top:0;background:var(--bg2);z-index:2}
+td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap;text-align:center}
 .pos{color:var(--grn);font-weight:500}.neg{color:var(--red);font-weight:500}
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .stat-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);padding:12px}
@@ -204,7 +204,7 @@ tr.clickable:active{background:var(--bg3)}
     </div>
     <button class="btn btn-primary" onclick="saveSettings()" style="margin-bottom:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Einstellungen speichern</button>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v3.5 · 30.04.2026 13:20</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.0 · 30.04.2026 14:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -233,6 +233,8 @@ tr.clickable:active{background:var(--bg3)}
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 <div class="modal-overlay" id="infoModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="infoModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
+
+<div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 
 <button class="info-btn" onclick="openInfoModal()">i</button>
 <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
@@ -454,6 +456,7 @@ function renderEingabe(){
   let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · Spiel '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
+  html+='<div style="display:flex;justify-content:center;margin-bottom:8px"><button class="share-btn" onclick="openCalcModal()" style="font-size:11px;padding:5px 12px;opacity:.7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg> Punkte zählen</button></div>';
   html+='<div class="numpad">';
   for(let i=1;i<=9;i++){html+='<div class="numpad-btn" onclick="numpadPress('+i+')">'+i+'</div>'}
   html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
@@ -806,7 +809,11 @@ function renderTabelle(scrollToBottom){
     html+='<td style="color:var(--tx3)">'+r.points+'</td>';
     all.forEach(p=>{
       const c=cumul[p][i];const cls=c>0?'pos':c<0?'neg':'';
-      html+='<td class="'+cls+'">'+(c>0?'+':'')+c+'</td>';
+      const played=r.playing.includes(p);
+      const won=r.winners.includes(p);
+      const lost=played&&!won;
+      const bg=won?'background:var(--grn-bg)':lost?'background:var(--red-bg)':'';
+      html+='<td class="'+cls+'" style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
     });
     html+='<td style="white-space:nowrap;position:relative">';
     html+='<div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
@@ -960,6 +967,142 @@ function buildPairings(all){
   document.getElementById('pairCard').innerHTML=html;
 }
 
+// CALCULATOR
+function openCalcModal(){
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5"><h3 style="margin:0">Punkte zählen</h3><div id="calcResultSticky" style="font-family:\'Space Mono\',monospace;font-size:28px;font-weight:700;color:var(--acc)">0</div></div>';
+  // Game type
+  html+='<div class="section-label">Spielart</div>';
+  html+='<div style="display:flex;gap:6px;margin-bottom:12px">';
+  html+='<div class="solo-chip selected" data-calc="normal" onclick="setCalcType(\'normal\',this)" style="flex:1;text-align:center">Normalspiel</div>';
+  html+='<div class="solo-chip" data-calc="solo" onclick="setCalcType(\'solo\',this)" style="flex:1;text-align:center">Solo</div>';
+  html+='</div>';
+  // Result
+  html+='<div class="section-label">Ergebnis</div>';
+  html+='<div class="card" style="padding:8px 10px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="c120" onchange="calcAutoCheck(\'result\')"> Gewonnen (120+)</label></div>';
+  ['90','60','30'].forEach(v=>{
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="c'+v+'" onchange="calcAutoCheck(\'result\')"> Keine '+v+'</label><label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3);cursor:pointer"><input type="checkbox" id="c'+v+'A" onchange="calcAutoCheck(\'ansage\')"> angesagt</label></div>';
+  });
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cSchwarz" onchange="calcAutoCheck(\'result\')"> Schwarz</label><label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tx3);cursor:pointer"><input type="checkbox" id="cSchwarzA" onchange="calcAutoCheck(\'ansage\')"> angesagt</label></div>';
+  html+='</div>';
+  // Ansagen (verdoppeln)
+  html+='<div class="section-label">Ansagen <span style="font-size:10px;color:var(--tx3)">(verdoppeln die Punkte)</span></div>';
+  html+='<div class="card" style="padding:8px 10px">';
+  html+='<div style="padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cRe" onchange="calcPoints()"> Re angesagt</label></div>';
+  html+='<div style="padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cKontra" onchange="calcPoints()"> Kontra angesagt</label></div>';
+  html+='<div id="calcVorabRow" style="padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cVorab" onchange="calcPoints()"> Vorab</label></div>';
+  html+='<div id="calcGegenAlte" style="padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cGegenAlte" onchange="calcPoints()"> Gegen die Alten</label></div>';
+  html+='</div>';
+  // Sonderpunkte (nicht verdoppelt)
+  html+='<div id="calcSonderNormal" class="section-label">Sonderpunkte <span style="font-size:10px;color:var(--tx3)">(werden nicht verdoppelt)</span></div>';
+  html+='<div id="calcSonderNormalCard" class="card" style="padding:8px 10px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cFuchs" onchange="calcPoints()"> Fuchs gefangen</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cFuchsN\',-1)">−</button><span id="cFuchsN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cFuchsN\',1)">+</button></div></div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cDoko" onchange="calcPoints()"> Doppelkopf</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cDokoN\',-1)">−</button><span id="cDokoN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cDokoN\',1)">+</button></div></div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cCharlie" onchange="calcPoints()"> Charlie</label><div style="display:flex;align-items:center;gap:4px"><button class="icon-btn" onclick="calcCounter(\'cCharlieN\',-1)">−</button><span id="cCharlieN" style="font-family:\'Space Mono\',monospace;font-size:13px;min-width:16px;text-align:center">1</span><button class="icon-btn" onclick="calcCounter(\'cCharlieN\',1)">+</button></div></div>';
+  html+='</div>';
+  // Solo sonderpunkte
+  html+='<div id="calcSonderSolo" class="section-label" style="display:none">Sonderpunkte</div>';
+  html+='<div id="calcSonderSoloCard" class="card" style="padding:8px 10px;display:none">';
+  html+='<div style="padding:5px 0"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="cSoloPkt" onchange="calcPoints()" checked> Solopunkt (+1)</label></div>';
+  html+='</div>';
+  // Buttons
+  html+='<div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg2);padding:8px 0 0"><button class="btn btn-secondary" onclick="closeCalcModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="applyCalcPoints()" style="flex:1">'+ICO.check+' Übernehmen</button></div>';
+  document.getElementById('calcModalContent').innerHTML=html;
+  document.getElementById('calcModal').classList.add('show');
+  calcPoints();
+}
+let calcGameType='normal';
+const calcCounterMax={cFuchsN:2,cDokoN:9,cCharlieN:2};
+function calcCounter(id,dir){
+  const el=document.getElementById(id);
+  let v=parseInt(el.textContent)||1;
+  v=Math.max(1,Math.min(calcCounterMax[id]||9,v+dir));
+  el.textContent=v;
+  calcPoints();
+}
+function calcAutoCheck(type){
+  // Cascade: result levels (120 > 90 > 60 > 30 > Schwarz)
+  const levels=['c120','c90','c60','c30','cSchwarz'];
+  const levelsA=['','c90A','c60A','c30A','cSchwarzA'];
+  if(type==='result'){
+    // If checking a lower level, check all higher ones
+    // If unchecking a higher level, uncheck all lower ones
+    let foundChecked=false;
+    for(let i=levels.length-1;i>=0;i--){
+      if(document.getElementById(levels[i]).checked){foundChecked=true}
+      if(foundChecked)document.getElementById(levels[i]).checked=true;
+    }
+    // Also uncheck: if a higher one is unchecked, uncheck all below
+    let foundUnchecked=false;
+    for(let i=0;i<levels.length;i++){
+      if(!document.getElementById(levels[i]).checked)foundUnchecked=true;
+      if(foundUnchecked)document.getElementById(levels[i]).checked=false;
+    }
+  }
+  if(type==='ansage'){
+    // Same logic for "angesagt" checkboxes (skip 120 which has no ansage)
+    let foundChecked=false;
+    for(let i=levelsA.length-1;i>=1;i--){
+      if(document.getElementById(levelsA[i]).checked){foundChecked=true}
+      if(foundChecked)document.getElementById(levelsA[i]).checked=true;
+    }
+    let foundUnchecked=false;
+    for(let i=1;i<levelsA.length;i++){
+      if(!document.getElementById(levelsA[i]).checked)foundUnchecked=true;
+      if(foundUnchecked)document.getElementById(levelsA[i]).checked=false;
+    }
+  }
+  calcPoints();
+}
+function setCalcType(type,el){
+  calcGameType=type;
+  document.querySelectorAll('#calcModalContent [data-calc]').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  const isSolo=type==='solo';
+  document.getElementById('calcVorabRow').style.display=isSolo?'none':'';
+  document.getElementById('calcGegenAlte').style.display=isSolo?'none':'';
+  document.getElementById('calcSonderNormal').style.display=isSolo?'none':'';
+  document.getElementById('calcSonderNormalCard').style.display=isSolo?'none':'';
+  document.getElementById('calcSonderSolo').style.display=isSolo?'':'none';
+  document.getElementById('calcSonderSoloCard').style.display=isSolo?'':'none';
+  if(isSolo){document.getElementById('cVorab').checked=false;document.getElementById('cGegenAlte').checked=false;document.getElementById('cFuchs').checked=false;document.getElementById('cDoko').checked=false;document.getElementById('cCharlie').checked=false;document.getElementById('cSoloPkt').checked=true}
+  calcPoints();
+}
+function calcPoints(){
+  let base=0;
+  if(document.getElementById('c120').checked)base+=1;
+  ['90','60','30','Schwarz'].forEach(v=>{
+    const id=v==='Schwarz'?'cSchwarz':'c'+v;
+    if(document.getElementById(id).checked)base+=1;
+    if(document.getElementById(id+'A').checked)base+=1;
+  });
+  // Verdopplung
+  let multiplier=1;
+  if(document.getElementById('cRe').checked)multiplier*=2;
+  if(document.getElementById('cKontra').checked)multiplier*=2;
+  // Vorab and Gegen die Alten are also doubled
+  if(calcGameType!=='solo'&&document.getElementById('cVorab').checked)base+=1;
+  if(calcGameType!=='solo'&&document.getElementById('cGegenAlte').checked)base+=1;
+  let total=base*multiplier;
+  // Sonderpunkte (not doubled)
+  if(calcGameType!=='solo'){
+    if(document.getElementById('cFuchs').checked)total+=parseInt(document.getElementById('cFuchsN').textContent)||1;
+    if(document.getElementById('cDoko').checked)total+=parseInt(document.getElementById('cDokoN').textContent)||1;
+    if(document.getElementById('cCharlie').checked)total+=parseInt(document.getElementById('cCharlieN').textContent)||1;
+  }else{
+    if(document.getElementById('cSoloPkt').checked)total+=1;
+  }
+  document.getElementById('calcResultSticky').textContent=total;
+}
+function applyCalcPoints(){
+  const total=document.getElementById('calcResultSticky').textContent;
+  currentPts=total;
+  updatePtsDisplay();
+  closeCalcModal();
+}
+function closeCalcModal(){document.getElementById('calcModal').classList.remove('show')}
+document.getElementById('calcModal').addEventListener('click',function(e){if(e.target===this)closeCalcModal()});
+
 // CONFETTI
 function launchConfetti(){
   const container=document.createElement('div');
@@ -1014,8 +1157,55 @@ function shareTabelle(){
 // INFO MODAL
 function openInfoModal(){
   let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
-  html+='<div class="section-label">Changelog</div><div class="card" style="max-height:300px;overflow-y:auto">';
+  html+='<div class="section-label">Punkte zählen – Normalspiel</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Gegen die Alten (Re verliert): <strong>+1</strong> (wird mit verdoppelt)</div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Ansagen</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>angesagt</strong>: Punkte werden <strong>verdoppelt</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>vorab</strong> angesagt (vor der 1. Karte): <strong>+1</strong> (wird mit verdoppelt)</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 90 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 60 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 30 angesagt: <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Schwarz angesagt: <strong>+1</strong></div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Sonderpunkte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 90/60/30/schwarz gespielt: jeweils <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Fuchs gefangen (Karo Ass): <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Doppelkopf (Stich mit 40+ Augen): <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Charlie (Kreuz Bube letzter Stich): <strong>+1</strong></div>';
+  html+='<div style="font-weight:700;margin-top:12px;margin-bottom:8px;color:var(--tx)">Verteilung</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Gewinner: <strong>+Punkte</strong>, Verlierer: <strong>−Punkte</strong></div>';
+  html+='</div>';
+  html+='<div class="section-label" style="margin-top:16px">Punkte zählen – Solo</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Solopunkt: <strong>+1</strong></div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Ansagen</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>angesagt</strong>: Punkte werden <strong>verdoppelt</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; <strong>Kein Vorab</strong> beim Solo</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Keine 90/60/30/schwarz angesagt: jeweils <strong>+1</strong></div>';
+  html+='<div style="margin-bottom:12px">&#9679; Keine 90/60/30/schwarz gespielt: jeweils <strong>+1</strong></div>';
+  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Sonderpunkte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Solopunkt: <strong>+1</strong> (wird nicht verdoppelt)</div>';
+  html+='<div style="margin-bottom:4px;font-size:11px;color:var(--tx3)">Fuchs, Doppelkopf und Charlie gibt es beim Solo nicht.</div>';
+  html+='<div style="font-weight:700;margin-top:12px;margin-bottom:8px;color:var(--tx)">Verteilung</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Solist bekommt die <strong>dreifachen</strong> Punkte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Die 3 Gegner bekommen die <strong>einfachen</strong> Punkte</div>';
+  html+='<div style="margin-bottom:4px">&#9679; Solo gewonnen: Solist <strong>+3×</strong>, Gegner je <strong>−1×</strong></div>';
+  html+='<div style="margin-bottom:4px">&#9679; Solo verloren: Solist <strong>−3×</strong>, Gegner je <strong>+1×</strong></div>';
+  html+='</div>';
+  html+='<div style="margin-top:8px;font-size:11px;color:var(--tx3);padding:0 4px">Hinweis: Die Punktewerte können je nach Hausregeln abweichen. Diese App berechnet keine Punkte automatisch – alle Werte werden manuell eingetragen.</div>';
+  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
+  html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
+  html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.0',d:'30.04.2026 14:10',t:'Punkterechner: Intelligente Kaskade – keine 60 ankreuzen setzt automatisch auch keine 90 und 120. Gleiches für Ansagen. Fuchs und Charlie maximal 2, Doppelkopf bis 9.'},
+    {v:'3.9',d:'30.04.2026 14:00',t:'Punkterechner überarbeitet: Vorab und Gegen die Alten werden jetzt verdoppelt. Fuchs/Doppelkopf/Charlie mit Zähler (±) für mehrere. Solo zeigt nur Solopunkt als Sonderpunkt. Rechner im Vollbild mit sticky Ergebnis-Anzeige oben. Hilfeseite korrigiert.'},
+    {v:'3.8',d:'30.04.2026 13:45',t:'Punkterechner: Button bei der Eingabe öffnet Dialog zum interaktiven Punkte zählen.'},
+    {v:'3.7',d:'30.04.2026 13:30',t:'Hilfeseite: Punktezählung getrennt nach Normalspiel und Solo mit jeweils eigener Anleitung inkl. Verteilung.'},
+    {v:'3.6',d:'30.04.2026 13:25',t:'Tabelle: Gewinner/Verlierer pro Spiel auf einen Blick erkennbar durch dezenten grünen/roten Hintergrund in der Zelle.'},
     {v:'3.5',d:'30.04.2026 13:20',t:'Team-Statistik: Solo-Spiele werden ignoriert (kein echtes Team).'},
     {v:'3.4',d:'30.04.2026 13:15',t:'Spieler löschen: Bestätigung wenn der Spieler bereits Spiele hat. Team-Statistik: zählt jetzt nur Paarungen im gleichen Team (beide gewonnen oder beide verloren), nicht mehr alle am Tisch.'},
     {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel. Punkte und Spieler-Auswahl gehen nicht mehr verloren.'},
@@ -1047,29 +1237,6 @@ function openInfoModal(){
     html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>';
   });
   html+='</div>';
-  html+='<div class="section-label" style="margin-top:16px">Punkte zählen – Anleitung</div>';
-  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
-  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
-  html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Gegen die Alten (Re verliert): <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:12px">&#9679; Solo: <strong>+1 Solopunkt</strong>, Solist bekommt <strong>dreifache</strong> Punkte</div>';
-  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Ansagen</div>';
-  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>angesagt</strong>: Punkte werden <strong>verdoppelt</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Re/Kontra <strong>vorab</strong> angesagt (vor der 1. Karte): <strong>+1 extra Punkt</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Vorab gibt es beim Solo <strong>nicht</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Keine 90 angesagt: <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Keine 60 angesagt: <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Keine 30 angesagt: <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:12px">&#9679; Schwarz angesagt: <strong>+1</strong></div>';
-  html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Sonderpunkte</div>';
-  html+='<div style="margin-bottom:4px">&#9679; Keine 90/60/30/schwarz gespielt: jeweils <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Fuchs gefangen (Karo Ass): <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Doppelkopf (Stich mit 40+ Augen): <strong>+1</strong></div>';
-  html+='<div style="margin-bottom:4px">&#9679; Charlie (Kreuz Bube letzter Stich): <strong>+1</strong></div>';
-  html+='<div style="margin-top:12px;font-size:11px;color:var(--tx3)">Hinweis: Die Punktewerte können je nach Hausregeln abweichen. Diese App berechnet keine Punkte automatisch – alle Werte werden manuell eingetragen.</div>';
-  html+='</div>';
-  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
-  html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<button class="btn btn-secondary" onclick="closeInfoModal()">Schließen</button>';
   document.getElementById('infoModalContent').innerHTML=html;
   document.getElementById('infoModal').classList.add('show');
