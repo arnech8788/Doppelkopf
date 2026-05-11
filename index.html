@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.6 · 11.05.2026 15:42</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.7 · 11.05.2026 15:55</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -204,6 +204,12 @@ function savePlayerName(){
   const oldName=state.players[editingPlayerIdx];
   if(!trimmed||trimmed===oldName){closeRenameModal();return}
   if(state.players.includes(trimmed)){alert('Dieser Name existiert bereits.');return}
+  // Konflikt mit historischem (gelöschtem) Spieler abfangen –
+  // sonst würden Punkte versehentlich zusammengeführt
+  const historical=getHistoricalPlayers();
+  if(historical.includes(trimmed)){
+    if(!confirm('"'+trimmed+'" wurde früher schon einmal verwendet (z. B. gelöschter Spieler). Wenn du fortfährst, werden die alten Punkte und Statistiken auf '+oldName+' übertragen.\n\nFortfahren?'))return;
+  }
   state.rounds.forEach(r=>{
     const idx=r.playing.indexOf(oldName);if(idx>=0)r.playing[idx]=trimmed;
     const wIdx=r.winners.indexOf(oldName);if(wIdx>=0)r.winners[wIdx]=trimmed;
@@ -220,6 +226,11 @@ function addPlayer(){
   const inp=document.getElementById('addPlayerInput');
   const name=inp.value.trim();
   if(!name||state.players.includes(name))return;
+  // Hinweis falls der Name historisch existiert (gelöschter Spieler kehrt zurück)
+  const historical=getHistoricalPlayers();
+  if(historical.includes(name)){
+    if(!confirm('"'+name+'" hat in dieser Runde schon einmal gespielt. Wenn du fortfährst, werden die bisherigen Punkte und Statistiken weiter mit diesem Spieler verknüpft.\n\nFortfahren?'))return;
+  }
   state.players.push(name);
   if(!state.knownNames.includes(name))state.knownNames.push(name);
   inp.value='';renderPlayerTags();
@@ -232,30 +243,7 @@ function removePlayer(i){
   const name=state.players[i];
   const hasGames=state.rounds.some(r=>r.playing.includes(name));
   if(hasGames){
-    // 3 Optionen: Abbrechen / Nur aus Liste entfernen (Daten behalten) / Komplett löschen
-    const choice=confirm(
-      name+' hat bereits Spiele.\n\n'+
-      'OK = Spieler aus Liste entfernen, Statistik & Punkte bleiben erhalten\n'+
-      'Abbrechen = nichts tun'
-    );
-    if(!choice)return;
-    // Bei Bedarf zusätzlich nachfragen ob auch die Daten gelöscht werden sollen
-    const alsoDelete=confirm(
-      'Sollen auch alle Spielergebnisse von '+name+' gelöscht werden?\n\n'+
-      'OK = Alle Daten von '+name+' aus dem Spielverlauf entfernen\n'+
-      'Abbrechen = Daten behalten (empfohlen)'
-    );
-    if(alsoDelete){
-      // Aus jedem betroffenen Spiel entfernen
-      state.rounds=state.rounds.filter(r=>{
-        if(!r.playing.includes(name))return true;
-        // Wenn der Spieler entfernt wird und dadurch nicht mehr 4 dabei sind, ganzes Spiel weg
-        const remaining=r.playing.filter(p=>p!==name);
-        if(remaining.length<4){return false}
-        // sollte eigentlich nicht passieren da immer 4 spielen, aber sicher ist sicher
-        return true;
-      });
-    }
+    if(!confirm(name+' hat bereits Spiele.\n\nDer Spieler wird nur aus der Eingabe-Auswahl entfernt. Alle Punkte und Statistiken bleiben in Tabelle und Statistik erhalten.\n\nFortfahren?'))return;
   }
   state.players.splice(i,1);renderPlayerTags();save();
   invalidateEingabeCache();
@@ -280,6 +268,19 @@ addInp.addEventListener('input',function(){
 addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
 function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 function getAllPlayers(){return [...state.players]}
+
+// Alle Spieler die je in einer Runde mitgespielt haben
+// (auch gelöschte – aktuelle Spieler haben Vorrang in der Reihenfolge)
+function getHistoricalPlayers(){
+  const seen=new Set(state.players);
+  const list=[...state.players];
+  state.rounds.forEach(r=>{
+    r.playing.forEach(p=>{
+      if(!seen.has(p)){seen.add(p);list.push(p)}
+    });
+  });
+  return list;
+}
 
 // Wird aufgerufen wenn sich die Spielerliste ändert –
 // damit der Eingabe-Screen beim nächsten Aufruf garantiert neu gerendert wird
@@ -369,8 +370,8 @@ function renderEingabe(){
   startTimerUpdate();
 }
 
-function getWinStreaks(){
-  const all=getAllPlayers();
+function getWinStreaks(playerList){
+  const all=playerList||getAllPlayers();
   const streaks={};all.forEach(p=>streaks[p]=0);
   for(let i=state.rounds.length-1;i>=0;i--){
     const r=state.rounds[i];
@@ -384,8 +385,8 @@ function getWinStreaks(){
   all.forEach(p=>{if(streaks[p]===-1)streaks[p]=0});
   return streaks;
 }
-function getLooseStreaks(){
-  const all=getAllPlayers();
+function getLooseStreaks(playerList){
+  const all=playerList||getAllPlayers();
   const streaks={};all.forEach(p=>streaks[p]=0);
   for(let i=state.rounds.length-1;i>=0;i--){
     const r=state.rounds[i];
@@ -540,7 +541,7 @@ function finalizeRound(round){
   const soloWin=round.solo&&round.winners.length===1;
   if(soloWin)setTimeout(launchConfetti,300);
   else{
-    const all=getAllPlayers();
+    const all=getHistoricalPlayers();
     if(all.length){
       const totals={};all.forEach(p=>totals[p]=0);
       state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
@@ -554,7 +555,9 @@ function finalizeRound(round){
 }
 
 function openEditModal(i){
-  editingRound=i;const all=getAllPlayers();const r=state.rounds[i];currentPts=''+r.points;
+  editingRound=i;const r=state.rounds[i];currentPts=''+r.points;
+  // Alle historischen Spieler anzeigen – damit auch gelöschte Spieler aus der Runde bearbeitbar sind
+  const all=getHistoricalPlayers();
   let html='<h3>Spiel '+(i+1)+' bearbeiten</h3>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display" id="editPtsDisplay">'+r.points+'</div>';
@@ -636,15 +639,16 @@ function closeAllMenus(){document.querySelectorAll('.row-menu.show').forEach(m=>
 document.addEventListener('click',closeAllMenus);
 
 function renderTabelle(scrollToBottom){
-  const all=getAllPlayers();
+  const all=getHistoricalPlayers();
+  const activePlayers=getAllPlayers(); // für Geber-Rotation
   if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
   if(!all.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state">Alle Spieler wurden entfernt. Füge im Setup neue Spieler hinzu.</div>';return}
   const totals={};all.forEach(p=>totals[p]=0);
   state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
   const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
   let shtml='<div class="card" style="margin-bottom:12px">';
-  const tStreaks=getWinStreaks();
-  const tLooseStreaks=getLooseStreaks();
+  const tStreaks=getWinStreaks(all);
+  const tLooseStreaks=getLooseStreaks(all);
   sorted.forEach((p,i)=>{
     const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
@@ -678,9 +682,10 @@ function renderTabelle(scrollToBottom){
     html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
     html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
     html+='</div></div></td></tr>';
-    const dealerForRound=all.length>0?all[i%all.length]:null;
-    const rundeForRound=all.length>0?Math.floor(i/all.length)+1:0;
-    const spielInRundeFor=all.length>0?(i%all.length)+1:0;
+    // Geber-Rotation läuft über die aktiven Spieler – nicht über historische
+    const dealerForRound=activePlayers.length>0?activePlayers[i%activePlayers.length]:null;
+    const rundeForRound=activePlayers.length>0?Math.floor(i/activePlayers.length)+1:0;
+    const spielInRundeFor=activePlayers.length>0?(i%activePlayers.length)+1:0;
     html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'"><div class="expand-detail">';
     if(rundeForRound)html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
     if(dealerForRound)html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
@@ -697,7 +702,7 @@ function toggleExpand(i){const row=document.getElementById('expandRow'+i);if(row
 
 function renderStats(){
   chartInstances.forEach(c=>c.destroy());chartInstances=[];
-  const all=getAllPlayers();const c=document.getElementById('statsContent');
+  const all=getHistoricalPlayers();const c=document.getElementById('statsContent');
   if(!state.rounds.length){c.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele für Statistiken.</div>';return}
   const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
   all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
@@ -946,6 +951,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.7',d:'11.05.2026 15:55',t:'Spieler entfernen verhält sich jetzt sinnvoll: Spieler verschwindet nur aus der Eingabe-Auswahl, alle Punkte und Statistiken bleiben in Tabelle und Statistik vollständig erhalten. Neue Funktion getHistoricalPlayers() liefert alle Spieler die je gespielt haben. Bonus: Konflikt-Warnung wenn ein Spieler-Name wiederverwendet wird (alte Punkte würden zugeordnet werden).'},
     {v:'4.6',d:'11.05.2026 15:42',t:'Logik-Bugfixes: 1) Crash in Statistik & Tabelle wenn alle Spieler entfernt sind verhindert (zeigt jetzt Hinweismeldung). 2) Geber-Anzeige für historische Spiele abgesichert (kein undefined mehr nach Spieler-Löschung). 3) deleteRound korrigiert bockQueue wenn aktive Bockrunde gelöscht wird. 4) Eingabe-Cache wird auch bei Spielbearbeitung, Verschieben und Löschen invalidiert. 5) Doppelter moveRound entfernt.'},
     {v:'4.5',d:'30.04.2026 18:05',t:'Bugfix: Spieleränderungen (hinzufügen, entfernen, umbenennen, verschieben) invalidieren jetzt den Eingabe-Screen-Cache. Vorher konnten Spiele mit zu wenig Spielern gespeichert oder ein veralteter Hinweis "mind. 4 Spieler" gezeigt werden. Beim Speichern wird zusätzlich live geprüft, ob noch genug Spieler da sind.'},
     {v:'4.4',d:'30.04.2026 17:50',t:'Bugfixes & Features: 1) "Neues Spiel" setzt jetzt wirklich ALLES zurück (Undo, Pending Round, Timer, Eingabe-Cache). 2) Spieler löschen mit zwei Sicherheitsfragen: standardmäßig bleiben Statistiken erhalten, optional können sie mitgelöscht werden. 3) Pech-Serie 💀 ab 2 Niederlagen, 💀💀 ab 4, 💀💀💀 ab 6. Sichtbar in Eingabe und Rangliste.'},
