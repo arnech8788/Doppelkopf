@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.3 · 30.04.2026 17:35</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.4 · 30.04.2026 17:50</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -228,7 +228,32 @@ function addPlayer(){
 function removePlayer(i){
   const name=state.players[i];
   const hasGames=state.rounds.some(r=>r.playing.includes(name));
-  if(hasGames){if(!confirm(name+' hat bereits Spiele. Wirklich löschen?'))return}
+  if(hasGames){
+    // 3 Optionen: Abbrechen / Nur aus Liste entfernen (Daten behalten) / Komplett löschen
+    const choice=confirm(
+      name+' hat bereits Spiele.\n\n'+
+      'OK = Spieler aus Liste entfernen, Statistik & Punkte bleiben erhalten\n'+
+      'Abbrechen = nichts tun'
+    );
+    if(!choice)return;
+    // Bei Bedarf zusätzlich nachfragen ob auch die Daten gelöscht werden sollen
+    const alsoDelete=confirm(
+      'Sollen auch alle Spielergebnisse von '+name+' gelöscht werden?\n\n'+
+      'OK = Alle Daten von '+name+' aus dem Spielverlauf entfernen\n'+
+      'Abbrechen = Daten behalten (empfohlen)'
+    );
+    if(alsoDelete){
+      // Aus jedem betroffenen Spiel entfernen
+      state.rounds=state.rounds.filter(r=>{
+        if(!r.playing.includes(name))return true;
+        // Wenn der Spieler entfernt wird und dadurch nicht mehr 4 dabei sind, ganzes Spiel weg
+        const remaining=r.playing.filter(p=>p!==name);
+        if(remaining.length<4){return false}
+        // sollte eigentlich nicht passieren da immer 4 spielen, aber sicher ist sicher
+        return true;
+      });
+    }
+  }
   state.players.splice(i,1);renderPlayerTags();save();
 }
 function checkAutoStart(){
@@ -258,7 +283,19 @@ function newGame(){
   }
   if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
   state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-  state.rounds=[];state.bockQueue=0;state.gameStartTime=null;save();showScreen('eingabe');
+  // KOMPLETTER Reset – alle Spielzustände zurücksetzen
+  state.rounds=[];
+  state.bockQueue=0;
+  state.gameStartTime=null;
+  lastUndo=null;
+  pendingRound=null;
+  currentPts='';
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  // Eingabe-Cache invalidieren, damit beim nächsten Aufruf neu gerendert wird
+  const eingabeEl=document.getElementById('eingabeContent');
+  if(eingabeEl)delete eingabeEl.dataset.roundCount;
+  save();
+  showScreen('eingabe');
 }
 
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
@@ -299,9 +336,10 @@ function renderEingabe(){
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
   html+='<div class="chip-grid" id="playerChips">';
   const streaks=getWinStreaks();
+  const looseStreaks=getLooseStreaks();
   all.forEach(p=>{
-    const flames=getFlames(streaks[p]);
-    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+(flames?' <span style="font-size:12px">'+flames+'</span>':'')+'</div>';
+    const icon=getStreakIcon(p,streaks,looseStreaks);
+    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div>';
   });
   html+='</div>';
   if(state.bockEnabled){
@@ -335,11 +373,38 @@ function getWinStreaks(){
   all.forEach(p=>{if(streaks[p]===-1)streaks[p]=0});
   return streaks;
 }
+function getLooseStreaks(){
+  const all=getAllPlayers();
+  const streaks={};all.forEach(p=>streaks[p]=0);
+  for(let i=state.rounds.length-1;i>=0;i--){
+    const r=state.rounds[i];
+    all.forEach(p=>{
+      if(!r.playing.includes(p))return;
+      if(streaks[p]===-1)return;
+      if(!r.winners.includes(p)){streaks[p]++}
+      else{streaks[p]=-1}
+    });
+  }
+  all.forEach(p=>{if(streaks[p]===-1)streaks[p]=0});
+  return streaks;
+}
 function getFlames(streak){
   if(streak>=6)return '🔥🔥🔥';
   if(streak>=4)return '🔥🔥';
   if(streak>=2)return '🔥';
   return '';
+}
+function getSkulls(streak){
+  if(streak>=6)return '💀💀💀';
+  if(streak>=4)return '💀💀';
+  if(streak>=2)return '💀';
+  return '';
+}
+function getStreakIcon(p,winStreaks,looseStreaks){
+  // Sieg-Serie hat Vorrang vor Pech-Serie (kann eigentlich nicht beides sein, aber sicher ist sicher)
+  const f=getFlames(winStreaks[p]);
+  if(f)return f;
+  return getSkulls(looseStreaks[p]);
 }
 function formatDuration(ms){
   const s=Math.floor(ms/1000);
@@ -547,11 +612,12 @@ function renderTabelle(scrollToBottom){
   const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
   let shtml='<div class="card" style="margin-bottom:12px">';
   const tStreaks=getWinStreaks();
+  const tLooseStreaks=getLooseStreaks();
   sorted.forEach((p,i)=>{
     const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
-    const flames=getFlames(tStreaks[p]);
-    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+(flames?' <span style="font-size:12px">'+flames+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
+    const icon=getStreakIcon(p,tStreaks,tLooseStreaks);
+    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
   const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
@@ -841,6 +907,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.4',d:'30.04.2026 17:50',t:'Bugfixes & Features: 1) "Neues Spiel" setzt jetzt wirklich ALLES zurück (Undo, Pending Round, Timer, Eingabe-Cache). 2) Spieler löschen mit zwei Sicherheitsfragen: standardmäßig bleiben Statistiken erhalten, optional können sie mitgelöscht werden. 3) Pech-Serie 💀 ab 2 Niederlagen, 💀💀 ab 4, 💀💀💀 ab 6. Sichtbar in Eingabe und Rangliste.'},
     {v:'4.3',d:'30.04.2026 17:35',t:'"Einstellungen speichern"-Button entfernt – alle Einstellungen werden bereits beim Ändern automatisch gespeichert. Weniger Klicks, weniger UI-Rauschen.'},
     {v:'4.2',d:'30.04.2026 17:20',t:'Refactoring: CSS in eigene Datei styles.css ausgelagert. index.html ist jetzt deutlich übersichtlicher.'},
     {v:'4.1',d:'30.04.2026 17:08',t:'Bugfix: Eingabe zeigte "mind. 4 Spieler" obwohl genug Spieler eingetragen waren. gameStarted-Flag entfernt – App prüft jetzt direkt die Spieleranzahl.'},
