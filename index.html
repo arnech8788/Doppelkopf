@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.4 · 30.04.2026 17:50</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.6 · 11.05.2026 15:42</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -183,6 +183,7 @@ function movePlayer(i,dir){
   const j=i+dir;if(j<0||j>=state.players.length)return;
   const tmp=state.players[i];state.players[i]=state.players[j];state.players[j]=tmp;
   save();renderPlayerTags();
+  invalidateEingabeCache();
 }
 let editingPlayerIdx=null;
 function editPlayerName(i){
@@ -211,6 +212,7 @@ function savePlayerName(){
   state.players[editingPlayerIdx]=trimmed;
   if(!state.knownNames.includes(trimmed))state.knownNames.push(trimmed);
   save();renderPlayerTags();closeRenameModal();
+  invalidateEingabeCache();
 }
 document.getElementById('renameModal').addEventListener('click',function(e){if(e.target===this)closeRenameModal()});
 
@@ -222,6 +224,7 @@ function addPlayer(){
   if(!state.knownNames.includes(name))state.knownNames.push(name);
   inp.value='';renderPlayerTags();
   checkAutoStart();save();
+  invalidateEingabeCache();
   document.getElementById('suggestions').classList.remove('show');
   setTimeout(()=>{inp.focus()},50);
 }
@@ -255,6 +258,7 @@ function removePlayer(i){
     }
   }
   state.players.splice(i,1);renderPlayerTags();save();
+  invalidateEingabeCache();
 }
 function checkAutoStart(){
   if(getAllPlayers().length>=4){
@@ -276,6 +280,13 @@ addInp.addEventListener('input',function(){
 addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
 function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 function getAllPlayers(){return [...state.players]}
+
+// Wird aufgerufen wenn sich die Spielerliste ändert –
+// damit der Eingabe-Screen beim nächsten Aufruf garantiert neu gerendert wird
+function invalidateEingabeCache(){
+  const el=document.getElementById('eingabeContent');
+  if(el)delete el.dataset.roundCount;
+}
 
 function newGame(){
   if(state.rounds.length>0){
@@ -460,6 +471,13 @@ function undoLastRound(){
   document.getElementById('eingabeContent').dataset.roundCount=state.rounds.length;
 }
 function saveNewRound(){
+  // Live-Check: gibt es überhaupt noch genug Spieler?
+  if(getAllPlayers().length<4){
+    alert('Mindestens 4 Spieler werden benötigt. Bitte im Setup hinzufügen.');
+    invalidateEingabeCache();
+    renderEingabe();
+    return;
+  }
   const pts=parseInt(currentPts||'0');
   if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
   const chips=document.querySelectorAll('#playerChips .player-chip');
@@ -522,12 +540,15 @@ function finalizeRound(round){
   const soloWin=round.solo&&round.winners.length===1;
   if(soloWin)setTimeout(launchConfetti,300);
   else{
-    const all=getAllPlayers();const totals={};all.forEach(p=>totals[p]=0);
-    state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
-    const prevTotals={};all.forEach(p=>prevTotals[p]=totals[p]-(round.scores[p]||0));
-    const prevLeader=all.reduce((a,b)=>prevTotals[a]>=prevTotals[b]?a:b);
-    const newLeader=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
-    if(state.rounds.length>1&&newLeader!==prevLeader)setTimeout(launchConfetti,300);
+    const all=getAllPlayers();
+    if(all.length){
+      const totals={};all.forEach(p=>totals[p]=0);
+      state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
+      const prevTotals={};all.forEach(p=>prevTotals[p]=totals[p]-(round.scores[p]||0));
+      const prevLeader=all.reduce((a,b)=>prevTotals[a]>=prevTotals[b]?a:b);
+      const newLeader=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
+      if(state.rounds.length>1&&newLeader!==prevLeader)setTimeout(launchConfetti,300);
+    }
   }
   showScreen('tabelle');renderTabelle(true);
 }
@@ -588,10 +609,20 @@ function saveEditRound(){
   }
   const oldSoloType=state.rounds[editingRound].soloType;
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
-  save();closeEditModal();renderTabelle(false);
+  save();invalidateEingabeCache();closeEditModal();renderTabelle(false);
 }
-function deleteRound(i){if(!confirm('Spiel '+(i+1)+' löschen?'))return;state.rounds.splice(i,1);save();renderTabelle(false)}
-function moveRound(i,dir){const j=i+dir;if(j<0||j>=state.rounds.length)return;const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;save();renderTabelle(false)}
+function deleteRound(i){
+  if(!confirm('Spiel '+(i+1)+' löschen?'))return;
+  const deletedRound=state.rounds[i];
+  if(deletedRound.bock){state.bockQueue++}
+  state.rounds.splice(i,1);
+  save();invalidateEingabeCache();renderTabelle(false);
+}
+function moveRound(i,dir){
+  const j=i+dir;if(j<0||j>=state.rounds.length)return;
+  const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;
+  save();invalidateEingabeCache();renderTabelle(false);
+}
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal()});
 
 function toggleRowMenu(e,i){
@@ -607,6 +638,7 @@ document.addEventListener('click',closeAllMenus);
 function renderTabelle(scrollToBottom){
   const all=getAllPlayers();
   if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
+  if(!all.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state">Alle Spieler wurden entfernt. Füge im Setup neue Spieler hinzu.</div>';return}
   const totals={};all.forEach(p=>totals[p]=0);
   state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
   const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
@@ -646,12 +678,12 @@ function renderTabelle(scrollToBottom){
     html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
     html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
     html+='</div></div></td></tr>';
-    const dealerForRound=all[i%all.length];
-    const rundeForRound=Math.floor(i/all.length)+1;
-    const spielInRundeFor=(i%all.length)+1;
+    const dealerForRound=all.length>0?all[i%all.length]:null;
+    const rundeForRound=all.length>0?Math.floor(i/all.length)+1:0;
+    const spielInRundeFor=all.length>0?(i%all.length)+1:0;
     html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'"><div class="expand-detail">';
-    html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
-    html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
+    if(rundeForRound)html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
+    if(dealerForRound)html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
     if(r.timestamp&&i>0&&state.rounds[i-1].timestamp){const dur=r.timestamp-state.rounds[i-1].timestamp;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
     else if(r.timestamp&&i===0&&state.gameStartTime){const dur=r.timestamp-state.gameStartTime;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
     all.forEach(p=>{const s=r.scores[p];if(r.playing.includes(p)){const cls=s>0?'pos':s<0?'neg':'';html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>'}});
@@ -671,7 +703,13 @@ function renderStats(){
   all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
   state.rounds.forEach(r=>{
     let solist=null;
-    if(r.solo){if(r.winners.length===1)solist=r.winners[0];else if(r.winners.length===3)solist=r.playing.find(p=>!r.winners.includes(p))}
+    if(r.solo){
+      if(r.winners.length===1)solist=r.winners[0];
+      else if(r.winners.length===3){
+        // Solist = der eine Verlierer (aus playing, nicht aus all – Spieler könnte gelöscht sein)
+        solist=r.playing.find(p=>!r.winners.includes(p));
+      }
+    }
     all.forEach(p=>{
       if(r.playing.includes(p)){gamesPlayed[p]++;totals[p]+=(r.scores[p]||0);
         if(r.winners.includes(p)){wins[p]++;if(r.solo&&p===solist)soloWins[p]++}
@@ -679,8 +717,9 @@ function renderStats(){
       }
     });
   });
-  const soloKing=all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b);
-  const bestPlayer=all.reduce((a,b)=>totals[a]>totals[b]?a:b);
+  // Guards gegen leere Spielerliste – reduce auf [] wirft sonst Fehler
+  const soloKing=all.length?all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b):'–';
+  const bestPlayer=all.length?all.reduce((a,b)=>totals[a]>totals[b]?a:b):'–';
   let html='<div id="shareableStats">';
   html+='<div class="stat-grid">';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
@@ -907,6 +946,8 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.6',d:'11.05.2026 15:42',t:'Logik-Bugfixes: 1) Crash in Statistik & Tabelle wenn alle Spieler entfernt sind verhindert (zeigt jetzt Hinweismeldung). 2) Geber-Anzeige für historische Spiele abgesichert (kein undefined mehr nach Spieler-Löschung). 3) deleteRound korrigiert bockQueue wenn aktive Bockrunde gelöscht wird. 4) Eingabe-Cache wird auch bei Spielbearbeitung, Verschieben und Löschen invalidiert. 5) Doppelter moveRound entfernt.'},
+    {v:'4.5',d:'30.04.2026 18:05',t:'Bugfix: Spieleränderungen (hinzufügen, entfernen, umbenennen, verschieben) invalidieren jetzt den Eingabe-Screen-Cache. Vorher konnten Spiele mit zu wenig Spielern gespeichert oder ein veralteter Hinweis "mind. 4 Spieler" gezeigt werden. Beim Speichern wird zusätzlich live geprüft, ob noch genug Spieler da sind.'},
     {v:'4.4',d:'30.04.2026 17:50',t:'Bugfixes & Features: 1) "Neues Spiel" setzt jetzt wirklich ALLES zurück (Undo, Pending Round, Timer, Eingabe-Cache). 2) Spieler löschen mit zwei Sicherheitsfragen: standardmäßig bleiben Statistiken erhalten, optional können sie mitgelöscht werden. 3) Pech-Serie 💀 ab 2 Niederlagen, 💀💀 ab 4, 💀💀💀 ab 6. Sichtbar in Eingabe und Rangliste.'},
     {v:'4.3',d:'30.04.2026 17:35',t:'"Einstellungen speichern"-Button entfernt – alle Einstellungen werden bereits beim Ändern automatisch gespeichert. Weniger Klicks, weniger UI-Rauschen.'},
     {v:'4.2',d:'30.04.2026 17:20',t:'Refactoring: CSS in eigene Datei styles.css ausgelagert. index.html ist jetzt deutlich übersichtlicher.'},
