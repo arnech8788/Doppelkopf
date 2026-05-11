@@ -57,8 +57,8 @@
         <div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle" id="bockSoloToggle" onclick="this.classList.toggle('on');save()"></button></div>
       </div>
     </div>
-    <button class="btn btn-danger" onclick="newGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Neues Spiel starten</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.7 · 11.05.2026 15:55</div>
+    <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.8 · 11.05.2026 16:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -289,13 +289,13 @@ function invalidateEingabeCache(){
   if(el)delete el.dataset.roundCount;
 }
 
-function newGame(){
-  if(state.rounds.length>0){
-    if(!confirm('Alle '+state.rounds.length+' Spiele werden gelöscht. Wirklich neues Spiel starten?'))return;
+function clearAllGames(){
+  if(state.rounds.length===0){
+    alert('Es sind noch keine Spiele eingetragen.');
+    return;
   }
-  if(getAllPlayers().length<4){alert('Mindestens 4 Spieler benötigt.');return}
-  state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
-  // KOMPLETTER Reset – alle Spielzustände zurücksetzen
+  if(!confirm('Alle '+state.rounds.length+' Spiele und Statistiken werden gelöscht. Die Spielerliste bleibt erhalten.\n\nWirklich fortfahren?'))return;
+  // KOMPLETTER Reset – alle Spielzustände zurücksetzen, Spieler bleiben
   state.rounds=[];
   state.bockQueue=0;
   state.gameStartTime=null;
@@ -303,11 +303,14 @@ function newGame(){
   pendingRound=null;
   currentPts='';
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
-  // Eingabe-Cache invalidieren, damit beim nächsten Aufruf neu gerendert wird
-  const eingabeEl=document.getElementById('eingabeContent');
-  if(eingabeEl)delete eingabeEl.dataset.roundCount;
+  invalidateEingabeCache();
   save();
-  showScreen('eingabe');
+  // Wenn 4+ Spieler da sind, direkt zur Eingabe – sonst auf Setup bleiben
+  if(getAllPlayers().length>=4){
+    showScreen('eingabe');
+  }else{
+    alert('Spiele gelöscht. Füge mindestens 4 Spieler hinzu um neue Spiele einzutragen.');
+  }
 }
 
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
@@ -951,6 +954,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.8',d:'11.05.2026 16:10',t:'Button "Neues Spiel starten" umbenannt zu "Alle Spiele löschen" mit Mülltonnen-Icon. Klare Aussage: löscht nur Spiele und Statistik, Spieler bleiben erhalten. Kein 4-Spieler-Zwang mehr beim Löschen – funktioniert auch wenn temporär weniger Spieler aktiv sind.'},
     {v:'4.7',d:'11.05.2026 15:55',t:'Spieler entfernen verhält sich jetzt sinnvoll: Spieler verschwindet nur aus der Eingabe-Auswahl, alle Punkte und Statistiken bleiben in Tabelle und Statistik vollständig erhalten. Neue Funktion getHistoricalPlayers() liefert alle Spieler die je gespielt haben. Bonus: Konflikt-Warnung wenn ein Spieler-Name wiederverwendet wird (alte Punkte würden zugeordnet werden).'},
     {v:'4.6',d:'11.05.2026 15:42',t:'Logik-Bugfixes: 1) Crash in Statistik & Tabelle wenn alle Spieler entfernt sind verhindert (zeigt jetzt Hinweismeldung). 2) Geber-Anzeige für historische Spiele abgesichert (kein undefined mehr nach Spieler-Löschung). 3) deleteRound korrigiert bockQueue wenn aktive Bockrunde gelöscht wird. 4) Eingabe-Cache wird auch bei Spielbearbeitung, Verschieben und Löschen invalidiert. 5) Doppelter moveRound entfernt.'},
     {v:'4.5',d:'30.04.2026 18:05',t:'Bugfix: Spieleränderungen (hinzufügen, entfernen, umbenennen, verschieben) invalidieren jetzt den Eingabe-Screen-Cache. Vorher konnten Spiele mit zu wenig Spielern gespeichert oder ein veralteter Hinweis "mind. 4 Spieler" gezeigt werden. Beim Speichern wird zusätzlich live geprüft, ob noch genug Spieler da sind.'},
