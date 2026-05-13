@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.14 · 13.05.2026 14:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.15 · 13.05.2026 14:30</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -108,7 +108,7 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
-let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null};
+let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false};
 let currentPts='';
 let editingRound=null;
 let chartInstances=[];
@@ -289,6 +289,53 @@ function getHistoricalPlayers(){
   return list;
 }
 
+// Berechnet pro Spielerliste eindeutige Kürzel (z. B. für Tabellenüberschrift)
+// "Christoph" und "Christopher" werden zu "Christop." und "Christophe." gekürzt,
+// "Marc" und "Tim" bleiben kurz: "Marc"/"Tim" (kein Trim nötig wenn schon unterscheidbar)
+function getShortNames(playerList){
+  const result={};
+  const minLen=3;
+  const maxLen=8;
+  playerList.forEach(p=>{
+    if(p.length<=minLen){result[p]=p;return}
+    // Finde die minimale Länge bei der dieses Kürzel eindeutig ist
+    for(let len=minLen;len<=maxLen;len++){
+      const prefix=p.substring(0,len);
+      const collides=playerList.some(o=>o!==p&&o.substring(0,len).toLowerCase()===prefix.toLowerCase());
+      if(!collides){
+        result[p]=p.length>len?prefix+'.':prefix;
+        return;
+      }
+    }
+    // Fallback: voller Name (oder gekürzt auf maxLen+1)
+    result[p]=p.length>maxLen?p.substring(0,maxLen)+'.':p;
+  });
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Easter Egg: Kursleiter-Cup
+// Wenn genau diese 4 Spieler aktiv sind, schaltet ein spezielles Theme an
+// ═══════════════════════════════════════════════════════════
+const KURSLEITER_NAMES=['jonas','lars','julia','jens'];
+const KURSLEITER_EMOJIS={jonas:'📚',lars:'🎓',julia:'🍎',jens:'✏️'};
+const KURSLEITER_VOCAB={
+  solo:'Frontalunterricht',
+  bockrunde:'Doppelstunde',
+  spiel:'Lektion'
+};
+
+function isKursleiterMode(){
+  const active=state.players.map(p=>p.toLowerCase());
+  if(active.length!==4)return false;
+  return KURSLEITER_NAMES.every(n=>active.includes(n));
+}
+
+function getPlayerEmoji(name){
+  if(!isKursleiterMode())return '';
+  return KURSLEITER_EMOJIS[name.toLowerCase()]||'';
+}
+
 // Wird aufgerufen wenn sich die Spielerliste ändert –
 // damit der Eingabe-Screen beim nächsten Aufruf garantiert neu gerendert wird
 function invalidateEingabeCache(){
@@ -331,20 +378,33 @@ function renderEingabe(){
   const bi=document.getElementById('bockIndicator');
   let biHtml='';
   const all=getAllPlayers();
+  // Kursleiter-Cup Banner
+  if(isKursleiterMode()){
+    biHtml+='<div style="background:linear-gradient(135deg,#5b4cdb,#2980b9);color:#fff;padding:10px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;box-shadow:0 2px 8px rgba(91,76,219,.3)">🎓 Kursleiter-Cup 📚 · ✏️ · 🍎</div>';
+  }
   if(state.rounds.length>0&&state.rounds.length%all.length===0){
     const completedRunde=Math.floor(state.rounds.length/all.length);
     biHtml+='<div style="background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;text-align:center;margin-bottom:8px;border:1px solid rgba(240,168,48,.15)">&#127183; Runde '+completedRunde+' beendet!</div>';
   }
   if(isBockRound()){
-    biHtml+='<div class="bock-indicator">&#9889; Bockrunde! Noch '+state.bockQueue+' Spiel'+(state.bockQueue>1?'e':'')+'</div>';
+    const bockLabel=isKursleiterMode()?'Doppelstunde':'Bockrunde';
+    biHtml+='<div class="bock-indicator">&#9889; '+bockLabel+'! Noch '+state.bockQueue+' '+(isKursleiterMode()?(state.bockQueue>1?'Stunden':'Stunde'):(state.bockQueue>1?'Spiele':'Spiel'))+'</div>';
   }
   bi.innerHTML=biHtml;
+  // Einmaliges Konfetti wenn der Kursleiter-Cup zum ersten Mal aktiviert wird
+  if(isKursleiterMode()&&!state.kursleiterCupSeen){
+    state.kursleiterCupSeen=true;
+    save();
+    setTimeout(launchConfetti,400);
+  }
   currentPts='';
   const dealerIdx=state.rounds.length%all.length;
   const dealer=all[dealerIdx];
   const rundeNr=Math.floor(state.rounds.length/all.length)+1;
   const spielInRunde=(state.rounds.length%all.length)+1;
-  let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · Spiel '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
+  const dealerEmoji=getPlayerEmoji(dealer);
+  const lektionLabel=isKursleiterMode()?'Lektion':'Spiel';
+  let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · '+lektionLabel+' '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+(dealerEmoji?dealerEmoji+' ':'')+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
   html+='<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;align-items:center">';
@@ -366,15 +426,20 @@ function renderEingabe(){
   const looseStreaks=getLooseStreaks();
   all.forEach(p=>{
     const icon=getStreakIcon(p,streaks,looseStreaks);
-    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div>';
+    const emoji=getPlayerEmoji(p);
+    const displayName=(emoji?emoji+' ':'')+p;
+    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+displayName+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div>';
   });
   html+='</div>';
   if(state.bockEnabled){
-    html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue Bockrunde auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
+    const triggerLabel=isKursleiterMode()?'Neue Doppelstunde auslösen':'Neue Bockrunde auslösen';
+    html+='<div class="toggle-row"><span class="toggle-label">&#9889; '+triggerLabel+'</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
   }
-  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' Spiel speichern</button></div>';
+  const saveLabel=isKursleiterMode()?'Lektion speichern':'Spiel speichern';
+  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+saveLabel+'</button></div>';
   if(lastUndo){
-    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Letztes Spiel rückgängig</button></div>';
+    const undoLabel=isKursleiterMode()?'Letzte Lektion rückgängig':'Letztes Spiel rückgängig';
+    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' '+undoLabel+'</button></div>';
   }
   html+='</div>';
   if(state.gameStartTime){
@@ -548,7 +613,7 @@ function saveNewRound(){
 }
 function openSoloModal(){
   const enabled=state.soloTypes.filter(s=>s.enabled);
-  let html='<h3>Welches Solo?</h3>';
+  let html='<h3>'+(isKursleiterMode()?'Welcher Frontalunterricht?':'Welches Solo?')+'</h3>';
   html+='<div class="solo-type-grid">';
   enabled.forEach(s=>{html+='<div class="solo-chip" data-solo="'+s.name+'" onclick="selectSoloType(this)">'+s.name+'</div>'});
   html+='</div>';
@@ -709,7 +774,7 @@ function renderTabelle(scrollToBottom){
     const pts=totals[p];const cls=pts>0?'pos':pts<0?'neg':'';
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
     const icon=getStreakIcon(p,tStreaks,tLooseStreaks);
-    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
+    shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+(getPlayerEmoji(p)?getPlayerEmoji(p)+' ':'')+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
   const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
@@ -717,7 +782,11 @@ function renderTabelle(scrollToBottom){
   let run={};all.forEach(p=>run[p]=0);
   state.rounds.forEach(r=>{all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])})});
   let html='<table><thead><tr><th>#</th>';
-  all.forEach(p=>html+='<th>'+p.substring(0,5)+'</th>');
+  const shortNames=getShortNames(all);
+  all.forEach(p=>{
+    const emoji=getPlayerEmoji(p);
+    html+='<th title="'+p+'">'+(emoji?emoji+'<br>':'')+shortNames[p]+'</th>';
+  });
   html+='<th>Pkt</th><th></th></tr></thead><tbody>';
   state.rounds.forEach((r,i)=>{
     html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
@@ -1004,6 +1073,15 @@ function openInfoModal(){
   html+='<div>Neue Versionen werden automatisch erkannt. Oben erscheint ein Hinweis und die App lädt sich nach 3 Sekunden selbst neu.</div>';
   html+='</div>';
 
+  // Easter Egg Hinweis nur wenn aktiv
+  if(isKursleiterMode()){
+    html+='<div class="section-label" style="margin-top:16px">🎓 Kursleiter-Cup aktiv</div>';
+    html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+    html+='<div>Sieh an, vier ganz bestimmte Namen … Genießt euren Doppelkopf-Abend!</div>';
+    html+='<div style="margin-top:8px">📚 Jonas · 🎓 Lars · 🍎 Julia · ✏️ Jens</div>';
+    html+='</div>';
+  }
+
   // Punkte zählen Hinweis
   html+='<div class="section-label" style="margin-top:16px">Punkte zählen</div>';
   html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
@@ -1018,6 +1096,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.15',d:'13.05.2026 14:30',t:'Zwei Verbesserungen: 1) Spalten-Kürzel sind jetzt eindeutig – aus "Christoph" und "Christopher" werden "Christop." und "Christophe." statt zweimal "Chris". Algorithmus kürzt so weit wie möglich, aber nur so weit dass die Namen unterscheidbar bleiben. 2) Geheimer Kursleiter-Cup-Modus (Easter Egg) wenn vier bestimmte Namen aktiv sind: eigenes Banner, persönliche Emojis und Lehrer-Vokabular ("Frontalunterricht" statt "Solo", "Doppelstunde" statt "Bockrunde", "Lektion" statt "Spiel").'},
     {v:'4.14',d:'13.05.2026 14:10',t:'Spiel-bearbeiten-Dialog auch auf Vollbild umgestellt – mit X-Button oben rechts und sticky Speichern/Abbrechen unten. Konsistent mit Punkterechner, Info und Punktezähl-Hilfe.'},
     {v:'4.13',d:'13.05.2026 13:55',t:'Tabellenzellen: nur noch Hintergrund-Farbe für Sieg/Niederlage des einzelnen Spiels (grün/rot). Die kumulierten Punkte werden in Standard-Textfarbe angezeigt – nicht mehr in Grün/Rot je nach Gesamtsaldo. Übersichtlicher.'},
     {v:'4.12',d:'13.05.2026 13:40',t:'Mehrere Änderungen: 1) Punkte-Spalte in der Tabelle nach rechts ans Ende verschoben (vor dem Menü). 2) Minuspunkte möglich – mit ±-Button im Numpad kann das Vorzeichen umgekehrt werden, für Fälle wo das Gewinner-Team trotzdem unter null landet. 3) ?-Button neben "Punkte zählen" für die Punktezähl-Anleitung. 4) Info-Modal komplett überarbeitet: kompakte App-Erklärung mit allen Besonderheiten (Streaks, Konfetti, Bockrunden, PWA-Installation, Updates).'},
