@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.11 · 13.05.2026 13:25</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.12 · 13.05.2026 13:40</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -85,6 +85,7 @@
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 <div class="modal-overlay" id="infoModal" style="align-items:stretch;padding:0"><div class="modal" id="infoModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
+<div class="modal-overlay" id="calcHelpModal" style="align-items:stretch;padding:0"><div class="modal" id="calcHelpModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 
 <div id="updateToast" class="update-toast">
@@ -346,12 +347,17 @@ function renderEingabe(){
   let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · Spiel '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
-  html+='<div style="display:flex;justify-content:center;margin-bottom:8px"><button class="share-btn" onclick="openCalcModal()" style="font-size:11px;padding:5px 12px;opacity:.7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg> Punkte zählen</button></div>';
+  html+='<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;align-items:center">';
+  html+='<button class="share-btn" onclick="openCalcModal()" style="font-size:11px;padding:5px 12px;opacity:.7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg> Punkte zählen</button>';
+  html+='<button class="icon-btn" onclick="openCalcHelpModal()" style="padding:6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-family:\'Space Mono\',monospace;font-size:12px;font-weight:700;color:var(--tx2);opacity:.7" aria-label="Hilfe zur Punktezählung">?</button>';
+  html+='</div>';
   html+='<div class="numpad">';
   for(let i=1;i<=9;i++){html+='<div class="numpad-btn" onclick="numpadPress('+i+')">'+i+'</div>'}
   html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
   html+='<div class="numpad-btn" onclick="numpadPress(0)">0</div>';
   html+='<div class="numpad-btn del" onclick="numpadDelete()">'+ICO.backspace+'</div>';
+  // ±-Toggle für Minuspunkte (Sieg mit negativem Saldo, z.B. Sonderpunkte beim Gegner)
+  html+='<div class="numpad-btn" onclick="numpadToggleSign()" style="grid-column:1/4;font-size:16px;color:var(--warn)">± Vorzeichen umkehren</div>';
   html+='</div>';
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
@@ -453,13 +459,33 @@ function cycleState(el){
   const icon=el.querySelector('.chip-icon');
   icon.innerHTML=next==='lost'?ICO.x:next==='won'?ICO.check:'';
 }
-function numpadPress(n){if(currentPts.length>=3)return;currentPts+=n;updatePtsDisplay()}
+function numpadPress(n){
+  // Max 3 Ziffern (ohne Vorzeichen)
+  const digits=currentPts.replace('-','');
+  if(digits.length>=3)return;
+  currentPts+=n;
+  updatePtsDisplay();
+}
 function numpadDelete(){currentPts=currentPts.slice(0,-1);updatePtsDisplay()}
 function numpadClear(){currentPts='';updatePtsDisplay()}
+function numpadToggleSign(){
+  if(!currentPts)return; // Vorzeichen nur sinnvoll bei eingegebenen Zahlen
+  if(currentPts.startsWith('-')){currentPts=currentPts.slice(1)}
+  else{currentPts='-'+currentPts}
+  updatePtsDisplay();
+}
 function updatePtsDisplay(){
   const el=document.getElementById('ptsDisplay');if(!el)return;
-  if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
-  else{el.textContent='Punkte eingeben';el.classList.add('empty')}
+  if(currentPts){
+    el.textContent=currentPts;
+    el.classList.remove('empty');
+    // Bei negativen Werten visuell hervorheben
+    el.style.color=currentPts.startsWith('-')?'var(--red)':'';
+  }else{
+    el.textContent='Punkte eingeben';
+    el.classList.add('empty');
+    el.style.color='';
+  }
 }
 function undoLastRound(){
   if(!lastUndo)return;
@@ -489,7 +515,8 @@ function saveNewRound(){
     return;
   }
   const pts=parseInt(currentPts||'0');
-  if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
+  if(isNaN(pts)){alert('Bitte Punkte eingeben.');return}
+  if(!currentPts||currentPts==='-'){alert('Bitte Punkte eingeben.');return}
   const chips=document.querySelectorAll('#playerChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{
@@ -575,6 +602,7 @@ function openEditModal(i){
   html+='<div class="numpad-btn del" onclick="editNumpadClear()">'+ICO.trash+'</div>';
   html+='<div class="numpad-btn" onclick="editNumpadPress(0)">0</div>';
   html+='<div class="numpad-btn del" onclick="editNumpadDelete()">'+ICO.backspace+'</div>';
+  html+='<div class="numpad-btn" onclick="editNumpadToggleSign()" style="grid-column:1/4;font-size:16px;color:var(--warn)">± Vorzeichen umkehren</div>';
   html+='</div>';
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
@@ -590,17 +618,36 @@ function openEditModal(i){
   document.getElementById('editModal').classList.add('show');
 }
 function closeEditModal(){document.getElementById('editModal').classList.remove('show')}
-function editNumpadPress(n){if(currentPts.length>=3)return;currentPts+=n;updateEditPtsDisplay()}
+function editNumpadPress(n){
+  const digits=currentPts.replace('-','');
+  if(digits.length>=3)return;
+  currentPts+=n;
+  updateEditPtsDisplay();
+}
 function editNumpadDelete(){currentPts=currentPts.slice(0,-1);updateEditPtsDisplay()}
 function editNumpadClear(){currentPts='';updateEditPtsDisplay()}
+function editNumpadToggleSign(){
+  if(!currentPts)return;
+  if(currentPts.startsWith('-')){currentPts=currentPts.slice(1)}
+  else{currentPts='-'+currentPts}
+  updateEditPtsDisplay();
+}
 function updateEditPtsDisplay(){
   const el=document.getElementById('editPtsDisplay');if(!el)return;
-  if(currentPts){el.textContent=currentPts;el.classList.remove('empty')}
-  else{el.textContent='Punkte eingeben';el.classList.add('empty')}
+  if(currentPts){
+    el.textContent=currentPts;
+    el.classList.remove('empty');
+    el.style.color=currentPts.startsWith('-')?'var(--red)':'';
+  }else{
+    el.textContent='Punkte eingeben';
+    el.classList.add('empty');
+    el.style.color='';
+  }
 }
 function saveEditRound(){
   const pts=parseInt(currentPts||'0');
-  if(isNaN(pts)||pts<0){alert('Bitte Punkte eingeben.');return}
+  if(isNaN(pts)){alert('Bitte Punkte eingeben.');return}
+  if(!currentPts||currentPts==='-'){alert('Bitte Punkte eingeben.');return}
   const chips=document.querySelectorAll('#editChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{const p=c.dataset.player;const s=c.dataset.state;if(s==='lost'){playing.push(p);losers.push(p)}else if(s==='won'){playing.push(p);winners.push(p)}});
@@ -669,21 +716,23 @@ function renderTabelle(scrollToBottom){
   const cumul={};all.forEach(p=>cumul[p]=[]);
   let run={};all.forEach(p=>run[p]=0);
   state.rounds.forEach(r=>{all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])})});
-  let html='<table><thead><tr><th>#</th><th>Pkt</th>';
+  let html='<table><thead><tr><th>#</th>';
   all.forEach(p=>html+='<th>'+p.substring(0,5)+'</th>');
-  html+='<th></th></tr></thead><tbody>';
+  html+='<th>Pkt</th><th></th></tr></thead><tbody>';
   state.rounds.forEach((r,i)=>{
     html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
     html+='<td style="color:var(--tx3)">'+(i+1);
     if(r.solo){const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>'}
     if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
-    html+='</td><td style="color:var(--tx3)">'+r.points+'</td>';
+    html+='</td>';
     all.forEach(p=>{
       const c=cumul[p][i];const cls=c>0?'pos':c<0?'neg':'';
       const played=r.playing.includes(p);const won=r.winners.includes(p);const lost=played&&!won;
       const bg=won?'background:var(--grn-bg)':lost?'background:var(--red-bg)':'';
       html+='<td class="'+cls+'" style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
     });
+    // Punkte des Spiels jetzt ganz rechts (vor dem Menü)
+    html+='<td style="color:var(--tx3);font-family:\'Space Mono\',monospace">'+r.points+'</td>';
     html+='<td style="white-space:nowrap;position:relative"><div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
     html+='<div class="row-menu" id="rowMenu'+i+'">';
     if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
@@ -916,7 +965,87 @@ function shareTabelle(){const el=document.getElementById('standsCard');if(el)cap
 
 function openInfoModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">&#9824; Doppelkopf Punktezettel</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-  html+='<div class="section-label">Punkte zählen – Normalspiel</div>';
+
+  // App-Überblick
+  html+='<div class="section-label">So funktioniert die App</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">⚙️ Setup</div>';
+  html+='<div style="margin-bottom:10px">Spieler hinzufügen, umbenennen, sortieren. Der <strong>erste Spieler in der Liste gibt zuerst die Karten</strong> – danach rotiert der Geber automatisch. Optional: Bockrunden aktivieren oder Solo-Arten abfragen.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">➕ Eingabe</div>';
+  html+='<div style="margin-bottom:10px">Punkte eintippen, Spieler antippen: <strong>rot = verloren</strong>, <strong>grün = gewonnen</strong>. Es müssen genau 4 mitspielen. Wer pausiert bleibt grau. Mit dem ± Button kannst du auch <strong>negative Punkte</strong> eintragen (z. B. wenn die Gewinner trotzdem unterm Strich verlieren).</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">📋 Tabelle</div>';
+  html+='<div style="margin-bottom:10px">Aktuelle Rangliste und alle Spiele chronologisch. Tippe auf ein Spiel um Details aufzuklappen (Geber, Dauer, Einzelpunkte). Über das Drei-Punkte-Menü kannst du Spiele bearbeiten, verschieben oder löschen.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">📊 Statistik</div>';
+  html+='<div style="margin-bottom:10px">Punkteverlauf, Siege/Niederlagen, Solo-Quote, Lieblings-Teampartner und mehr. Solokönig und Bester Spieler werden automatisch ermittelt.</div>';
+  html+='</div>';
+
+  // Besonderheiten
+  html+='<div class="section-label" style="margin-top:16px">Besonderheiten</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">🔥 Siegesserie</div>';
+  html+='<div style="margin-bottom:4px">🔥 ab <strong>2 Siegen</strong> in Folge</div>';
+  html+='<div style="margin-bottom:4px">🔥🔥 ab <strong>4 Siegen</strong> in Folge</div>';
+  html+='<div style="margin-bottom:10px">🔥🔥🔥 ab <strong>6 Siegen</strong> in Folge. Sichtbar in Eingabe und Rangliste. Verschwindet bei einer Niederlage. Pausierte Spiele unterbrechen die Serie <strong>nicht</strong>.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">💀 Pech-Serie</div>';
+  html+='<div style="margin-bottom:4px">💀 ab <strong>2 Niederlagen</strong> in Folge</div>';
+  html+='<div style="margin-bottom:4px">💀💀 ab <strong>4 Niederlagen</strong> in Folge</div>';
+  html+='<div style="margin-bottom:10px">💀💀💀 ab <strong>6 Niederlagen</strong> in Folge. Verschwindet bei einem Sieg.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">🎉 Konfetti-Animation</div>';
+  html+='<div style="margin-bottom:4px">• Bei einem <strong>gewonnenen Solo</strong> (1 Spieler gegen 3)</div>';
+  html+='<div style="margin-bottom:10px">• Bei einem <strong>Führungswechsel</strong> in der Rangliste</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">🃏 Bockrunden</div>';
+  html+='<div style="margin-bottom:10px">Wenn aktiviert, kann jedes Spiel eine neue Bockrunde auslösen (Toggle vor dem Speichern). Während einer Bockrunde zählen alle Punkte <strong>doppelt</strong>. Optional auch für Soli.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">↩️ Rückgängig</div>';
+  html+='<div style="margin-bottom:10px">Nach jedem gespeicherten Spiel erscheint unter dem Speichern-Button ein dezenter "Rückgängig"-Button.</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">📱 Als App installieren</div>';
+  html+='<div style="margin-bottom:4px">iPhone: In Safari öffnen → Teilen → "Zum Home-Bildschirm"</div>';
+  html+='<div style="margin-bottom:10px">Android: In Chrome öffnen → Menü → "App installieren"</div>';
+  html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">🔄 Updates</div>';
+  html+='<div>Neue Versionen werden automatisch erkannt. Oben erscheint ein Hinweis und die App lädt sich nach 3 Sekunden selbst neu.</div>';
+  html+='</div>';
+
+  // Punkte zählen Hinweis
+  html+='<div class="section-label" style="margin-top:16px">Punkte zählen</div>';
+  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+  html+='Eine ausführliche Erklärung wie Punkte beim Doppelkopf gezählt werden, findest du über den <strong>?-Button</strong> neben "Punkte zählen" in der Eingabe.';
+  html+='<button class="btn btn-secondary" style="margin-top:10px" onclick="closeInfoModal();openCalcHelpModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Punktezählung anzeigen</button>';
+  html+='</div>';
+
+  // Feedback
+  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
+  html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
+
+  // Changelog
+  html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
+  const log=[
+    {v:'4.12',d:'13.05.2026 13:40',t:'Mehrere Änderungen: 1) Punkte-Spalte in der Tabelle nach rechts ans Ende verschoben (vor dem Menü). 2) Minuspunkte möglich – mit ±-Button im Numpad kann das Vorzeichen umgekehrt werden, für Fälle wo das Gewinner-Team trotzdem unter null landet. 3) ?-Button neben "Punkte zählen" für die Punktezähl-Anleitung. 4) Info-Modal komplett überarbeitet: kompakte App-Erklärung mit allen Besonderheiten (Streaks, Konfetti, Bockrunden, PWA-Installation, Updates).'},
+    {v:'4.11',d:'13.05.2026 13:25',t:'Info-Popup auf Vollbild umgestellt mit X-Button oben rechts (sticky, immer sichtbar) und festem Schließen-Button unten. Komplette Anleitung und Changelog jetzt besser lesbar.'},
+    {v:'4.10',d:'13.05.2026 13:15',t:'Auto-Update-Hinweis: Wenn eine neue Version verfügbar ist, erscheint oben ein Toast "Neue Version verfügbar – wird automatisch geladen…" mit Fortschrittsbalken. Nach 3 Sekunden lädt die App selbstständig neu.'},
+    {v:'4.9',d:'13.05.2026 13:04',t:'Anonyme Besucherzählung via GoatCounter eingebaut – zählt nur Seitenaufrufe und grobe Geräteinfos. Keine Cookies, keine personenbezogenen Daten, DSGVO-konform.'},
+    {v:'4.8',d:'11.05.2026 16:10',t:'Button "Neues Spiel starten" umbenannt zu "Alle Spiele löschen" mit Mülltonnen-Icon. Klare Aussage: löscht nur Spiele und Statistik, Spieler bleiben erhalten.'},
+    {v:'4.7',d:'11.05.2026 15:55',t:'Spieler entfernen verhält sich jetzt sinnvoll: Spieler verschwindet nur aus der Eingabe-Auswahl, alle Punkte und Statistiken bleiben in Tabelle und Statistik vollständig erhalten.'},
+    {v:'4.6',d:'11.05.2026 15:42',t:'Diverse Logik-Bugfixes für Edge Cases (Crash-Verhinderung bei leerer Spielerliste, Geber-Anzeige, Bockrunden-Konsistenz).'},
+    {v:'4.5',d:'30.04.2026 18:05',t:'Bugfix: Eingabe-Cache wird bei jeder Spieleränderung invalidiert. Live-Prüfung der Spielerzahl beim Speichern.'},
+    {v:'4.4',d:'30.04.2026 17:50',t:'Bugfix Reset + Pech-Serie 💀 ab 2 Niederlagen.'},
+    {v:'4.3',d:'30.04.2026 17:35',t:'"Einstellungen speichern"-Button entfernt – wird automatisch gespeichert.'},
+    {v:'4.2',d:'30.04.2026 17:20',t:'CSS in eigene Datei styles.css ausgelagert.'},
+    {v:'4.1',d:'30.04.2026 17:08',t:'Bugfix: Eingabe zeigte fälschlich "mind. 4 Spieler".'},
+    {v:'4.0',d:'30.04.2026 14:10',t:'Punkterechner: Intelligente Kaskade bei Keine-90/60/30-Optionen.'},
+    {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit-Erfassung pro Spiel.'},
+    {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App installierbar, funktioniert offline.'},
+    {v:'1.0',d:'22.04.2026',t:'Erste Version.'}
+  ];
+  log.forEach(e=>{html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>'});
+  html+='</div><button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeInfoModal()">Schließen</button>';
+  document.getElementById('infoModalContent').innerHTML=html;
+  document.getElementById('infoModal').classList.add('show');
+}
+function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
+document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
+
+function openCalcHelpModal(){
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">🧮 Punkte zählen</h3><button onclick="closeCalcHelpModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div class="section-label">Normalspiel</div>';
   html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
   html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
   html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
@@ -936,7 +1065,7 @@ function openInfoModal(){
   html+='<div style="font-weight:700;margin-top:12px;margin-bottom:8px;color:var(--tx)">Verteilung</div>';
   html+='<div style="margin-bottom:4px">&#9679; Gewinner: <strong>+Punkte</strong>, Verlierer: <strong>−Punkte</strong></div>';
   html+='</div>';
-  html+='<div class="section-label" style="margin-top:16px">Punkte zählen – Solo</div>';
+  html+='<div class="section-label" style="margin-top:16px">Solo</div>';
   html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
   html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
   html+='<div style="margin-bottom:4px">&#9679; Gewonnen (120+ Augen): <strong>1 Punkt</strong></div>';
@@ -955,46 +1084,13 @@ function openInfoModal(){
   html+='<div style="margin-bottom:4px">&#9679; Solo gewonnen: Solist <strong>+3×</strong>, Gegner je <strong>−1×</strong></div>';
   html+='<div style="margin-bottom:4px">&#9679; Solo verloren: Solist <strong>−3×</strong>, Gegner je <strong>+1×</strong></div>';
   html+='</div>';
-  html+='<div style="margin-top:8px;font-size:11px;color:var(--tx3);padding:0 4px">Hinweis: Die Punktewerte können je nach Hausregeln abweichen.</div>';
-  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
-  html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
-  html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
-  const log=[
-    {v:'4.11',d:'13.05.2026 13:25',t:'Info-Popup auf Vollbild umgestellt mit X-Button oben rechts (sticky, immer sichtbar) und festem Schließen-Button unten. Komplette Anleitung und Changelog jetzt besser lesbar.'},
-    {v:'4.10',d:'13.05.2026 13:15',t:'Auto-Update-Hinweis: Wenn eine neue Version verfügbar ist, erscheint oben ein Toast "Neue Version verfügbar – wird automatisch geladen…" mit Fortschrittsbalken. Nach 3 Sekunden lädt die App selbstständig neu. Nutzer sehen so transparent, dass sich was tut – kein manuelles Schließen mehr nötig.'},
-    {v:'4.9',d:'13.05.2026 13:04',t:'Anonyme Besucherzählung via GoatCounter eingebaut – zählt nur Seitenaufrufe und grobe Geräteinfos. Keine Cookies, keine personenbezogenen Daten, DSGVO-konform.'},
-    {v:'4.8',d:'11.05.2026 16:10',t:'Button "Neues Spiel starten" umbenannt zu "Alle Spiele löschen" mit Mülltonnen-Icon. Klare Aussage: löscht nur Spiele und Statistik, Spieler bleiben erhalten. Kein 4-Spieler-Zwang mehr beim Löschen – funktioniert auch wenn temporär weniger Spieler aktiv sind.'},
-    {v:'4.7',d:'11.05.2026 15:55',t:'Spieler entfernen verhält sich jetzt sinnvoll: Spieler verschwindet nur aus der Eingabe-Auswahl, alle Punkte und Statistiken bleiben in Tabelle und Statistik vollständig erhalten. Neue Funktion getHistoricalPlayers() liefert alle Spieler die je gespielt haben. Bonus: Konflikt-Warnung wenn ein Spieler-Name wiederverwendet wird (alte Punkte würden zugeordnet werden).'},
-    {v:'4.6',d:'11.05.2026 15:42',t:'Logik-Bugfixes: 1) Crash in Statistik & Tabelle wenn alle Spieler entfernt sind verhindert (zeigt jetzt Hinweismeldung). 2) Geber-Anzeige für historische Spiele abgesichert (kein undefined mehr nach Spieler-Löschung). 3) deleteRound korrigiert bockQueue wenn aktive Bockrunde gelöscht wird. 4) Eingabe-Cache wird auch bei Spielbearbeitung, Verschieben und Löschen invalidiert. 5) Doppelter moveRound entfernt.'},
-    {v:'4.5',d:'30.04.2026 18:05',t:'Bugfix: Spieleränderungen (hinzufügen, entfernen, umbenennen, verschieben) invalidieren jetzt den Eingabe-Screen-Cache. Vorher konnten Spiele mit zu wenig Spielern gespeichert oder ein veralteter Hinweis "mind. 4 Spieler" gezeigt werden. Beim Speichern wird zusätzlich live geprüft, ob noch genug Spieler da sind.'},
-    {v:'4.4',d:'30.04.2026 17:50',t:'Bugfixes & Features: 1) "Neues Spiel" setzt jetzt wirklich ALLES zurück (Undo, Pending Round, Timer, Eingabe-Cache). 2) Spieler löschen mit zwei Sicherheitsfragen: standardmäßig bleiben Statistiken erhalten, optional können sie mitgelöscht werden. 3) Pech-Serie 💀 ab 2 Niederlagen, 💀💀 ab 4, 💀💀💀 ab 6. Sichtbar in Eingabe und Rangliste.'},
-    {v:'4.3',d:'30.04.2026 17:35',t:'"Einstellungen speichern"-Button entfernt – alle Einstellungen werden bereits beim Ändern automatisch gespeichert. Weniger Klicks, weniger UI-Rauschen.'},
-    {v:'4.2',d:'30.04.2026 17:20',t:'Refactoring: CSS in eigene Datei styles.css ausgelagert. index.html ist jetzt deutlich übersichtlicher.'},
-    {v:'4.1',d:'30.04.2026 17:08',t:'Bugfix: Eingabe zeigte "mind. 4 Spieler" obwohl genug Spieler eingetragen waren. gameStarted-Flag entfernt – App prüft jetzt direkt die Spieleranzahl.'},
-    {v:'4.0',d:'30.04.2026 14:10',t:'Punkterechner: Intelligente Kaskade – keine 60 ankreuzen setzt automatisch auch keine 90 und 120. Gleiches für Ansagen. Fuchs und Charlie maximal 2, Doppelkopf bis 9.'},
-    {v:'3.9',d:'30.04.2026 14:00',t:'Punkterechner überarbeitet: Vorab und Gegen die Alten werden jetzt verdoppelt. Fuchs/Doppelkopf/Charlie mit Zähler (±) für mehrere. Solo zeigt nur Solopunkt als Sonderpunkt. Rechner im Vollbild mit sticky Ergebnis-Anzeige oben. Hilfeseite korrigiert.'},
-    {v:'3.8',d:'30.04.2026 13:45',t:'Punkterechner: Button bei der Eingabe öffnet Dialog zum interaktiven Punkte zählen.'},
-    {v:'3.7',d:'30.04.2026 13:30',t:'Hilfeseite: Punktezählung getrennt nach Normalspiel und Solo mit jeweils eigener Anleitung inkl. Verteilung.'},
-    {v:'3.6',d:'30.04.2026 13:25',t:'Tabelle: Gewinner/Verlierer pro Spiel auf einen Blick erkennbar durch dezenten grünen/roten Hintergrund in der Zelle.'},
-    {v:'3.5',d:'30.04.2026 13:20',t:'Team-Statistik: Solo-Spiele werden ignoriert (kein echtes Team).'},
-    {v:'3.4',d:'30.04.2026 13:15',t:'Spieler löschen: Bestätigung wenn der Spieler bereits Spiele hat. Team-Statistik: zählt jetzt nur Paarungen im gleichen Team.'},
-    {v:'3.3',d:'30.04.2026 13:10',t:'Eingabe-Zustand bleibt erhalten beim Tab-Wechsel.'},
-    {v:'3.2',d:'30.04.2026 13:00',t:'Siegesserie: 🔥 ab 2 Siegen, 🔥🔥 ab 4, 🔥🔥🔥 ab 6 hintereinander.'},
-    {v:'3.1',d:'30.04.2026 12:50',t:'Konfetti-Animation bei Solo-Gewinn und Führungswechsel.'},
-    {v:'3.0',d:'30.04.2026 12:40',t:'Timer: Spielzeit läuft ab dem ersten Spiel, zeigt Gesamtzeit und Durchschnittszeit pro Spiel.'},
-    {v:'2.9',d:'30.04.2026 12:30',t:'Absagen (Re, Kontra, keine 90/60/30, schwarz) erfassbar.'},
-    {v:'2.8',d:'30.04.2026 12:20',t:'Rundenzähler: Anzeige von Runde und Spiel-Nummer in der Eingabe.'},
-    {v:'2.7',d:'30.04.2026 12:15',t:'Rückgängig-Button nach dem Speichern.'},
-    {v:'2.6',d:'30.04.2026 12:10',t:'PWA: App ist jetzt installierbar auf dem Homescreen, funktioniert offline.'},
-    {v:'1.0',d:'22.04.2026',t:'Erste Version.'}
-  ];
-  log.forEach(e=>{html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>'});
-  html+='</div><button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeInfoModal()">Schließen</button>';
-  document.getElementById('infoModalContent').innerHTML=html;
-  document.getElementById('infoModal').classList.add('show');
+  html+='<div style="margin-top:8px;font-size:11px;color:var(--tx3);padding:0 4px">Hinweis: Die Punktewerte können je nach Hausregeln abweichen. Diese App berechnet keine Punkte automatisch – alle Werte werden manuell eingetragen.</div>';
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeCalcHelpModal()">Schließen</button>';
+  document.getElementById('calcHelpModalContent').innerHTML=html;
+  document.getElementById('calcHelpModal').classList.add('show');
 }
-function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
-document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
+function closeCalcHelpModal(){document.getElementById('calcHelpModal').classList.remove('show')}
+document.getElementById('calcHelpModal').addEventListener('click',function(e){if(e.target===this)closeCalcHelpModal()});
 
 function toggleTheme(){
   const html=document.documentElement;
