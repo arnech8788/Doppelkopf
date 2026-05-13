@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.10 · 13.05.2026 13:15</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.11 · 13.05.2026 13:25</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -84,7 +84,7 @@
 <div class="modal-overlay" id="editModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="editModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
-<div class="modal-overlay" id="infoModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="infoModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
+<div class="modal-overlay" id="infoModal" style="align-items:stretch;padding:0"><div class="modal" id="infoModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 
 <div id="updateToast" class="update-toast">
@@ -915,7 +915,7 @@ function shareStats(){const el=document.getElementById('shareableStats');if(el)c
 function shareTabelle(){const el=document.getElementById('standsCard');if(el)captureAndShare(el,'doppelkopf-tabelle.png')}
 
 function openInfoModal(){
-  let html='<h3>&#9824; Doppelkopf Punktezettel</h3>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">&#9824; Doppelkopf Punktezettel</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="section-label">Punkte zählen – Normalspiel</div>';
   html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
   html+='<div style="font-weight:700;margin-bottom:8px;color:var(--tx)">Grundwerte</div>';
@@ -960,6 +960,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.11',d:'13.05.2026 13:25',t:'Info-Popup auf Vollbild umgestellt mit X-Button oben rechts (sticky, immer sichtbar) und festem Schließen-Button unten. Komplette Anleitung und Changelog jetzt besser lesbar.'},
     {v:'4.10',d:'13.05.2026 13:15',t:'Auto-Update-Hinweis: Wenn eine neue Version verfügbar ist, erscheint oben ein Toast "Neue Version verfügbar – wird automatisch geladen…" mit Fortschrittsbalken. Nach 3 Sekunden lädt die App selbstständig neu. Nutzer sehen so transparent, dass sich was tut – kein manuelles Schließen mehr nötig.'},
     {v:'4.9',d:'13.05.2026 13:04',t:'Anonyme Besucherzählung via GoatCounter eingebaut – zählt nur Seitenaufrufe und grobe Geräteinfos. Keine Cookies, keine personenbezogenen Daten, DSGVO-konform.'},
     {v:'4.8',d:'11.05.2026 16:10',t:'Button "Neues Spiel starten" umbenannt zu "Alle Spiele löschen" mit Mülltonnen-Icon. Klare Aussage: löscht nur Spiele und Statistik, Spieler bleiben erhalten. Kein 4-Spieler-Zwang mehr beim Löschen – funktioniert auch wenn temporär weniger Spieler aktiv sind.'},
@@ -988,7 +989,7 @@ function openInfoModal(){
     {v:'1.0',d:'22.04.2026',t:'Erste Version.'}
   ];
   log.forEach(e=>{html+='<div class="changelog-entry"><span class="cl-ver">v'+e.v+'</span><span class="cl-date">'+e.d+'</span><div class="cl-text">'+e.t+'</div></div>'});
-  html+='</div><button class="btn btn-secondary" style="margin-top:12px" onclick="closeInfoModal()">Schließen</button>';
+  html+='</div><button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeInfoModal()">Schließen</button>';
   document.getElementById('infoModalContent').innerHTML=html;
   document.getElementById('infoModal').classList.add('show');
 }
