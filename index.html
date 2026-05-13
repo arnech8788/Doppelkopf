@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.8 · 11.05.2026 16:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.9 · 13.05.2026 13:04</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -954,6 +954,7 @@ function openInfoModal(){
   html+='<a href="mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback" class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.9',d:'13.05.2026 13:04',t:'Anonyme Besucherzählung via GoatCounter eingebaut – zählt nur Seitenaufrufe und grobe Geräteinfos. Keine Cookies, keine personenbezogenen Daten, DSGVO-konform.'},
     {v:'4.8',d:'11.05.2026 16:10',t:'Button "Neues Spiel starten" umbenannt zu "Alle Spiele löschen" mit Mülltonnen-Icon. Klare Aussage: löscht nur Spiele und Statistik, Spieler bleiben erhalten. Kein 4-Spieler-Zwang mehr beim Löschen – funktioniert auch wenn temporär weniger Spieler aktiv sind.'},
     {v:'4.7',d:'11.05.2026 15:55',t:'Spieler entfernen verhält sich jetzt sinnvoll: Spieler verschwindet nur aus der Eingabe-Auswahl, alle Punkte und Statistiken bleiben in Tabelle und Statistik vollständig erhalten. Neue Funktion getHistoricalPlayers() liefert alle Spieler die je gespielt haben. Bonus: Konflikt-Warnung wenn ein Spieler-Name wiederverwendet wird (alte Punkte würden zugeordnet werden).'},
     {v:'4.6',d:'11.05.2026 15:42',t:'Logik-Bugfixes: 1) Crash in Statistik & Tabelle wenn alle Spieler entfernt sind verhindert (zeigt jetzt Hinweismeldung). 2) Geber-Anzeige für historische Spiele abgesichert (kein undefined mehr nach Spieler-Löschung). 3) deleteRound korrigiert bockQueue wenn aktive Bockrunde gelöscht wird. 4) Eingabe-Cache wird auch bei Spielbearbeitung, Verschieben und Löschen invalidiert. 5) Doppelter moveRound entfernt.'},
@@ -1014,5 +1015,8 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch
 
 load();
 </script>
+<!-- Anonyme Besucherzählung (keine Cookies, keine personenbezogenen Daten) -->
+<script data-goatcounter="https://doppelkopf.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
