@@ -1,4 +1,4 @@
-const CACHE_NAME = 'doko-v4.9';
+const CACHE_NAME = 'doko-v4.10';
 const ASSETS = [
   '/',
   '/index.html',
@@ -16,12 +16,17 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  e.waitUntil((async () => {
+    // Alte Caches aufräumen
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)));
+    await self.clients.claim();
+    // Allen offenen Clients Bescheid geben, dass eine neue Version aktiv ist
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach(client => {
+      client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME });
+    });
+  })());
 });
 
 self.addEventListener('fetch', e => {
