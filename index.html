@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.15 · 13.05.2026 14:30</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.17 · 13.05.2026 14:55</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -108,7 +108,7 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
-let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false};
+let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false};
 let currentPts='';
 let editingRound=null;
 let chartInstances=[];
@@ -315,7 +315,8 @@ function getShortNames(playerList){
 
 // ═══════════════════════════════════════════════════════════
 // Easter Egg: Kursleiter-Cup
-// Wenn genau diese 4 Spieler aktiv sind, schaltet ein spezielles Theme an
+// Vollmodus: genau die 4 Kursleiter aktiv (Theme + Vokabular)
+// Mini: mind. 1 Kursleiter dabei, egal wer sonst (nur Badge)
 // ═══════════════════════════════════════════════════════════
 const KURSLEITER_NAMES=['jonas','lars','julia','jens'];
 const KURSLEITER_EMOJIS={jonas:'📚',lars:'🎓',julia:'🍎',jens:'✏️'};
@@ -330,10 +331,43 @@ function isKursleiterMode(){
   if(active.length!==4)return false;
   return KURSLEITER_NAMES.every(n=>active.includes(n));
 }
+// Mini-Modus: mind. 1 Kursleiter dabei, aber NICHT alle 4 (sonst Vollmodus)
+// Egal wer sonst dabei ist
+function isKursleiterMiniMode(){
+  if(isKursleiterMode())return false;
+  const active=state.players.map(p=>p.toLowerCase());
+  return KURSLEITER_NAMES.some(n=>active.includes(n));
+}
 
+// ═══════════════════════════════════════════════════════════
+// Easter Egg: Doko-Stammrunde
+// Aktiv wenn mindestens 4 aktive Spieler aus der Liste sind UND keine Fremden
+// Nur Konfetti + Hinweis – keine Emojis, kein Vokabular-Switch
+// ═══════════════════════════════════════════════════════════
+const DOKO_RUNDE_NAMES=['alisa','arne','christoph','eva','lena','lisa','sarah','annabelle','moritz'];
+
+function isDokoRundeMode(){
+  const active=state.players.map(p=>p.toLowerCase());
+  if(active.length<4)return false;
+  // Keine Fremden zugelassen
+  if(!active.every(p=>DOKO_RUNDE_NAMES.includes(p)))return false;
+  // Mindestens 4 müssen es sein
+  return active.length>=4;
+}
+
+// Liefert Emoji für einen Spieler – aktuell nur für Kursleiter (Voll- oder Mini-Modus)
 function getPlayerEmoji(name){
-  if(!isKursleiterMode())return '';
-  return KURSLEITER_EMOJIS[name.toLowerCase()]||'';
+  const key=name.toLowerCase();
+  if(isKursleiterMode()||isKursleiterMiniMode()){
+    if(KURSLEITER_EMOJIS[key])return KURSLEITER_EMOJIS[key];
+  }
+  return '';
+}
+
+// Welches Vokabular gerade gilt – nur Kursleiter-Vollmodus überschreibt
+function getVocab(){
+  if(isKursleiterMode())return KURSLEITER_VOCAB;
+  return {solo:'Solo',bockrunde:'Bockrunde',spiel:'Spiel'};
 }
 
 // Wird aufgerufen wenn sich die Spielerliste ändert –
@@ -378,22 +412,35 @@ function renderEingabe(){
   const bi=document.getElementById('bockIndicator');
   let biHtml='';
   const all=getAllPlayers();
-  // Kursleiter-Cup Banner
+  // Easter Egg Banner – Vollmodi
   if(isKursleiterMode()){
     biHtml+='<div style="background:linear-gradient(135deg,#5b4cdb,#2980b9);color:#fff;padding:10px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;box-shadow:0 2px 8px rgba(91,76,219,.3)">🎓 Kursleiter-Cup 📚 · ✏️ · 🍎</div>';
+  }else if(isKursleiterMiniMode()){
+    // Mini-Kursleiter: kleines Achievement-Badge statt vollem Banner
+    const count=state.players.filter(p=>KURSLEITER_NAMES.includes(p.toLowerCase())).length;
+    biHtml+='<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg3);color:var(--acc2);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;margin-bottom:8px;border:1px solid var(--bdr)">🎓 <span>'+count+' Kursleiter dabei</span></div>';
+  }
+  if(isDokoRundeMode()){
+    biHtml+='<div style="background:linear-gradient(135deg,#e74c3c,#f0a830);color:#fff;padding:10px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;box-shadow:0 2px 8px rgba(231,76,60,.3)">🃏 Doko-Stammrunde 🍀 Schön, dass ihr da seid!</div>';
   }
   if(state.rounds.length>0&&state.rounds.length%all.length===0){
     const completedRunde=Math.floor(state.rounds.length/all.length);
     biHtml+='<div style="background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:500;text-align:center;margin-bottom:8px;border:1px solid rgba(240,168,48,.15)">&#127183; Runde '+completedRunde+' beendet!</div>';
   }
   if(isBockRound()){
-    const bockLabel=isKursleiterMode()?'Doppelstunde':'Bockrunde';
-    biHtml+='<div class="bock-indicator">&#9889; '+bockLabel+'! Noch '+state.bockQueue+' '+(isKursleiterMode()?(state.bockQueue>1?'Stunden':'Stunde'):(state.bockQueue>1?'Spiele':'Spiel'))+'</div>';
+    const bockLabel=getVocab().bockrunde;
+    biHtml+='<div class="bock-indicator">&#9889; '+bockLabel+'! Noch '+state.bockQueue+' '+(state.bockQueue>1?'Spiele':'Spiel')+'</div>';
   }
   bi.innerHTML=biHtml;
   // Einmaliges Konfetti wenn der Kursleiter-Cup zum ersten Mal aktiviert wird
   if(isKursleiterMode()&&!state.kursleiterCupSeen){
     state.kursleiterCupSeen=true;
+    save();
+    setTimeout(launchConfetti,400);
+  }
+  // Einmaliges Konfetti wenn die Doko-Stammrunde zum ersten Mal aktiv ist
+  if(isDokoRundeMode()&&!state.dokoRundeSeen){
+    state.dokoRundeSeen=true;
     save();
     setTimeout(launchConfetti,400);
   }
@@ -403,8 +450,8 @@ function renderEingabe(){
   const rundeNr=Math.floor(state.rounds.length/all.length)+1;
   const spielInRunde=(state.rounds.length%all.length)+1;
   const dealerEmoji=getPlayerEmoji(dealer);
-  const lektionLabel=isKursleiterMode()?'Lektion':'Spiel';
-  let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · '+lektionLabel+' '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+(dealerEmoji?dealerEmoji+' ':'')+dealer+' gibt</span></div>';
+  const vocab=getVocab();
+  let html='<div class="card"><div class="card-title">Runde '+rundeNr+' · '+vocab.spiel+' '+spielInRunde+' von '+all.length+' · <span style="color:var(--acc2)">&#9827; '+(dealerEmoji?dealerEmoji+' ':'')+dealer+' gibt</span></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
   html+='<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;align-items:center">';
@@ -432,14 +479,11 @@ function renderEingabe(){
   });
   html+='</div>';
   if(state.bockEnabled){
-    const triggerLabel=isKursleiterMode()?'Neue Doppelstunde auslösen':'Neue Bockrunde auslösen';
-    html+='<div class="toggle-row"><span class="toggle-label">&#9889; '+triggerLabel+'</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
+    html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue '+vocab.bockrunde+' auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
   }
-  const saveLabel=isKursleiterMode()?'Lektion speichern':'Spiel speichern';
-  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+saveLabel+'</button></div>';
+  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button></div>';
   if(lastUndo){
-    const undoLabel=isKursleiterMode()?'Letzte Lektion rückgängig':'Letztes Spiel rückgängig';
-    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' '+undoLabel+'</button></div>';
+    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Letzte:s '+vocab.spiel+' rückgängig</button></div>';
   }
   html+='</div>';
   if(state.gameStartTime){
@@ -613,7 +657,8 @@ function saveNewRound(){
 }
 function openSoloModal(){
   const enabled=state.soloTypes.filter(s=>s.enabled);
-  let html='<h3>'+(isKursleiterMode()?'Welcher Frontalunterricht?':'Welches Solo?')+'</h3>';
+  const vocab=getVocab();
+  let html='<h3>Welche:r '+vocab.solo+'?</h3>';
   html+='<div class="solo-type-grid">';
   enabled.forEach(s=>{html+='<div class="solo-chip" data-solo="'+s.name+'" onclick="selectSoloType(this)">'+s.name+'</div>'});
   html+='</div>';
@@ -1080,6 +1125,18 @@ function openInfoModal(){
     html+='<div>Sieh an, vier ganz bestimmte Namen … Genießt euren Doppelkopf-Abend!</div>';
     html+='<div style="margin-top:8px">📚 Jonas · 🎓 Lars · 🍎 Julia · ✏️ Jens</div>';
     html+='</div>';
+  }else if(isKursleiterMiniMode()){
+    const count=state.players.filter(p=>KURSLEITER_NAMES.includes(p.toLowerCase())).length;
+    html+='<div class="section-label" style="margin-top:16px">🎓 Achievement</div>';
+    html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+    html+='<div>'+count+' Kursleiter dabei. Wenn alle vier zusammen spielen, gibt es einen Spezial-Modus!</div>';
+    html+='</div>';
+  }
+  if(isDokoRundeMode()){
+    html+='<div class="section-label" style="margin-top:16px">🃏 Doko-Stammrunde</div>';
+    html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
+    html+='<div>Schön, dass die Stammrunde wieder zusammen ist! 🍀</div>';
+    html+='</div>';
   }
 
   // Punkte zählen Hinweis
@@ -1096,6 +1153,8 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.17',d:'13.05.2026 14:55',t:'Easter Eggs verfeinert: Mini-Kursleiter-Modus zeigt nur noch ein kleines Achievement-Badge "X Kursleiter dabei" (egal wer sonst dabei ist). Doko-Stammrunde aktiviert sich wenn mindestens 4 Spieler aus der Stammrunde aktiv sind und keine Fremden – Konfetti beim ersten Mal und ein Spezial-Hinweis im Banner.'},
+    {v:'4.16',d:'13.05.2026 14:45',t:'Zwei neue Easter Eggs: 1) Mini-Kursleiter-Modus – wenn nur 1-3 Kursleiter dabei sind, gibts dezenten Banner und persönliche Emojis. 2) Doko-Stammrunde mit eigenen Emojis und Theme (Alisa, Arne, Christoph, Eva, Lena, Lisa, Sarah, Annabelle, Moritz). Vollmodus mit Konfetti wenn alle 4 aktiven Spieler aus der Stammrunde sind. Mini-Modus bei mind. einem dabei.'},
     {v:'4.15',d:'13.05.2026 14:30',t:'Zwei Verbesserungen: 1) Spalten-Kürzel sind jetzt eindeutig – aus "Christoph" und "Christopher" werden "Christop." und "Christophe." statt zweimal "Chris". Algorithmus kürzt so weit wie möglich, aber nur so weit dass die Namen unterscheidbar bleiben. 2) Geheimer Kursleiter-Cup-Modus (Easter Egg) wenn vier bestimmte Namen aktiv sind: eigenes Banner, persönliche Emojis und Lehrer-Vokabular ("Frontalunterricht" statt "Solo", "Doppelstunde" statt "Bockrunde", "Lektion" statt "Spiel").'},
     {v:'4.14',d:'13.05.2026 14:10',t:'Spiel-bearbeiten-Dialog auch auf Vollbild umgestellt – mit X-Button oben rechts und sticky Speichern/Abbrechen unten. Konsistent mit Punkterechner, Info und Punktezähl-Hilfe.'},
     {v:'4.13',d:'13.05.2026 13:55',t:'Tabellenzellen: nur noch Hintergrund-Farbe für Sieg/Niederlage des einzelnen Spiels (grün/rot). Die kumulierten Punkte werden in Standard-Textfarbe angezeigt – nicht mehr in Grün/Rot je nach Gesamtsaldo. Übersichtlicher.'},
