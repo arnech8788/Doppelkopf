@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.12 · 13.05.2026 13:40</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.13 · 13.05.2026 13:55</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -726,10 +726,10 @@ function renderTabelle(scrollToBottom){
     if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
     html+='</td>';
     all.forEach(p=>{
-      const c=cumul[p][i];const cls=c>0?'pos':c<0?'neg':'';
+      const c=cumul[p][i];
       const played=r.playing.includes(p);const won=r.winners.includes(p);const lost=played&&!won;
       const bg=won?'background:var(--grn-bg)':lost?'background:var(--red-bg)':'';
-      html+='<td class="'+cls+'" style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
+      html+='<td style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
     });
     // Punkte des Spiels jetzt ganz rechts (vor dem Menü)
     html+='<td style="color:var(--tx3);font-family:\'Space Mono\',monospace">'+r.points+'</td>';
@@ -1018,6 +1018,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.13',d:'13.05.2026 13:55',t:'Tabellenzellen: nur noch Hintergrund-Farbe für Sieg/Niederlage des einzelnen Spiels (grün/rot). Die kumulierten Punkte werden in Standard-Textfarbe angezeigt – nicht mehr in Grün/Rot je nach Gesamtsaldo. Übersichtlicher.'},
     {v:'4.12',d:'13.05.2026 13:40',t:'Mehrere Änderungen: 1) Punkte-Spalte in der Tabelle nach rechts ans Ende verschoben (vor dem Menü). 2) Minuspunkte möglich – mit ±-Button im Numpad kann das Vorzeichen umgekehrt werden, für Fälle wo das Gewinner-Team trotzdem unter null landet. 3) ?-Button neben "Punkte zählen" für die Punktezähl-Anleitung. 4) Info-Modal komplett überarbeitet: kompakte App-Erklärung mit allen Besonderheiten (Streaks, Konfetti, Bockrunden, PWA-Installation, Updates).'},
     {v:'4.11',d:'13.05.2026 13:25',t:'Info-Popup auf Vollbild umgestellt mit X-Button oben rechts (sticky, immer sichtbar) und festem Schließen-Button unten. Komplette Anleitung und Changelog jetzt besser lesbar.'},
     {v:'4.10',d:'13.05.2026 13:15',t:'Auto-Update-Hinweis: Wenn eine neue Version verfügbar ist, erscheint oben ein Toast "Neue Version verfügbar – wird automatisch geladen…" mit Fortschrittsbalken. Nach 3 Sekunden lädt die App selbstständig neu.'},
