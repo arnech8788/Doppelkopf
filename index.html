@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.13 · 13.05.2026 13:55</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.14 · 13.05.2026 14:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -81,7 +81,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="editModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="editModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
+<div class="modal-overlay" id="editModal" style="align-items:stretch;padding:0"><div class="modal" id="editModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="renameModal" style="align-items:flex-start;padding-top:40px"><div class="modal" id="renameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr)"></div></div>
 <div class="modal-overlay" id="soloModal"><div class="modal" id="soloModalContent"></div></div>
 <div class="modal-overlay" id="infoModal" style="align-items:stretch;padding:0"><div class="modal" id="infoModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
@@ -594,7 +594,7 @@ function openEditModal(i){
   editingRound=i;const r=state.rounds[i];currentPts=''+r.points;
   // Alle historischen Spieler anzeigen – damit auch gelöschte Spieler aus der Runde bearbeitbar sind
   const all=getHistoricalPlayers();
-  let html='<h3>Spiel '+(i+1)+' bearbeiten</h3>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Spiel '+(i+1)+' bearbeiten</h3><button onclick="closeEditModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display" id="editPtsDisplay">'+r.points+'</div>';
   html+='<div class="numpad">';
@@ -613,7 +613,7 @@ function openEditModal(i){
     html+='<div class="player-chip" data-player="'+p+'" data-state="'+st+'" onclick="cycleState(this)"><span class="chip-icon">'+ic+'</span>'+p+'</div>';
   });
   html+='</div>';
-  html+='<div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="saveEditRound()" style="flex:1">'+ICO.check+' Speichern</button></div>';
+  html+='<div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg2);padding:8px 0 0"><button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="saveEditRound()" style="flex:1">'+ICO.check+' Speichern</button></div>';
   document.getElementById('editModalContent').innerHTML=html;
   document.getElementById('editModal').classList.add('show');
 }
@@ -1018,6 +1018,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.14',d:'13.05.2026 14:10',t:'Spiel-bearbeiten-Dialog auch auf Vollbild umgestellt – mit X-Button oben rechts und sticky Speichern/Abbrechen unten. Konsistent mit Punkterechner, Info und Punktezähl-Hilfe.'},
     {v:'4.13',d:'13.05.2026 13:55',t:'Tabellenzellen: nur noch Hintergrund-Farbe für Sieg/Niederlage des einzelnen Spiels (grün/rot). Die kumulierten Punkte werden in Standard-Textfarbe angezeigt – nicht mehr in Grün/Rot je nach Gesamtsaldo. Übersichtlicher.'},
     {v:'4.12',d:'13.05.2026 13:40',t:'Mehrere Änderungen: 1) Punkte-Spalte in der Tabelle nach rechts ans Ende verschoben (vor dem Menü). 2) Minuspunkte möglich – mit ±-Button im Numpad kann das Vorzeichen umgekehrt werden, für Fälle wo das Gewinner-Team trotzdem unter null landet. 3) ?-Button neben "Punkte zählen" für die Punktezähl-Anleitung. 4) Info-Modal komplett überarbeitet: kompakte App-Erklärung mit allen Besonderheiten (Streaks, Konfetti, Bockrunden, PWA-Installation, Updates).'},
     {v:'4.11',d:'13.05.2026 13:25',t:'Info-Popup auf Vollbild umgestellt mit X-Button oben rechts (sticky, immer sichtbar) und festem Schließen-Button unten. Komplette Anleitung und Changelog jetzt besser lesbar.'},
