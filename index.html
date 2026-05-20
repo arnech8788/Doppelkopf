@@ -894,9 +894,11 @@ function renderStats(){
       }
     });
   });
-  // Guards gegen leere Spielerliste – reduce auf [] wirft sonst Fehler
-  const soloKing=all.length?all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b):'–';
-  const bestPlayer=all.length?all.reduce((a,b)=>totals[a]>totals[b]?a:b):'–';
+  const soloCount=state.rounds.filter(r=>r.solo).length;
+  const soloKing=soloCount>0?all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b):'–';
+  const maxTotal=all.length?Math.max(...all.map(p=>totals[p])):0;
+  const _bestCandidates=all.filter(p=>totals[p]===maxTotal);
+  const bestPlayer=_bestCandidates.length===1?_bestCandidates[0]:'–';
   let html='<div id="shareableStats">';
   html+='<div class="stat-grid">';
   html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
