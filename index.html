@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.18 · 13.05.2026 15:10</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.19 · 20.05.2026 11:02</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1155,6 +1155,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.19',d:'20.05.2026 11:02',t:'Statistik-Bugfix: Solokönig zeigt jetzt "–" wenn kein einziges Solo gespielt wurde (statt fälschlich dem ersten Spieler). Bester Spieler zeigt "–" bei Gleichstand (z.B. wenn alle Spieler gleich viele Punkte haben).'},
     {v:'4.18',d:'13.05.2026 15:10',t:'Spalten-Kürzel überarbeitet: Mindestlänge ist jetzt 4 Buchstaben (vorher 3), kein Punkt mehr am Ende. Wichtiger Bugfix: bei zwei langen Namen die nur einen Buchstaben Unterschied haben (z. B. Christoph & Christopher) wurde vorher auf 8 Zeichen begrenzt und es kollidierte – jetzt wächst das Kürzel beliebig lang bis eindeutig.'},
     {v:'4.17',d:'13.05.2026 14:55',t:'Easter Eggs verfeinert: Mini-Kursleiter-Modus zeigt nur noch ein kleines Achievement-Badge "X Kursleiter dabei" (egal wer sonst dabei ist). Doko-Stammrunde aktiviert sich wenn mindestens 4 Spieler aus der Stammrunde aktiv sind und keine Fremden – Konfetti beim ersten Mal und ein Spezial-Hinweis im Banner.'},
     {v:'4.16',d:'13.05.2026 14:45',t:'Zwei neue Easter Eggs: 1) Mini-Kursleiter-Modus – wenn nur 1-3 Kursleiter dabei sind, gibts dezenten Banner und persönliche Emojis. 2) Doko-Stammrunde mit eigenen Emojis und Theme (Alisa, Arne, Christoph, Eva, Lena, Lisa, Sarah, Annabelle, Moritz). Vollmodus mit Konfetti wenn alle 4 aktiven Spieler aus der Stammrunde sind. Mini-Modus bei mind. einem dabei.'},
