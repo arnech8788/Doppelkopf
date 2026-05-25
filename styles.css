@@ -39,7 +39,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 .screen{display:none}
 .screen.active{display:block}
-#screen-eingabe{display:flex;flex-direction:column}
+#screen-eingabe{display:flex;flex-direction:column;height:calc(100dvh - 82px)}
 #eingabeContent{flex:1;display:flex;flex-direction:column}
 #eingabeContent .card{flex:1;display:flex;flex-direction:column}
 
