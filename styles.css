@@ -39,6 +39,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 .screen{display:none}
 .screen.active{display:block}
+#screen-eingabe{display:flex;flex-direction:column}
+#eingabeContent{flex:1;display:flex;flex-direction:column}
+#eingabeContent .card{flex:1;display:flex;flex-direction:column}
 
 .card{background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;margin-bottom:12px}
 .card-title{font-size:13px;color:var(--acc2);margin-bottom:12px;font-weight:500;letter-spacing:.3px;text-transform:uppercase}
@@ -125,7 +128,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap;text-a
 .chip-legend span{display:flex;align-items:center;gap:4px}
 .chip-legend .dot{width:10px;height:10px;border-radius:3px}
 
-.numpad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:16px}
+.numpad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(5,1fr);gap:6px;margin-bottom:0;flex:1;min-height:180px}
 .numpad-btn{padding:14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--tx);cursor:pointer;text-align:center;transition:.15s;user-select:none;display:flex;align-items:center;justify-content:center}
 .numpad-btn:active{transform:scale(.95);background:var(--bg4)}
 .numpad-btn.del{color:var(--red);background:var(--red-bg);border-color:rgba(224,82,82,.15)}
