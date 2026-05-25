@@ -612,8 +612,6 @@ function undoLastRound(){
     if(ps){c.dataset.state=ps.won?'won':'lost';c.querySelector('.chip-icon').innerHTML=ps.won?ICO.check:ICO.x}
   });
   lastUndo=null;
-  const undoBtn=document.getElementById('undoBtn');
-  if(undoBtn)undoBtn.style.display='none';
   document.getElementById('eingabeContent').dataset.roundCount=state.rounds.length;
 }
 function saveNewRound(){
