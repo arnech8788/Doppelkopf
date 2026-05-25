@@ -134,7 +134,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap;text-a
 .numpad-btn.del{color:var(--red);background:var(--red-bg);border-color:rgba(224,82,82,.15)}
 .numpad-btn svg{width:20px;height:20px}
 
-.pts-display{font-family:'Space Mono',monospace;font-size:36px;font-weight:700;text-align:center;padding:12px;height:64px;display:flex;align-items:center;justify-content:center;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);margin-bottom:8px}
+.pts-display{font-family:'Space Mono',monospace;font-size:36px;font-weight:700;text-align:center;padding:12px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--tx);background:var(--bg3);border:1px solid var(--bdr);border-radius:var(--r-sm);margin-bottom:8px}
 .pts-display.empty{color:var(--tx3);font-size:16px;font-weight:400}
 
 .settings-link{display:flex;align-items:center;gap:6px;color:var(--tx3);font-size:12px;cursor:pointer;padding:8px 0;margin-top:4px}
@@ -225,3 +225,10 @@ tr.clickable:active{background:var(--bg3)}
   animation:reloadCountdown 3s linear forwards;
 }
 @keyframes reloadCountdown{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+@media(max-height:680px){
+  .section-label{margin:8px 0 4px}
+  .player-chip{padding:8px 14px}
+  .chip-grid{gap:6px;margin-bottom:10px}
+  .numpad{gap:4px}
+}
