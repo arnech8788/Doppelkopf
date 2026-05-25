@@ -481,9 +481,10 @@ function renderEingabe(){
   if(state.bockEnabled){
     html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue '+vocab.bockrunde+' auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
   }
-  html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button></div>';
   if(lastUndo){
-    html+='<div id="undoBtn" style="display:flex;justify-content:center;margin-top:8px"><button class="btn btn-secondary" style="width:auto;padding:6px 16px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Letzte:s '+vocab.spiel+' rückgängig</button></div>';
+    html+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-primary" style="flex:1.5;padding:10px 16px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button><button class="btn btn-secondary" style="flex:1;padding:10px 12px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Rückgängig</button></div>';
+  }else{
+    html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button></div>';
   }
   html+='</div>';
   if(state.gameStartTime){
