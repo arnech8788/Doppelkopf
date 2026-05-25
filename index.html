@@ -58,7 +58,7 @@
       </div>
     </div>
     <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.22 · 25.05.2026 21:32</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.23 · 25.05.2026 21:53</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1159,6 +1159,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.23',d:'25.05.2026 21:53',t:'Bugfix: Spieleingabe war auf allen Screens sichtbar – CSS-Spezifitätsfehler behoben.'},
     {v:'4.22',d:'25.05.2026 21:32',t:'Eingabe-Screen: Numpad füllt jetzt den ganzen Bildschirm – kein Scrollen mehr nötig. Auf kleinen Handys kompakter Modus. Speichern und Rückgängig nebeneinander.'},
     {v:'4.21',d:'25.05.2026 20:41',t:'Bugfix Tabelle: Spielernamen bleiben beim Runterscrollen sichtbar – Tabellenkopf ist jetzt korrekt fixiert (sticky Header).'},
     {v:'4.20',d:'20.05.2026 11:19',t:'Design-Fix: Statistik-Leerseite ("Spiele ein paar Spiele für Statistiken") hat jetzt denselben weißen Kartenhintergrund wie die Tabelle ("Noch keine Daten").'},
