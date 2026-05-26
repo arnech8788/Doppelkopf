@@ -108,12 +108,13 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
-let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false};
+let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10};
 let currentPts='';
 let editingRound=null;
 let chartInstances=[];
 let pendingRound=null;
 let lastUndo=null;
+let viewingArchive=null;
 let timerInterval=null;
 
 const ICO={
@@ -141,6 +142,46 @@ function save(){
   state.bockSolo=document.getElementById('bockSoloToggle').classList.contains('on');
   state.soloTypesEnabled=document.getElementById('soloTypesToggle').classList.contains('on');
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
+}
+function loadArchive(){
+  try{const s=localStorage.getItem('doko-v4-archive');return s?JSON.parse(s):[]}catch(e){return[]}
+}
+function saveArchive(archive){
+  try{localStorage.setItem('doko-v4-archive',JSON.stringify(archive))}catch(e){}
+}
+function archiveCurrentGame(){
+  if(!state.rounds.length)return;
+  const snapshot={
+    id:Date.now(),
+    date:state.gameStartTime||new Date().toISOString(),
+    myPlayer:state.myPlayer,
+    players:[...state.players],
+    rounds:JSON.parse(JSON.stringify(state.rounds)),
+    bockEnabled:state.bockEnabled,
+    bockCount:state.bockCount,
+    bockSolo:state.bockSolo,
+    bockQueue:state.bockQueue,
+    soloTypesEnabled:state.soloTypesEnabled,
+    soloTypes:JSON.parse(JSON.stringify(state.soloTypes)),
+    gameStartTime:state.gameStartTime
+  };
+  const archive=loadArchive();
+  archive.unshift(snapshot);
+  while(archive.length>state.archiveMax)archive.pop();
+  saveArchive(archive);
+}
+function deleteArchivedGame(id){
+  const archive=loadArchive().filter(g=>g.id!==id);
+  saveArchive(archive);
+}
+function getArchiveWinner(game){
+  if(!game.rounds.length)return '\u2013';
+  const totals={};
+  game.players.forEach(p=>totals[p]=0);
+  game.rounds.forEach(r=>game.players.forEach(p=>{totals[p]+=(r.scores[p]||0)}));
+  const max=Math.max(...Object.values(totals));
+  const winners=game.players.filter(p=>totals[p]===max);
+  return winners.length===1?winners[0]:'\u2013';
 }
 
 function showScreen(id){
