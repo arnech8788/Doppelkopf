@@ -245,3 +245,21 @@ tr.clickable:active{background:var(--bg3)}
 .archive-banner{display:flex;align-items:center;justify-content:space-between;background:var(--accent,#1a9e8f);color:#fff;padding:8px 12px;border-radius:var(--r-sm);margin-bottom:12px;font-size:13px;font-weight:500}
 .archive-banner button{background:none;border:none;color:#fff;cursor:pointer;padding:4px}
 .archive-banner button svg{width:18px;height:18px}
+
+/* Custom Dialogs */
+.app-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-150%);padding:12px 20px;border-radius:var(--r-sm);box-shadow:0 6px 24px rgba(0,0,0,.3);z-index:400;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;max-width:90%;transition:transform .35s cubic-bezier(.2,.9,.3,1.3);cursor:pointer}
+.app-toast.show{transform:translateX(-50%) translateY(0)}
+.app-toast.info{background:var(--acc);color:#fff}
+.app-toast.error{background:var(--red);color:#fff}
+.app-toast button{background:none;border:none;color:#fff;cursor:pointer;padding:2px;flex-shrink:0;opacity:.8}
+.app-toast button svg{width:16px;height:16px}
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
+.confirm-overlay.show{display:flex}
+.confirm-modal{background:var(--bg2);border-radius:var(--r);width:100%;max-width:340px;padding:20px;border:1px solid var(--bdr)}
+.confirm-modal p{font-size:14px;line-height:1.5;margin:0 0 16px;color:var(--tx)}
+.confirm-modal .confirm-actions{display:flex;gap:8px}
+.confirm-modal .confirm-actions button{flex:1;padding:10px 10px;font-size:13px;border-radius:var(--r-sm);font-family:inherit;font-weight:500;cursor:pointer;transition:.15s}
+.confirm-modal .confirm-actions button:active{transform:scale(.97)}
+.confirm-modal .confirm-cancel{background:var(--bg3);color:var(--tx2);border:1px solid var(--bdr)}
+.confirm-modal .confirm-action{background:var(--acc);color:#fff;border:none}
+.confirm-modal .confirm-action.danger{background:var(--red)}
