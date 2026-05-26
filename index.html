@@ -288,7 +288,7 @@ function savePlayerName(){
   const trimmed=inp.value.trim();
   const oldName=state.players[editingPlayerIdx];
   if(!trimmed||trimmed===oldName){closeRenameModal();return}
-  if(state.players.includes(trimmed)){alert('Dieser Name existiert bereits.');return}
+  if(state.players.includes(trimmed)){showToast('Dieser Name existiert bereits.','error');return}
   // Konflikt mit historischem (gelöschtem) Spieler abfangen –
   // sonst würden Punkte versehentlich zusammengeführt
   const historical=getHistoricalPlayers();
@@ -457,7 +457,7 @@ function invalidateEingabeCache(){
 
 function startNewGame(){
   if(state.rounds.length===0){
-    alert('Es sind noch keine Spiele eingetragen.');
+    showToast('Es sind noch keine Spiele eingetragen.','info');
     return;
   }
   if(!confirm('Aktuelles Spiel wird archiviert und ein neues gestartet. Fortfahren?'))return;
@@ -477,7 +477,7 @@ function startNewGame(){
   if(getAllPlayers().length>=4){
     showScreen('eingabe');
   }else{
-    alert('Neues Spiel gestartet. Füge mindestens 4 Spieler hinzu um Spiele einzutragen.');
+    showToast('Neues Spiel gestartet. Füge mindestens 4 Spieler hinzu.','info');
   }
 }
 function renderArchiveList(){
@@ -725,14 +725,14 @@ function undoLastRound(){
 function saveNewRound(){
   // Live-Check: gibt es überhaupt noch genug Spieler?
   if(getAllPlayers().length<4){
-    alert('Mindestens 4 Spieler werden benötigt. Bitte im Setup hinzufügen.');
+    showToast('Mindestens 4 Spieler werden benötigt. Bitte im Setup hinzufügen.','error');
     invalidateEingabeCache();
     renderEingabe();
     return;
   }
   const pts=parseInt(currentPts||'0');
-  if(isNaN(pts)){alert('Bitte Punkte eingeben.');return}
-  if(!currentPts||currentPts==='-'){alert('Bitte Punkte eingeben.');return}
+  if(isNaN(pts)){showToast('Bitte Punkte eingeben.','error');return}
+  if(!currentPts||currentPts==='-'){showToast('Bitte Punkte eingeben.','error');return}
   const chips=document.querySelectorAll('#playerChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{
@@ -740,9 +740,9 @@ function saveNewRound(){
     if(s==='lost'){playing.push(p);losers.push(p)}
     else if(s==='won'){playing.push(p);winners.push(p)}
   });
-  if(playing.length!==4){alert('Es müssen genau 4 Spieler mitspielen (rot oder grün). Aktuell: '+playing.length);return}
-  if(!winners.length){alert('Mindestens einen Gewinner auswählen (grün).');return}
-  if(!losers.length){alert('Mindestens einen Verlierer auswählen (rot).');return}
+  if(playing.length!==4){showToast('Es müssen genau 4 Spieler mitspielen (rot oder grün). Aktuell: '+playing.length,'error');return}
+  if(!winners.length){showToast('Mindestens einen Gewinner auswählen (grün).','error');return}
+  if(!losers.length){showToast('Mindestens einen Verlierer auswählen (rot).','error');return}
   const solo=(winners.length===1)||(winners.length===3);
   const bock=isBockRound();
   const bockApplies=bock&&(!solo||state.bockSolo);
@@ -863,14 +863,14 @@ function updateEditPtsDisplay(){
 }
 function saveEditRound(){
   const pts=parseInt(currentPts||'0');
-  if(isNaN(pts)){alert('Bitte Punkte eingeben.');return}
-  if(!currentPts||currentPts==='-'){alert('Bitte Punkte eingeben.');return}
+  if(isNaN(pts)){showToast('Bitte Punkte eingeben.','error');return}
+  if(!currentPts||currentPts==='-'){showToast('Bitte Punkte eingeben.','error');return}
   const chips=document.querySelectorAll('#editChips .player-chip');
   const playing=[];const winners=[];const losers=[];
   chips.forEach(c=>{const p=c.dataset.player;const s=c.dataset.state;if(s==='lost'){playing.push(p);losers.push(p)}else if(s==='won'){playing.push(p);winners.push(p)}});
-  if(playing.length!==4){alert('Es müssen genau 4 Spieler mitspielen. Aktuell: '+playing.length);return}
-  if(!winners.length){alert('Mindestens einen Gewinner auswählen.');return}
-  if(!losers.length){alert('Mindestens einen Verlierer auswählen.');return}
+  if(playing.length!==4){showToast('Es müssen genau 4 Spieler mitspielen. Aktuell: '+playing.length,'error');return}
+  if(!winners.length){showToast('Mindestens einen Gewinner auswählen.','error');return}
+  if(!losers.length){showToast('Mindestens einen Verlierer auswählen.','error');return}
   const solo=(winners.length===1)||(winners.length===3);
   const oldBock=state.rounds[editingRound].bock;
   const bockApplies=oldBock&&(!solo||state.bockSolo);
