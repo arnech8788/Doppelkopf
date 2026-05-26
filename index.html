@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.26 · 26.05.2026 12:48</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.27 · 26.05.2026 16:27</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1302,6 +1302,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.27',d:'26.05.2026 16:27',t:'Einheitliche App-Dialoge: Alle Browser-Popups (alert/confirm) durch eigene Toast-Benachrichtigungen und Bestätigungs-Modals im App-Design ersetzt.'},
     {v:'4.26',d:'26.05.2026 12:48',t:'Eingabe noch kompakter: Punkte-\u00dcberschrift entfernt (Placeholder im Feld), Spieler antippen + Legende in einer Zeile, Buttons nochmals verkleinert, weniger Abstand zwischen Titel und Punktefeld. Edit-Modal identisch.'},
     {v:'4.25',d:'26.05.2026 12:36',t:'Eingabe kompakter: Punktefeld kleiner, Vorzeichen-Button in Hilfe-Zeile verschoben, R\u00fcckg\u00e4ngig-Button immer sichtbar (deaktiviert wenn nicht nutzbar), Speichern/R\u00fcckg\u00e4ngig-Buttons kleiner mit fester Position. Edit-Modal identisch angepasst.'},
     {v:'4.24',d:'26.05.2026 12:08',t:'Spielarchiv: Vergangene Spiele werden beim Start eines neuen Spiels automatisch archiviert. Archivierte Spiele im Setup einsehbar mit kompletter Tabelle und Statistiken (read-only). Max. archivierte Spiele einstellbar (1\u201350, Standard: 10). Einzelne Archiv-Eintr\u00e4ge l\u00f6schbar.'},
