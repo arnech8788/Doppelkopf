@@ -57,7 +57,12 @@
         <div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle" id="bockSoloToggle" onclick="this.classList.toggle('on');save()"></button></div>
       </div>
     </div>
-    <button class="btn btn-danger" onclick="clearAllGames()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg> Alle Spiele löschen</button>
+    <div class="card">
+      <div class="card-title">Spielarchiv</div>
+      <div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="10" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>
+    </div>
+    <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
+    <div id="archiveList"></div>
     <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.23 · 25.05.2026 21:53</div>
   </div>
 
@@ -133,7 +138,8 @@ function load(){
   document.getElementById('bockCount').value=state.bockCount||4;
   document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
   document.getElementById('soloTypesToggle').classList.toggle('on',!!state.soloTypesEnabled);
-  renderPlayerTags();renderSoloTypes();
+  document.getElementById('archiveMax').value=state.archiveMax||10;
+  renderPlayerTags();renderSoloTypes();renderArchiveList();
   if(getAllPlayers().length>=4)showScreen('eingabe');
 }
 function save(){
@@ -418,28 +424,54 @@ function invalidateEingabeCache(){
   if(el)delete el.dataset.roundCount;
 }
 
-function clearAllGames(){
+function startNewGame(){
   if(state.rounds.length===0){
     alert('Es sind noch keine Spiele eingetragen.');
     return;
   }
-  if(!confirm('Alle '+state.rounds.length+' Spiele und Statistiken werden gelöscht. Die Spielerliste bleibt erhalten.\n\nWirklich fortfahren?'))return;
-  // KOMPLETTER Reset – alle Spielzustände zurücksetzen, Spieler bleiben
+  if(!confirm('Aktuelles Spiel wird archiviert und ein neues gestartet. Fortfahren?'))return;
+  archiveCurrentGame();
   state.rounds=[];
   state.bockQueue=0;
   state.gameStartTime=null;
+  state.kursleiterCupSeen=false;
+  state.dokoRundeSeen=false;
   lastUndo=null;
   pendingRound=null;
   currentPts='';
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   invalidateEingabeCache();
   save();
-  // Wenn 4+ Spieler da sind, direkt zur Eingabe – sonst auf Setup bleiben
+  renderArchiveList();
   if(getAllPlayers().length>=4){
     showScreen('eingabe');
   }else{
-    alert('Spiele gelöscht. Füge mindestens 4 Spieler hinzu um neue Spiele einzutragen.');
+    alert('Neues Spiel gestartet. Füge mindestens 4 Spieler hinzu um Spiele einzutragen.');
   }
+}
+function renderArchiveList(){
+  const archive=loadArchive();
+  const el=document.getElementById('archiveList');
+  if(!archive.length){el.innerHTML='';return}
+  let html='<div class="section-label" style="margin-top:20px">Vergangene Spiele ('+archive.length+')</div>';
+  archive.forEach(g=>{
+    const d=new Date(g.date);
+    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const winner=getArchiveWinner(g);
+    html+='<div class="archive-item" onclick="openArchivedGame('+g.id+')">';
+    html+='<div class="archive-item-info">';
+    html+='<div class="archive-item-title">'+dateStr+'</div>';
+    html+='<div class="archive-item-meta">'+g.players.length+' Spieler \u00b7 '+g.rounds.length+' Runden'+(winner!=='\u2013'?' \u00b7 Sieger: '+winner:'')+'</div>';
+    html+='</div>';
+    html+='<button class="archive-item-delete" onclick="event.stopPropagation();deleteArchived('+g.id+')">'+ICO.trash+'</button>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function deleteArchived(id){
+  if(!confirm('Archiviertes Spiel wirklich l\u00f6schen?'))return;
+  deleteArchivedGame(id);
+  renderArchiveList();
 }
 
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
