@@ -191,6 +191,7 @@ function getArchiveWinner(game){
 }
 
 function showScreen(id){
+  if(viewingArchive&&(id==='setup'||id==='eingabe'))viewingArchive=null;
   document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active')});
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
@@ -472,6 +473,17 @@ function deleteArchived(id){
   if(!confirm('Archiviertes Spiel wirklich l\u00f6schen?'))return;
   deleteArchivedGame(id);
   renderArchiveList();
+}
+function openArchivedGame(id){
+  const archive=loadArchive();
+  const game=archive.find(g=>g.id===id);
+  if(!game)return;
+  viewingArchive=game;
+  showScreen('tabelle');
+}
+function closeArchiveView(){
+  viewingArchive=null;
+  showScreen('tabelle');
 }
 
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
@@ -877,12 +889,26 @@ function closeAllMenus(){document.querySelectorAll('.row-menu.show').forEach(m=>
 document.addEventListener('click',closeAllMenus);
 
 function renderTabelle(scrollToBottom){
-  const all=getHistoricalPlayers();
-  const activePlayers=getAllPlayers(); // für Geber-Rotation
-  if(!state.rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
-  if(!all.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state">Alle Spieler wurden entfernt. Füge im Setup neue Spieler hinzu.</div>';return}
+  const src=viewingArchive||state;
+  const all=viewingArchive?[...viewingArchive.players]:getHistoricalPlayers();
+  const activePlayers=viewingArchive?[...viewingArchive.players]:getAllPlayers();
+  const rounds=src.rounds;
+  // Archive banner
+  const tabelleScreen=document.getElementById('screen-tabelle');
+  let banner=tabelleScreen.querySelector('.archive-banner');
+  if(viewingArchive){
+    if(!banner){banner=document.createElement('div');banner.className='archive-banner';tabelleScreen.insertBefore(banner,tabelleScreen.firstChild)}
+    const d=new Date(viewingArchive.date);
+    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    banner.innerHTML='<span>Archiv: '+dateStr+' \u2013 '+viewingArchive.players.length+' Spieler \u00b7 '+viewingArchive.rounds.length+' Runden</span><button onclick="closeArchiveView()">'+ICO.x+'</button>';
+  }else if(banner){banner.remove()}
+  // Share button visibility
+  const shareBtn=tabelleScreen.querySelector('.share-btn');
+  if(shareBtn)shareBtn.style.display=viewingArchive?'none':'';
+  if(!rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
+  if(!all.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state">Alle Spieler wurden entfernt.</div>';return}
   const totals={};all.forEach(p=>totals[p]=0);
-  state.rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
+  rounds.forEach(r=>{all.forEach(p=>{totals[p]+=(r.scores[p]||0)})});
   const sorted=all.slice().sort((a,b)=>totals[b]-totals[a]);
   let shtml='<div class="card" style="margin-bottom:12px">';
   const tStreaks=getWinStreaks(all);
@@ -894,10 +920,10 @@ function renderTabelle(scrollToBottom){
     shtml+='<div class="player-row"><div class="rank '+rc+'">'+(i+1)+'</div><div class="name">'+(getPlayerEmoji(p)?getPlayerEmoji(p)+' ':'')+p+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div><div class="pts '+cls+'">'+(pts>0?'+':'')+pts+'</div></div>';
   });
   shtml+='</div>';document.getElementById('standsCard').innerHTML=shtml;
-  const soloMap={};state.soloTypes.forEach(s=>{soloMap[s.name]=s.short});
+  const soloMap={};(src.soloTypes||state.soloTypes).forEach(s=>{soloMap[s.name]=s.short});
   const cumul={};all.forEach(p=>cumul[p]=[]);
   let run={};all.forEach(p=>run[p]=0);
-  state.rounds.forEach(r=>{all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])})});
+  rounds.forEach(r=>{all.forEach(p=>{run[p]+=(r.scores[p]||0);cumul[p].push(run[p])})});
   let html='<table><thead><tr><th>#</th>';
   const shortNames=getShortNames(all);
   all.forEach(p=>{
@@ -905,7 +931,7 @@ function renderTabelle(scrollToBottom){
     html+='<th title="'+p+'">'+(emoji?emoji+'<br>':'')+shortNames[p]+'</th>';
   });
   html+='<th>Pkt</th><th></th></tr></thead><tbody>';
-  state.rounds.forEach((r,i)=>{
+  rounds.forEach((r,i)=>{
     html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
     html+='<td style="color:var(--tx3)">'+(i+1);
     if(r.solo){const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>'}
@@ -919,13 +945,18 @@ function renderTabelle(scrollToBottom){
     });
     // Punkte des Spiels jetzt ganz rechts (vor dem Menü)
     html+='<td style="color:var(--tx3);font-family:\'Space Mono\',monospace">'+r.points+'</td>';
-    html+='<td style="white-space:nowrap;position:relative"><div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
-    html+='<div class="row-menu" id="rowMenu'+i+'">';
-    if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
-    if(i<state.rounds.length-1)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',1)">'+ICO.down+' Nach unten</button>';
-    html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
-    html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' Löschen</button>';
-    html+='</div></div></td></tr>';
+    if(viewingArchive){
+      html+='<td></td>';
+    }else{
+      html+='<td style="white-space:nowrap;position:relative"><div class="row-menu-wrap"><button class="row-menu-btn" onclick="event.stopPropagation();toggleRowMenu(event,'+i+')">&#8942;</button>';
+      html+='<div class="row-menu" id="rowMenu'+i+'">';
+      if(i>0)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',-1)">'+ICO.up+' Nach oben</button>';
+      if(i<rounds.length-1)html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();moveRound('+i+',1)">'+ICO.down+' Nach unten</button>';
+      html+='<button class="row-menu-item" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>openEditModal('+i+'),10)">'+ICO.edit+' Bearbeiten</button>';
+      html+='<button class="row-menu-item danger" onclick="event.stopPropagation();closeAllMenus();setTimeout(()=>deleteRound('+i+'),10)">'+ICO.trash+' L\u00f6schen</button>';
+      html+='</div></div></td>';
+    }
+    html+='</tr>';
     // Geber-Rotation läuft über die aktiven Spieler – nicht über historische
     const dealerForRound=activePlayers.length>0?activePlayers[i%activePlayers.length]:null;
     const rundeForRound=activePlayers.length>0?Math.floor(i/activePlayers.length)+1:0;
@@ -933,8 +964,8 @@ function renderTabelle(scrollToBottom){
     html+='<tr class="expand-row" id="expandRow'+i+'"><td colspan="'+(all.length+3)+'"><div class="expand-detail">';
     if(rundeForRound)html+='<span style="font-size:10px;color:var(--tx3)">R'+rundeForRound+'/S'+spielInRundeFor+'</span> ';
     if(dealerForRound)html+='<span class="dealer-badge">&#9827; '+dealerForRound+' gibt</span> ';
-    if(r.timestamp&&i>0&&state.rounds[i-1].timestamp){const dur=r.timestamp-state.rounds[i-1].timestamp;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
-    else if(r.timestamp&&i===0&&state.gameStartTime){const dur=r.timestamp-state.gameStartTime;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
+    if(r.timestamp&&i>0&&rounds[i-1].timestamp){const dur=r.timestamp-rounds[i-1].timestamp;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
+    else if(r.timestamp&&i===0&&src.gameStartTime){const dur=r.timestamp-src.gameStartTime;html+='<span style="font-size:10px;color:var(--tx3)">⏱ '+formatDuration(dur)+'</span> '}
     all.forEach(p=>{const s=r.scores[p];if(r.playing.includes(p)){const cls=s>0?'pos':s<0?'neg':'';html+='<span class="expand-score '+cls+'">'+p+': '+(s>0?'+':'')+s+'</span>'}});
     html+='</div></td></tr>';
   });
@@ -951,11 +982,26 @@ function toggleExpand(i){const row=document.getElementById('expandRow'+i);if(row
 
 function renderStats(){
   chartInstances.forEach(c=>c.destroy());chartInstances=[];
-  const all=getHistoricalPlayers();const c=document.getElementById('statsContent');
-  if(!state.rounds.length){c.innerHTML='<div class="card"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele für Statistiken.</div></div>';return}
+  const src=viewingArchive||state;
+  const all=viewingArchive?[...viewingArchive.players]:getHistoricalPlayers();
+  const c=document.getElementById('statsContent');
+  // Archive banner
+  const statsScreen=document.getElementById('screen-stats');
+  let banner=statsScreen.querySelector('.archive-banner');
+  if(viewingArchive){
+    if(!banner){banner=document.createElement('div');banner.className='archive-banner';statsScreen.insertBefore(banner,statsScreen.firstChild)}
+    const d=new Date(viewingArchive.date);
+    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    banner.innerHTML='<span>Archiv: '+dateStr+' \u2013 '+viewingArchive.players.length+' Spieler \u00b7 '+viewingArchive.rounds.length+' Runden</span><button onclick="closeArchiveView()">'+ICO.x+'</button>';
+  }else if(banner){banner.remove()}
+  // Share button visibility
+  const shareBtn=statsScreen.querySelector('.share-btn');
+  if(shareBtn)shareBtn.style.display=viewingArchive?'none':'';
+  const rounds=src.rounds;
+  if(!rounds.length){c.innerHTML='<div class="card"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele f\u00fcr Statistiken.</div></div>';return}
   const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
   all.forEach(p=>{totals[p]=0;wins[p]=0;losses[p]=0;soloWins[p]=0;soloLosses[p]=0;gamesPlayed[p]=0});
-  state.rounds.forEach(r=>{
+  rounds.forEach(r=>{
     let solist=null;
     if(r.solo){
       if(r.winners.length===1)solist=r.winners[0];
@@ -971,16 +1017,16 @@ function renderStats(){
       }
     });
   });
-  const soloCount=state.rounds.filter(r=>r.solo).length;
+  const soloCount=rounds.filter(r=>r.solo).length;
   const soloKing=soloCount>0?all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b):'–';
   const maxTotal=all.length?Math.max(...all.map(p=>totals[p])):0;
   const _bestCandidates=all.filter(p=>totals[p]===maxTotal);
   const bestPlayer=_bestCandidates.length===1?_bestCandidates[0]:'–';
   let html='<div id="shareableStats">';
   html+='<div class="stat-grid">';
-  html+='<div class="stat-card"><div class="stat-val">'+state.rounds.length+'</div><div class="stat-label">Spiele</div></div>';
+  html+='<div class="stat-card"><div class="stat-val">'+rounds.length+'</div><div class="stat-label">Spiele</div></div>';
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+'</div><div class="stat-label">Bester Spieler</div></div>';
-  html+='<div class="stat-card"><div class="stat-val">'+state.rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
+  html+='<div class="stat-card"><div class="stat-val">'+rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">👑 Solokönig</div></div>';
   html+='</div>';
   html+='<div class="section-label" style="margin-top:20px">Spieler</div><div class="card">';
@@ -1002,8 +1048,9 @@ function renderStats(){
 function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
   const cumulative={};all.forEach(p=>cumulative[p]=[]);
   let running={};all.forEach(p=>running[p]=0);
-  state.rounds.forEach(r=>{all.forEach(p=>{running[p]+=(r.scores[p]||0);cumulative[p].push(running[p])})});
-  const labels=state.rounds.map((_,i)=>''+(i+1));
+  const rounds=(viewingArchive||state).rounds;
+  rounds.forEach(r=>{all.forEach(p=>{running[p]+=(r.scores[p]||0);cumulative[p].push(running[p])})});
+  const labels=rounds.map((_,i)=>''+(i+1));
   const cOpts={responsive:true,maintainAspectRatio:false};
   const cc=getChartColors();const gridC=cc.grid;const tickC=cc.tick;const lblC=cc.lbl;
   chartInstances.push(new Chart(document.getElementById('lineChart'),{type:'line',data:{labels,datasets:all.map((p,i)=>({label:p,data:cumulative[p],borderColor:COLORS[i%COLORS.length],backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3}))},options:{...cOpts,plugins:{legend:{labels:{color:lblC,font:{size:11},boxWidth:12,padding:8}}},scales:{x:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}},y:{grid:{color:gridC},ticks:{color:tickC,font:{size:11}}}}}}));
@@ -1015,7 +1062,7 @@ function buildCharts(all,totals,wins,losses,soloWins,soloLosses,gamesPlayed){
 function buildPairings(all){
   const pairs={};
   for(let i=0;i<all.length;i++){for(let j=i+1;j<all.length;j++){pairs[all[i]+'|'+all[j]]=0}}
-  state.rounds.forEach(r=>{
+  (viewingArchive||state).rounds.forEach(r=>{
     if(r.solo)return;
     const teamWin=r.winners;const teamLose=r.playing.filter(p=>!r.winners.includes(p));
     [teamWin,teamLose].forEach(team=>{
