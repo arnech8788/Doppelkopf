@@ -283,7 +283,7 @@ function editPlayerName(i){
   setTimeout(()=>{const inp=document.getElementById('editPlayerInput');inp.focus();inp.select()},50);
 }
 function closeRenameModal(){document.getElementById('renameModal').classList.remove('show')}
-function savePlayerName(){
+async function savePlayerName(){
   const inp=document.getElementById('editPlayerInput');
   const trimmed=inp.value.trim();
   const oldName=state.players[editingPlayerIdx];
@@ -293,7 +293,7 @@ function savePlayerName(){
   // sonst würden Punkte versehentlich zusammengeführt
   const historical=getHistoricalPlayers();
   if(historical.includes(trimmed)){
-    if(!confirm('"'+trimmed+'" wurde früher schon einmal verwendet (z. B. gelöschter Spieler). Wenn du fortfährst, werden die alten Punkte und Statistiken auf '+oldName+' übertragen.\n\nFortfahren?'))return;
+    if(!await showConfirm('"'+trimmed+'" wurde früher schon einmal verwendet (z. B. gelöschter Spieler). Wenn du fortfährst, werden die alten Punkte und Statistiken auf '+oldName+' übertragen.','Fortfahren'))return;
   }
   state.rounds.forEach(r=>{
     const idx=r.playing.indexOf(oldName);if(idx>=0)r.playing[idx]=trimmed;
@@ -307,14 +307,14 @@ function savePlayerName(){
 }
 document.getElementById('renameModal').addEventListener('click',function(e){if(e.target===this)closeRenameModal()});
 
-function addPlayer(){
+async function addPlayer(){
   const inp=document.getElementById('addPlayerInput');
   const name=inp.value.trim();
   if(!name||state.players.includes(name))return;
   // Hinweis falls der Name historisch existiert (gelöschter Spieler kehrt zurück)
   const historical=getHistoricalPlayers();
   if(historical.includes(name)){
-    if(!confirm('"'+name+'" hat in dieser Runde schon einmal gespielt. Wenn du fortfährst, werden die bisherigen Punkte und Statistiken weiter mit diesem Spieler verknüpft.\n\nFortfahren?'))return;
+    if(!await showConfirm('"'+name+'" hat in dieser Runde schon einmal gespielt. Wenn du fortfährst, werden die bisherigen Punkte und Statistiken weiter mit diesem Spieler verknüpft.','Fortfahren'))return;
   }
   state.players.push(name);
   if(!state.knownNames.includes(name))state.knownNames.push(name);
@@ -324,11 +324,11 @@ function addPlayer(){
   document.getElementById('suggestions').classList.remove('show');
   setTimeout(()=>{inp.focus()},50);
 }
-function removePlayer(i){
+async function removePlayer(i){
   const name=state.players[i];
   const hasGames=state.rounds.some(r=>r.playing.includes(name));
   if(hasGames){
-    if(!confirm(name+' hat bereits Spiele.\n\nDer Spieler wird nur aus der Eingabe-Auswahl entfernt. Alle Punkte und Statistiken bleiben in Tabelle und Statistik erhalten.\n\nFortfahren?'))return;
+    if(!await showConfirm(name+' hat bereits Spiele.\n\nDer Spieler wird nur aus der Eingabe-Auswahl entfernt. Alle Punkte und Statistiken bleiben erhalten.','Entfernen',true))return;
   }
   state.players.splice(i,1);renderPlayerTags();save();
   invalidateEingabeCache();
@@ -455,12 +455,12 @@ function invalidateEingabeCache(){
   if(el)delete el.dataset.roundCount;
 }
 
-function startNewGame(){
+async function startNewGame(){
   if(state.rounds.length===0){
     showToast('Es sind noch keine Spiele eingetragen.','info');
     return;
   }
-  if(!confirm('Aktuelles Spiel wird archiviert und ein neues gestartet. Fortfahren?'))return;
+  if(!await showConfirm('Aktuelles Spiel wird archiviert und ein neues gestartet.','Neues Spiel'))return;
   archiveCurrentGame();
   state.rounds=[];
   state.bockQueue=0;
@@ -499,8 +499,8 @@ function renderArchiveList(){
   });
   el.innerHTML=html;
 }
-function deleteArchived(id){
-  if(!confirm('Archiviertes Spiel wirklich l\u00f6schen?'))return;
+async function deleteArchived(id){
+  if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
   renderArchiveList();
 }
@@ -887,8 +887,8 @@ function saveEditRound(){
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
   save();invalidateEingabeCache();closeEditModal();renderTabelle(false);
 }
-function deleteRound(i){
-  if(!confirm('Spiel '+(i+1)+' löschen?'))return;
+async function deleteRound(i){
+  if(!await showConfirm('Spiel '+(i+1)+' löschen?','Löschen',true))return;
   const deletedRound=state.rounds[i];
   if(deletedRound.bock){state.bockQueue++}
   state.rounds.splice(i,1);
