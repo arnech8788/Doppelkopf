@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.24 · 26.05.2026 12:08</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.25 · 26.05.2026 12:36</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -540,16 +540,15 @@ function renderEingabe(){
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display empty" id="ptsDisplay">Punkte eingeben</div>';
   html+='<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;align-items:center">';
-  html+='<button class="share-btn" onclick="openCalcModal()" style="font-size:11px;padding:5px 12px;opacity:.7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg> Punkte zählen</button>';
-  html+='<button class="icon-btn" onclick="openCalcHelpModal()" style="padding:6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-family:\'Space Mono\',monospace;font-size:12px;font-weight:700;color:var(--tx2);opacity:.7" aria-label="Hilfe zur Punktezählung">?</button>';
+  html+='<button class="share-btn" onclick="numpadToggleSign()" style="font-size:11px;padding:5px 12px;opacity:.7;color:var(--warn)">\u00b1 Vorzeichen</button>';
+  html+='<button class="share-btn" onclick="openCalcModal()" style="font-size:11px;padding:5px 12px;opacity:.7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/><line x1="8" y1="14" x2="8" y2="14.01"/><line x1="12" y1="14" x2="12" y2="14.01"/><line x1="16" y1="14" x2="16" y2="14.01"/><line x1="8" y1="18" x2="16" y2="18"/></svg> Punkte z\u00e4hlen</button>';
+  html+='<button class="icon-btn" onclick="openCalcHelpModal()" style="padding:6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-family:\'Space Mono\',monospace;font-size:12px;font-weight:700;color:var(--tx2);opacity:.7" aria-label="Hilfe zur Punktez\u00e4hlung">?</button>';
   html+='</div>';
   html+='<div class="numpad">';
   for(let i=1;i<=9;i++){html+='<div class="numpad-btn" onclick="numpadPress('+i+')">'+i+'</div>'}
   html+='<div class="numpad-btn del" onclick="numpadClear()">'+ICO.trash+'</div>';
   html+='<div class="numpad-btn" onclick="numpadPress(0)">0</div>';
   html+='<div class="numpad-btn del" onclick="numpadDelete()">'+ICO.backspace+'</div>';
-  // ±-Toggle für Minuspunkte (Sieg mit negativem Saldo, z.B. Sonderpunkte beim Gegner)
-  html+='<div class="numpad-btn" onclick="numpadToggleSign()" style="grid-column:1/4;font-size:16px;color:var(--warn)">± Vorzeichen umkehren</div>';
   html+='</div>';
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
@@ -566,11 +565,7 @@ function renderEingabe(){
   if(state.bockEnabled){
     html+='<div class="toggle-row"><span class="toggle-label">&#9889; Neue '+vocab.bockrunde+' auslösen</span><button class="toggle" id="triggerBockToggle" onclick="this.classList.toggle(\'on\')"></button></div>';
   }
-  if(lastUndo){
-    html+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-primary" style="flex:1.5;padding:10px 16px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button><button class="btn btn-secondary" style="flex:1;padding:10px 12px;font-size:12px;opacity:.7" onclick="undoLastRound()">'+ICO.backspace+' Rückgängig</button></div>';
-  }else{
-    html+='<div style="display:flex;justify-content:center;margin-top:4px"><button class="btn btn-primary" style="width:auto;padding:10px 24px;font-size:14px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button></div>';
-  }
+  html+='<div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-primary" style="flex:1.5;padding:8px 12px;font-size:13px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button><button class="btn btn-secondary" style="flex:1;padding:8px 12px;font-size:13px'+(lastUndo?';opacity:.7':';opacity:.35;pointer-events:none')+'" onclick="undoLastRound()">'+ICO.backspace+' R\u00fcckg\u00e4ngig</button></div>';
   html+='</div>';
   if(state.gameStartTime){
     html+='<div id="gameTimer" style="text-align:center;padding:8px;font-size:11px;color:var(--tx3);font-family:\'Space Mono\',monospace"></div>';
@@ -791,12 +786,14 @@ function openEditModal(i){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Spiel '+(i+1)+' bearbeiten</h3><button onclick="closeEditModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="section-label">Punkte</div>';
   html+='<div class="pts-display" id="editPtsDisplay">'+r.points+'</div>';
+  html+='<div style="display:flex;justify-content:center;gap:6px;margin-bottom:8px;align-items:center">';
+  html+='<button class="share-btn" onclick="editNumpadToggleSign()" style="font-size:11px;padding:5px 12px;opacity:.7;color:var(--warn)">\u00b1 Vorzeichen</button>';
+  html+='</div>';
   html+='<div class="numpad">';
   for(let n=1;n<=9;n++){html+='<div class="numpad-btn" onclick="editNumpadPress('+n+')">'+n+'</div>'}
   html+='<div class="numpad-btn del" onclick="editNumpadClear()">'+ICO.trash+'</div>';
   html+='<div class="numpad-btn" onclick="editNumpadPress(0)">0</div>';
   html+='<div class="numpad-btn del" onclick="editNumpadDelete()">'+ICO.backspace+'</div>';
-  html+='<div class="numpad-btn" onclick="editNumpadToggleSign()" style="grid-column:1/4;font-size:16px;color:var(--warn)">± Vorzeichen umkehren</div>';
   html+='</div>';
   html+='<div class="section-label">Spieler antippen</div>';
   html+='<div class="chip-legend"><span><span class="dot" style="background:var(--bg4)"></span> Nicht dabei</span><span><span class="dot" style="background:var(--red)"></span> Verloren</span><span><span class="dot" style="background:var(--grn)"></span> Gewonnen</span></div>';
@@ -807,7 +804,7 @@ function openEditModal(i){
     html+='<div class="player-chip" data-player="'+p+'" data-state="'+st+'" onclick="cycleState(this)"><span class="chip-icon">'+ic+'</span>'+p+'</div>';
   });
   html+='</div>';
-  html+='<div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg2);padding:8px 0 0"><button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1">Abbrechen</button><button class="btn btn-primary" onclick="saveEditRound()" style="flex:1">'+ICO.check+' Speichern</button></div>';
+  html+='<div style="display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:var(--bg2);padding:8px 0 0"><button class="btn btn-secondary" onclick="closeEditModal()" style="flex:1;padding:8px 12px;font-size:13px">Abbrechen</button><button class="btn btn-primary" onclick="saveEditRound()" style="flex:1;padding:8px 12px;font-size:13px">'+ICO.check+' Speichern</button></div>';
   document.getElementById('editModalContent').innerHTML=html;
   document.getElementById('editModal').classList.add('show');
 }
@@ -1279,6 +1276,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.25',d:'26.05.2026 12:36',t:'Eingabe kompakter: Punktefeld kleiner, Vorzeichen-Button in Hilfe-Zeile verschoben, R\u00fcckg\u00e4ngig-Button immer sichtbar (deaktiviert wenn nicht nutzbar), Speichern/R\u00fcckg\u00e4ngig-Buttons kleiner mit fester Position. Edit-Modal identisch angepasst.'},
     {v:'4.24',d:'26.05.2026 12:08',t:'Spielarchiv: Vergangene Spiele werden beim Start eines neuen Spiels automatisch archiviert. Archivierte Spiele im Setup einsehbar mit kompletter Tabelle und Statistiken (read-only). Max. archivierte Spiele einstellbar (1\u201350, Standard: 10). Einzelne Archiv-Eintr\u00e4ge l\u00f6schbar.'},
     {v:'4.23',d:'25.05.2026 21:53',t:'Bugfix: Spieleingabe war auf allen Screens sichtbar – CSS-Spezifitätsfehler behoben.'},
     {v:'4.22',d:'25.05.2026 21:32',t:'Eingabe-Screen: Numpad füllt jetzt den ganzen Bildschirm – kein Scrollen mehr nötig. Auf kleinen Handys kompakter Modus. Speichern und Rückgängig nebeneinander.'},
