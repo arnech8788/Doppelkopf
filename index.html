@@ -98,6 +98,8 @@
   <span>Neue Version verfügbar – wird automatisch geladen…</span>
   <div class="reload-bar"></div>
 </div>
+<div class="app-toast" id="appToast"><span id="appToastText"></span><button onclick="hideToast()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+<div class="confirm-overlay" id="confirmOverlay"><div class="confirm-modal"><p id="confirmText"></p><div class="confirm-actions"><button class="confirm-cancel" id="confirmCancel">Abbrechen</button><button class="confirm-action" id="confirmAction">OK</button></div></div></div>
 
 <button class="info-btn" onclick="openInfoModal()">i</button>
 <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
@@ -121,6 +123,34 @@ let pendingRound=null;
 let lastUndo=null;
 let viewingArchive=null;
 let timerInterval=null;
+let toastTimer=null;
+function showToast(text,type){
+  const el=document.getElementById('appToast');
+  const tx=document.getElementById('appToastText');
+  tx.textContent=text;
+  el.className='app-toast '+(type||'info');
+  el.classList.add('show');
+  el.onclick=hideToast;
+  clearTimeout(toastTimer);
+}
+function hideToast(){
+  document.getElementById('appToast').classList.remove('show');
+}
+function showConfirm(text,actionLabel,danger){
+  return new Promise(resolve=>{
+    const overlay=document.getElementById('confirmOverlay');
+    document.getElementById('confirmText').textContent=text;
+    const actionBtn=document.getElementById('confirmAction');
+    actionBtn.textContent=actionLabel||'OK';
+    actionBtn.className='confirm-action'+(danger?' danger':'');
+    overlay.classList.add('show');
+    const cancel=document.getElementById('confirmCancel');
+    function cleanup(){overlay.classList.remove('show');actionBtn.onclick=null;cancel.onclick=null;overlay.onclick=null}
+    actionBtn.onclick=function(){cleanup();resolve(true)};
+    cancel.onclick=function(){cleanup();resolve(false)};
+    overlay.onclick=function(e){if(e.target===overlay){cleanup();resolve(false)}};
+  });
+}
 
 const ICO={
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>',
