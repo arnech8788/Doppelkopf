@@ -1093,6 +1093,7 @@ function renderStats(){
   html+='<div class="stat-card"><div class="stat-val">'+rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">👑 Solokönig</div></div>';
   html+='</div>';
+  html+=buildHighlights(all,rounds,src);
   html+='<div class="section-label" style="margin-top:20px">Spieler</div><div class="card">';
   const sortedStats=all.slice().sort((a,b)=>totals[b]-totals[a]);
   sortedStats.forEach((p,i)=>{
