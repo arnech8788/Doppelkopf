@@ -24,6 +24,7 @@
 
   <div class="screen active" id="screen-setup">
     <h2>Einstellungen</h2>
+    <div id="quickStartCard"></div>
     <div class="card">
       <div class="card-title">Spieler</div>
       <div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Der erste Spieler gibt zuerst die Karten. Nach jedem Spiel rotiert der Geber automatisch in der Reihenfolge der Liste.</div>
@@ -243,7 +244,7 @@ function load(){
   document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
   document.getElementById('soloTypesToggle').classList.toggle('on',!!state.soloTypesEnabled);
   document.getElementById('archiveMax').value=state.archiveMax||10;
-  renderPlayerTags();renderSoloTypes();renderArchiveList();
+  renderPlayerTags();renderQuickStart();renderSoloTypes();renderArchiveList();
   if(getAllPlayers().length>=4)showScreen('eingabe');
 }
 function save(){
@@ -326,6 +327,31 @@ function addCustomSolo(){
   inp.value='';save();renderSoloTypes();
 }
 
+function renderQuickStart(){
+  const el=document.getElementById('quickStartCard');
+  // Nur anzeigen wenn <4 Spieler UND Archiv vorhanden
+  const archive=loadArchive();
+  if(getAllPlayers().length>=4||!archive.length||!archive[0].players||!archive[0].players.length){
+    el.innerHTML='';return;
+  }
+  const lastPlayers=archive[0].players;
+  el.innerHTML='<div class="card" style="cursor:pointer;border:1px solid var(--acc2);background:var(--acc-bg)" onclick="quickStart()">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center">'
+    +'<div><div style="font-size:11px;color:var(--tx3);margin-bottom:2px">Letzte Spielrunde</div>'
+    +'<div style="font-weight:500">'+lastPlayers.join(', ')+'</div></div>'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="var(--acc2)" stroke-width="2" style="width:20px;height:20px;flex-shrink:0"><polygon points="5 3 19 12 5 21 5 3"/></svg>'
+    +'</div></div>';
+}
+function quickStart(){
+  const archive=loadArchive();
+  if(!archive.length)return;
+  state.players=[...archive[0].players];
+  save();
+  renderPlayerTags();
+  renderQuickStart();
+  invalidateEingabeCache();
+  showScreen('eingabe');
+}
 function renderPlayerTags(){
   const c=document.getElementById('playerManageList');
   if(!state.players.length){c.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Noch keine Mitspieler</div>';return}
@@ -392,7 +418,7 @@ async function addPlayer(){
   }
   state.players.push(name);
   if(!state.knownNames.includes(name))state.knownNames.push(name);
-  inp.value='';renderPlayerTags();
+  inp.value='';renderPlayerTags();renderQuickStart();
   checkAutoStart();save();
   invalidateEingabeCache();
   document.getElementById('suggestions').classList.remove('show');
@@ -404,7 +430,7 @@ async function removePlayer(i){
   if(hasGames){
     if(!await showConfirm(name+' hat bereits Spiele.\n\nDer Spieler wird nur aus der Eingabe-Auswahl entfernt. Alle Punkte und Statistiken bleiben erhalten.','Entfernen',true))return;
   }
-  state.players.splice(i,1);renderPlayerTags();save();
+  state.players.splice(i,1);renderPlayerTags();renderQuickStart();save();
   invalidateEingabeCache();
 }
 function checkAutoStart(){
@@ -548,7 +574,7 @@ async function startNewGame(){
   if(timerInterval){clearInterval(timerInterval);timerInterval=null}
   invalidateEingabeCache();
   save();
-  renderArchiveList();
+  renderArchiveList();renderQuickStart();
   if(getAllPlayers().length>=4){
     showScreen('eingabe');
   }else{
