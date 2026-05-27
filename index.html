@@ -1458,6 +1458,76 @@ function handleVersionTap(){
   _versionTapTimer=setTimeout(()=>{_versionTaps=0},2000);
   if(_versionTaps>=5){_versionTaps=0;openDebugModal()}
 }
+async function openDebugModal(){
+  const info=await getDeviceInfo();
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">🔧 Debug</h3><button onclick="closeDebugModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
+
+  // Geräteinfos
+  html+='<div class="section-label">Gerät</div>';
+  html+='<div class="card" style="font-size:12px;line-height:2">';
+  html+='<div><span style="color:var(--tx3)">App:</span> '+info.appVersion+'</div>';
+  html+='<div><span style="color:var(--tx3)">Browser:</span> '+info.browser+'</div>';
+  html+='<div><span style="color:var(--tx3)">OS:</span> '+info.os+'</div>';
+  if(info.model)html+='<div><span style="color:var(--tx3)">Modell:</span> '+info.model+'</div>';
+  html+='<div><span style="color:var(--tx3)">Screen:</span> '+info.screen+' @'+info.dpr+'</div>';
+  html+='<div><span style="color:var(--tx3)">Viewport:</span> '+info.viewport+'</div>';
+  html+='<div><span style="color:var(--tx3)">Theme:</span> '+info.theme+'</div>';
+  html+='<div><span style="color:var(--tx3)">Online:</span> '+info.online+'</div>';
+  html+='<div><span style="color:var(--tx3)">SW:</span> '+info.sw+'</div>';
+  html+='</div>';
+
+  // State-Übersicht
+  html+='<div class="section-label" style="margin-top:12px">State</div>';
+  html+='<div class="card" style="font-size:12px;line-height:2">';
+  html+='<div><span style="color:var(--tx3)">Spieler:</span> '+state.players.length+(state.players.length?' ('+state.players.join(', ')+')':'')+'</div>';
+  html+='<div><span style="color:var(--tx3)">Runden:</span> '+state.rounds.length+'</div>';
+  html+='<div><span style="color:var(--tx3)">Bock:</span> '+(state.bockEnabled?'Aktiv (Queue: '+state.bockQueue+', Count: '+state.bockCount+(state.bockSolo?', Solo: ja':'')+')':'Aus')+'</div>';
+  html+='<div><span style="color:var(--tx3)">Solo-Typen:</span> '+(state.soloTypesEnabled?'Aktiv ('+state.soloTypes.filter(s=>s.enabled).length+' aktiv)':'Aus')+'</div>';
+  const archive=loadArchive();
+  html+='<div><span style="color:var(--tx3)">Archiv:</span> '+archive.length+' Spiele (Max: '+state.archiveMax+')</div>';
+  if(state.gameStartTime)html+='<div><span style="color:var(--tx3)">Spielstart:</span> '+new Date(state.gameStartTime).toLocaleString('de-DE')+'</div>';
+  html+='</div>';
+
+  // localStorage
+  html+='<div class="section-label" style="margin-top:12px">localStorage</div>';
+  html+='<div class="card" style="font-size:12px;line-height:2">';
+  let totalBytes=0;
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(key.startsWith('doko')){
+      const size=new Blob([localStorage.getItem(key)]).size;
+      totalBytes+=size;
+      html+='<div><span style="color:var(--tx3)">'+key+':</span> '+(size/1024).toFixed(2)+' KB</div>';
+    }
+  }
+  html+='<div style="font-weight:700;margin-top:4px"><span style="color:var(--tx3)">Gesamt:</span> '+(totalBytes/1024).toFixed(2)+' KB</div>';
+  html+='</div>';
+
+  // Konsolen-Logs
+  html+='<div class="section-label" style="margin-top:12px">Konsole (letzte 20)</div>';
+  html+='<div class="card" style="font-size:11px;font-family:monospace;line-height:1.6;max-height:160px;overflow-y:auto">';
+  const logs=_debugLogs.slice(-20);
+  if(logs.length===0)html+='<div style="color:var(--tx3)">Keine Fehler oder Warnungen</div>';
+  else logs.forEach(l=>{
+    const color=l.type==='error'?'#d32f2f':'#f57c00';
+    const icon=l.type==='error'?'⛔':'⚠️';
+    const time=new Date(l.ts).toLocaleTimeString('de-DE');
+    html+='<div style="color:'+color+'">'+icon+' <span style="opacity:0.6">'+time+'</span> '+l.msg.replace(/</g,'&lt;').substring(0,200)+'</div>';
+  });
+  html+='</div>';
+
+  // State Export/Import
+  html+='<div class="section-label" style="margin-top:12px">State Export / Import</div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:8px">';
+  html+='<button class="btn btn-secondary" style="flex:1" onclick="copyStateJSON()">📋 State kopieren</button>';
+  html+='<button class="btn btn-secondary" style="flex:1" onclick="toggleStateImport()">📥 State importieren</button>';
+  html+='</div>';
+  html+='<div id="stateImportArea" style="display:none"><textarea id="stateImportInput" placeholder="State-JSON hier einfügen..." style="width:100%;box-sizing:border-box;height:120px;font-size:11px;font-family:monospace;padding:8px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg);color:var(--tx);resize:vertical"></textarea><button class="btn btn-primary" style="margin-top:6px" onclick="importState()">Importieren</button></div>';
+
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeDebugModal()">Schließen</button>';
+  document.getElementById('debugModalContent').innerHTML=html;
+  document.getElementById('debugModal').classList.add('show');
+}
 function closeDebugModal(){document.getElementById('debugModal').classList.remove('show')}
 document.getElementById('debugModal').addEventListener('click',function(e){if(e.target===this)closeDebugModal()});
 function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
