@@ -1528,6 +1528,32 @@ async function openDebugModal(){
   document.getElementById('debugModalContent').innerHTML=html;
   document.getElementById('debugModal').classList.add('show');
 }
+function copyStateJSON(){
+  const json=JSON.stringify(state,null,2);
+  navigator.clipboard.writeText(json).then(()=>showToast('State in Zwischenablage kopiert','success')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    showToast('State in Zwischenablage kopiert','success');
+  });
+}
+function toggleStateImport(){
+  const area=document.getElementById('stateImportArea');
+  area.style.display=area.style.display==='none'?'block':'none';
+}
+async function importState(){
+  const input=document.getElementById('stateImportInput').value.trim();
+  if(!input){showToast('Kein JSON eingegeben','error');return}
+  let parsed;
+  try{parsed=JSON.parse(input)}catch(e){showToast('Ungültiges JSON: '+e.message,'error');return}
+  if(!parsed.players||!Array.isArray(parsed.players)){showToast('Ungültiger State: players fehlt','error');return}
+  const ok=await showConfirm('Aktuellen State wirklich überschreiben? Das kann nicht rückgängig gemacht werden.','Überschreiben',true);
+  if(!ok)return;
+  Object.assign(state,parsed);
+  save();
+  closeDebugModal();
+  load();
+  renderAll();
+  showToast('State importiert','success');
+}
 function closeDebugModal(){document.getElementById('debugModal').classList.remove('show')}
 document.getElementById('debugModal').addEventListener('click',function(e){if(e.target===this)closeDebugModal()});
 function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
