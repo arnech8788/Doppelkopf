@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.31 · 27.05.2026 14:32</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.32 · 27.05.2026 15:52</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1392,6 +1392,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.32',d:'27.05.2026 15:52',t:'Debug-Modus: 5x auf die Versionsnummer tippen öffnet den Debug-Bereich mit Geräteinfos, App-State, localStorage, Konsolen-Logs und State-Export/Import. Feedback-Mail enthält jetzt automatisch Geräte- und App-Informationen.'},
     {v:'4.31',d:'27.05.2026 14:32',t:'Tabelle: Solo-Badge (Bu, Da, S) von der #-Spalte in die Punkte-Spalte verschoben. Solo-Punkte zeigen jetzt beide Werte (z.B. 4/12). Teilen: Volle Spielernamen statt Kürzel im Header.'},
     {v:'4.30',d:'27.05.2026 14:27',t:'Tabelle teilen: Zeigt jetzt Spaltenköpfe + letzte 8 Spiele (statt schwarzem Bild). Menü-Spalte wird beim Teilen ausgeblendet.'},
     {v:'4.29',d:'27.05.2026 14:13',t:'Teilen-Button auch bei archivierten Spielen sichtbar – Tabelle und Statistik aus dem Archiv können jetzt geteilt werden.'},
