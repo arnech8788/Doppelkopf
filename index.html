@@ -1403,6 +1403,7 @@ function renderStats(){
   html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">👑 Solokönig</div></div>';
   html+='</div>';
   html+=buildHighlights(all,rounds,src);
+  html+=buildAchievementSection(all,src);
   html+='<div class="section-label" style="margin-top:20px">Spieler</div><div class="card">';
   const sortedStats=all.slice().sort((a,b)=>totals[b]-totals[a]);
   sortedStats.forEach((p,i)=>{
@@ -1555,6 +1556,35 @@ function formatHighlightDuration(ms){
   if(h>0)return h+'h '+m+'min';
   if(m>0)return m+':'+String(s).padStart(2,'0')+'min';
   return s+'s';
+}
+function buildAchievementSection(all,src){
+  const eveningAch=(src===state)?state.achievements||{}:{};
+  const seasonAch=loadSeasonAchievements();
+  // Merge evening + season achievements per player
+  const merged={};
+  all.forEach(p=>{
+    const ea=eveningAch[p]||[];
+    const sa=seasonAch[p]||[];
+    const combined=[];
+    ea.forEach(id=>{const def=ACHIEVEMENTS.evening[id];if(def)combined.push(def.emoji+' '+def.name)});
+    sa.forEach(id=>{const def=ACHIEVEMENTS.season[id];if(def)combined.push(def.emoji+' '+def.name)});
+    if(combined.length)merged[p]=combined;
+  });
+  const players=Object.keys(merged);
+  if(!players.length)return '';
+  let html='<div class="section-label" style="margin-top:20px">Achievements</div><div class="card">';
+  players.forEach((p,i)=>{
+    const border=i<players.length-1?'border-bottom:1px solid var(--bdr);':'';
+    html+='<div style="padding:8px 0;'+border+'">';
+    html+='<div style="font-weight:500;margin-bottom:4px">'+p+'</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    merged[p].forEach(badge=>{
+      html+='<span style="background:var(--bg3);padding:2px 8px;border-radius:12px;font-size:11px;white-space:nowrap">'+badge+'</span>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+  return html;
 }
 
 function openCalcModal(){
