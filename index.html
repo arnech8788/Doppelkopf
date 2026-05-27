@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.31 · 27.05.2026 14:32</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.31 · 27.05.2026 14:32</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -92,6 +92,7 @@
 <div class="modal-overlay" id="infoModal" style="align-items:stretch;padding:0"><div class="modal" id="infoModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="calcHelpModal" style="align-items:stretch;padding:0"><div class="modal" id="calcHelpModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
+<div class="modal-overlay" id="debugModal" style="align-items:stretch;padding:0"><div class="modal" id="debugModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px;overflow-y:auto"></div></div>
 
 <div id="updateToast" class="update-toast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -1450,6 +1451,15 @@ async function sendFeedbackMail(e){
   );
   window.location.href='mailto:doppelkopf@arne-chudobba.de?subject=Doppelkopf%20Feedback%20('+encodeURIComponent(devInfo.appVersion)+')&body='+body;
 }
+let _versionTaps=0,_versionTapTimer=null;
+function handleVersionTap(){
+  _versionTaps++;
+  clearTimeout(_versionTapTimer);
+  _versionTapTimer=setTimeout(()=>{_versionTaps=0},2000);
+  if(_versionTaps>=5){_versionTaps=0;openDebugModal()}
+}
+function closeDebugModal(){document.getElementById('debugModal').classList.remove('show')}
+document.getElementById('debugModal').addEventListener('click',function(e){if(e.target===this)closeDebugModal()});
 function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
 document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)closeInfoModal()});
 
