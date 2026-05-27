@@ -122,6 +122,23 @@ const DEFAULT_SOLOS=[
   {name:'Stille Hochzeit',short:'SH',enabled:true},
   {name:'Hängen gel. Hochzeit',short:'HH',enabled:true}
 ];
+const ACHIEVEMENTS={
+  evening:{
+    hotStreak:{name:'Hot Streak',emoji:'🔥',desc:'5 Siege in Folge'},
+    comebackKid:{name:'Comeback Kid',emoji:'📈',desc:'Von letztem auf Platz 1'},
+    solist:{name:'Solist',emoji:'🎭',desc:'3 Soli an einem Abend'},
+    unbesiegbar:{name:'Unbesiegbar',emoji:'🛡️',desc:'Keine Niederlage (mind. 5 Spiele)'},
+    pechvogel:{name:'Pechvogel',emoji:'🤦',desc:'5 Niederlagen in Folge'}
+  },
+  season:{
+    stammgast:{name:'Stammgast',emoji:'🏠',desc:'5 Spielabende dabei'},
+    veteran:{name:'Veteran',emoji:'⭐',desc:'100 Spiele gespielt'},
+    soloKoenig:{name:'Solokönig',emoji:'👑',desc:'10 Solos gewonnen'},
+    dominator:{name:'Dominator',emoji:'💪',desc:'3× Bester des Abends'},
+    dauersieger:{name:'Dauersieger',emoji:'🏆',desc:'5× hintereinander Top 2'},
+    marathon:{name:'Marathon',emoji:'🏃',desc:'50 Spiele an einem Abend'}
+  }
+};
 let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10};
 let currentPts='';
 let editingRound=null;
@@ -1478,6 +1495,21 @@ function launchConfetti(){
     container.appendChild(c);
   }
   setTimeout(()=>container.remove(),4000);
+}
+function launchMiniConfetti(){
+  const container=document.createElement('div');container.className='confetti-container';document.body.appendChild(container);
+  const colors=['#2ec4b6','#e05252','#f0a830','#5b4cdb','#ff6b6b','#48dbfb','#ff9ff3','#feca57'];
+  const shapes=['&#9824;','&#9829;','&#9830;','&#9827;'];
+  for(let i=0;i<25;i++){
+    const c=document.createElement('div');c.className='confetti';
+    c.innerHTML=Math.random()>0.5?shapes[Math.floor(Math.random()*shapes.length)]:'';
+    c.style.left=Math.random()*100+'%';c.style.backgroundColor=colors[Math.floor(Math.random()*colors.length)];
+    c.style.borderRadius=Math.random()>0.5?'50%':'2px';c.style.width=(4+Math.random()*8)+'px';c.style.height=(4+Math.random()*8)+'px';
+    c.style.animationDuration=(1+Math.random()*1.5)+'s';c.style.animationDelay=(Math.random()*0.3)+'s';
+    c.style.fontSize=(10+Math.random()*10)+'px';c.style.color=colors[Math.floor(Math.random()*colors.length)];
+    container.appendChild(c);
+  }
+  setTimeout(()=>container.remove(),2500);
 }
 
 async function captureAndShare(element,filename){
