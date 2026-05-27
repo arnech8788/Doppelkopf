@@ -93,6 +93,7 @@
 <div class="modal-overlay" id="calcHelpModal" style="align-items:stretch;padding:0"><div class="modal" id="calcHelpModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="calcModal" style="align-items:stretch;padding:0"><div class="modal" id="calcModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px"></div></div>
 <div class="modal-overlay" id="debugModal" style="align-items:stretch;padding:0"><div class="modal" id="debugModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px;overflow-y:auto"></div></div>
+<div class="modal-overlay" id="allTimeModal" style="align-items:stretch;padding:0"><div class="modal" id="allTimeModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px;overflow-y:auto"></div></div>
 
 <div id="updateToast" class="update-toast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -553,6 +554,7 @@ function renderArchiveList(){
     html+='<button class="archive-item-delete" onclick="event.stopPropagation();deleteArchived('+g.id+')">'+ICO.trash+'</button>';
     html+='</div>';
   });
+  if(archive.length>=2)html+='<button class="btn btn-secondary" style="margin-top:12px;width:100%" onclick="openAllTimeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg> Ewige Tabelle</button>';
   el.innerHTML=html;
 }
 async function deleteArchived(id){
@@ -571,6 +573,8 @@ function closeArchiveView(){
   viewingArchive=null;
   showScreen('tabelle');
 }
+function closeAllTimeModal(){document.getElementById('allTimeModal').classList.remove('show')}
+document.getElementById('allTimeModal').addEventListener('click',function(e){if(e.target===this)closeAllTimeModal()});
 
 function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
 
