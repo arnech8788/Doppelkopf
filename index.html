@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.34 · 27.05.2026 22:00</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.35 · 27.05.2026 22:34</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -555,14 +555,26 @@ async function startNewGame(){
     showToast('Neues Spiel gestartet. Füge mindestens 4 Spieler hinzu.','info');
   }
 }
+function formatArchiveDate(g,short){
+  const d=new Date(g.date);
+  const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:short?undefined:'numeric'});
+  if(!g.gameStartTime)return dateStr;
+  const start=new Date(g.gameStartTime);
+  const startTime=start.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  let endTime='';
+  if(g.rounds&&g.rounds.length){
+    const lastTs=g.rounds[g.rounds.length-1].timestamp;
+    if(lastTs){const end=new Date(lastTs);endTime='–'+end.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
+  }
+  return dateStr+' '+startTime+endTime;
+}
 function renderArchiveList(){
   const archive=loadArchive();
   const el=document.getElementById('archiveList');
   if(!archive.length){el.innerHTML='';return}
   let html='<div class="section-label" style="margin-top:20px">Vergangene Spiele ('+archive.length+')</div>';
   archive.forEach(g=>{
-    const d=new Date(g.date);
-    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const dateStr=formatArchiveDate(g,false);
     const winner=getArchiveWinner(g);
     html+='<div class="archive-item" onclick="openArchivedGame('+g.id+')">';
     html+='<div class="archive-item-info">';
@@ -685,8 +697,7 @@ function openAllTimeModal(){
     abendPlayers.forEach(p=>{abendTotals[p]=0});
     g.rounds.forEach(r=>r.playing.forEach(p=>{abendTotals[p]=(abendTotals[p]||0)+(r.scores[p]||0)}));
     const placings=[...abendPlayers].sort((a,b)=>(abendTotals[b]||0)-(abendTotals[a]||0));
-    const d=new Date(g.date);
-    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const dateStr=formatArchiveDate(g,true);
     html+='<tr><td style="padding:4px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap">'+dateStr+'</td>';
     for(let i=0;i<maxPlayers;i++){
       const p=placings[i];
@@ -699,7 +710,7 @@ function openAllTimeModal(){
   document.getElementById('allTimeModalContent').innerHTML=html;
   document.getElementById('allTimeModal').classList.add('show');
   // Chart bauen
-  const labels=sorted.map(g=>{const d=new Date(g.date);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})});
+  const labels=sorted.map(g=>formatArchiveDate(g,true));
   const datasets=ranked.map((p,idx)=>{
     const data=sorted.map(g=>{
       const abendPlayers=new Set();
@@ -1263,8 +1274,7 @@ function renderTabelle(scrollToBottom){
   let banner=tabelleScreen.querySelector('.archive-banner');
   if(viewingArchive){
     if(!banner){banner=document.createElement('div');banner.className='archive-banner';tabelleScreen.insertBefore(banner,tabelleScreen.firstChild)}
-    const d=new Date(viewingArchive.date);
-    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const dateStr=formatArchiveDate(viewingArchive,false);
     banner.innerHTML='<span>Archiv: '+dateStr+' \u2013 '+viewingArchive.players.length+' Spieler \u00b7 '+viewingArchive.rounds.length+' Runden</span><button onclick="closeArchiveView()">'+ICO.x+'</button>';
   }else if(banner){banner.remove()}
   // Share button visibility
@@ -1363,8 +1373,7 @@ function renderStats(){
   let banner=statsScreen.querySelector('.archive-banner');
   if(viewingArchive){
     if(!banner){banner=document.createElement('div');banner.className='archive-banner';statsScreen.insertBefore(banner,statsScreen.firstChild)}
-    const d=new Date(viewingArchive.date);
-    const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const dateStr=formatArchiveDate(viewingArchive,false);
     banner.innerHTML='<span>Archiv: '+dateStr+' \u2013 '+viewingArchive.players.length+' Spieler \u00b7 '+viewingArchive.rounds.length+' Runden</span><button onclick="closeArchiveView()">'+ICO.x+'</button>';
   }else if(banner){banner.remove()}
   // Share button visibility
@@ -1845,6 +1854,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.35',d:'27.05.2026 22:34',t:'Archiv und Ewige Tabelle zeigen jetzt neben dem Datum auch die Uhrzeit (HH:MM–HH:MM) an – Startzeit bis letzte Runde.'},
     {v:'4.34',d:'27.05.2026 22:00',t:'Ewige Tabelle: Saisonübergreifende Statistik über alle archivierten Spielabende – Rangliste mit Gesamt-Punkten, Siegen, Soli und Platz-1-Zähler, Punkteverlauf-Chart über Spielabende und Platzierungstabelle. Erreichbar über Button im Archiv-Bereich (ab 2 archivierten Spielen).'},
     {v:'4.33',d:'27.05.2026 21:33',t:'Statistik: Neue Sektion "Highlights des Abends" – größter Gewinn/Verlust, längste Sieges- und Pechserie, Comeback des Abends, Spieldauer mit Durchschnitt pro Runde und Wendepunkt der Partie.'},
     {v:'4.32',d:'27.05.2026 15:52',t:'Debug-Modus: 5x auf die Versionsnummer tippen öffnet den Debug-Bereich mit Geräteinfos, App-State, localStorage, Konsolen-Logs und State-Export/Import. Feedback-Mail enthält jetzt automatisch Geräte- und App-Informationen.'},
