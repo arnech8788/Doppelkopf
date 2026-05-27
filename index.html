@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.33 · 27.05.2026 21:33</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.34 · 27.05.2026 22:00</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1616,6 +1616,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.34',d:'27.05.2026 22:00',t:'Ewige Tabelle: Saisonübergreifende Statistik über alle archivierten Spielabende – Rangliste mit Gesamt-Punkten, Siegen, Soli und Platz-1-Zähler, Punkteverlauf-Chart über Spielabende und Platzierungstabelle. Erreichbar über Button im Archiv-Bereich (ab 2 archivierten Spielen).'},
     {v:'4.33',d:'27.05.2026 21:33',t:'Statistik: Neue Sektion "Highlights des Abends" – größter Gewinn/Verlust, längste Sieges- und Pechserie, Comeback des Abends, Spieldauer mit Durchschnitt pro Runde und Wendepunkt der Partie.'},
     {v:'4.32',d:'27.05.2026 15:52',t:'Debug-Modus: 5x auf die Versionsnummer tippen öffnet den Debug-Bereich mit Geräteinfos, App-State, localStorage, Konsolen-Logs und State-Export/Import. Feedback-Mail enthält jetzt automatisch Geräte- und App-Informationen.'},
     {v:'4.31',d:'27.05.2026 14:32',t:'Tabelle: Solo-Badge (Bu, Da, S) von der #-Spalte in die Punkte-Spalte verschoben. Solo-Punkte zeigen jetzt beide Werte (z.B. 4/12). Teilen: Volle Spielernamen statt Kürzel im Header.'},
