@@ -106,6 +106,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
+const _debugLogs=[];
+const _origConsoleError=console.error;
+const _origConsoleWarn=console.warn;
+console.error=function(){_debugLogs.push({type:'error',msg:[...arguments].map(a=>typeof a==='string'?a:JSON.stringify(a)).join(' '),ts:Date.now()});if(_debugLogs.length>50)_debugLogs.shift();_origConsoleError.apply(console,arguments)};
+console.warn=function(){_debugLogs.push({type:'warn',msg:[...arguments].map(a=>typeof a==='string'?a:JSON.stringify(a)).join(' '),ts:Date.now()});if(_debugLogs.length>50)_debugLogs.shift();_origConsoleWarn.apply(console,arguments)};
 const COLORS=['#5b4cdb','#0a8f6a','#c0392b','#d68910','#2980b9','#7c6fef','#16a085','#e74c3c','#f39c12','#3498db'];
 const DEFAULT_SOLOS=[
   {name:'Fleischlos',short:'FL',enabled:true},
