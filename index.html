@@ -536,6 +536,7 @@ async function startNewGame(){
   }
   if(!await showConfirm('Aktuelles Spiel wird archiviert und ein neues gestartet.','Neues Spiel'))return;
   archiveCurrentGame();
+  checkSeasonAchievements();
   state.rounds=[];
   state.bockQueue=0;
   state.gameStartTime=null;
@@ -1025,6 +1026,101 @@ function checkRoundAchievements(round){
     setTimeout(launchMiniConfetti,300);
   });
   save();
+}
+
+function loadSeasonAchievements(){
+  try{const s=localStorage.getItem('doko-v4-achievements');return s?JSON.parse(s):{}}catch(e){return{}}
+}
+function saveSeasonAchievements(data){
+  try{localStorage.setItem('doko-v4-achievements',JSON.stringify(data))}catch(e){}
+}
+function checkSeasonAchievements(){
+  const archive=loadArchive();
+  if(!archive.length)return;
+  const sa=loadSeasonAchievements();
+  const playerSet=new Set();
+  archive.forEach(g=>{
+    g.rounds.forEach(r=>r.playing.forEach(p=>playerSet.add(p)));
+    if(g.players)g.players.forEach(p=>playerSet.add(p));
+  });
+  const allPlayers=[...playerSet];
+  const newAchievements=[];
+  // Statistiken aggregieren
+  const stats={};
+  allPlayers.forEach(p=>{stats[p]={abende:0,spiele:0,soloWins:0,platz1:0,maxSpiele:0}});
+  const sorted=archive.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  sorted.forEach(g=>{
+    const abendPlayers=new Set();
+    g.rounds.forEach(r=>r.playing.forEach(p=>abendPlayers.add(p)));
+    if(g.players)g.players.forEach(p=>abendPlayers.add(p));
+    const abendTotals={};
+    let abendSpiele={};
+    abendPlayers.forEach(p=>{abendTotals[p]=0;abendSpiele[p]=0});
+    g.rounds.forEach(r=>{
+      let solist=null;
+      if(r.solo){
+        if(r.winners.length===1)solist=r.winners[0];
+        else if(r.winners.length===3)solist=r.playing.find(p=>!r.winners.includes(p));
+      }
+      r.playing.forEach(p=>{
+        if(!stats[p])return;
+        stats[p].spiele++;
+        abendSpiele[p]=(abendSpiele[p]||0)+1;
+        abendTotals[p]=(abendTotals[p]||0)+(r.scores[p]||0);
+        if(r.winners.includes(p)&&r.solo&&p===solist)stats[p].soloWins++;
+      });
+    });
+    abendPlayers.forEach(p=>{
+      if(stats[p]){
+        stats[p].abende++;
+        if(abendSpiele[p]>stats[p].maxSpiele)stats[p].maxSpiele=abendSpiele[p];
+      }
+    });
+    // Bester Spieler des Abends
+    const abendArr=[...abendPlayers];
+    if(abendArr.length){
+      const maxPts=Math.max(...abendArr.map(p=>abendTotals[p]||0));
+      const candidates=abendArr.filter(p=>(abendTotals[p]||0)===maxPts);
+      if(candidates.length===1&&stats[candidates[0]])stats[candidates[0]].platz1++;
+    }
+  });
+  // Dauersieger: 5 Abende hintereinander Top 2
+  const placingsPerAbend=sorted.map(g=>{
+    const ap=new Set();
+    g.rounds.forEach(r=>r.playing.forEach(p=>ap.add(p)));
+    if(g.players)g.players.forEach(p=>ap.add(p));
+    const t={};ap.forEach(p=>{t[p]=0});
+    g.rounds.forEach(r=>r.playing.forEach(p=>{t[p]=(t[p]||0)+(r.scores[p]||0)}));
+    return [...ap].sort((a,b)=>(t[b]||0)-(t[a]||0));
+  });
+  allPlayers.forEach(p=>{
+    if(!sa[p])sa[p]=[];
+    // stammgast
+    if(!sa[p].includes('stammgast')&&stats[p].abende>=5){sa[p].push('stammgast');newAchievements.push({player:p,id:'stammgast'})}
+    // veteran
+    if(!sa[p].includes('veteran')&&stats[p].spiele>=100){sa[p].push('veteran');newAchievements.push({player:p,id:'veteran'})}
+    // soloKoenig
+    if(!sa[p].includes('soloKoenig')&&stats[p].soloWins>=10){sa[p].push('soloKoenig');newAchievements.push({player:p,id:'soloKoenig'})}
+    // dominator
+    if(!sa[p].includes('dominator')&&stats[p].platz1>=3){sa[p].push('dominator');newAchievements.push({player:p,id:'dominator'})}
+    // marathon
+    if(!sa[p].includes('marathon')&&stats[p].maxSpiele>=50){sa[p].push('marathon');newAchievements.push({player:p,id:'marathon'})}
+    // dauersieger
+    if(!sa[p].includes('dauersieger')){
+      let streak=0,maxStreak=0;
+      placingsPerAbend.forEach(placing=>{
+        const idx=placing.indexOf(p);
+        if(idx===0||idx===1){streak++;if(streak>maxStreak)maxStreak=streak}else if(idx===-1){/* nicht dabei, streak bleibt */}else{streak=0}
+      });
+      if(maxStreak>=5){sa[p].push('dauersieger');newAchievements.push({player:p,id:'dauersieger'})}
+    }
+  });
+  saveSeasonAchievements(sa);
+  // Announce
+  newAchievements.forEach(a=>{
+    const def=ACHIEVEMENTS.season[a.id];
+    showToast(def.emoji+' '+a.player+': '+def.name+'!','info');
+  });
 }
 
 function finalizeRound(round){
