@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.30 · 27.05.2026 14:27</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.31 · 27.05.2026 14:32</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -941,7 +941,6 @@ function renderTabelle(scrollToBottom){
   rounds.forEach((r,i)=>{
     html+='<tr class="clickable" onclick="toggleExpand('+i+')">';
     html+='<td style="color:var(--tx3)">'+(i+1);
-    if(r.solo){const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';html+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>'}
     if(r.bock)html+=' <span class="round-badge badge-bock">B</span>';
     html+='</td>';
     all.forEach(p=>{
@@ -950,8 +949,10 @@ function renderTabelle(scrollToBottom){
       const bg=won?'background:var(--grn-bg)':lost?'background:var(--red-bg)':'';
       html+='<td style="'+bg+'">'+(played?(c>0?'+':'')+c:'')+'</td>';
     });
-    // Punkte des Spiels jetzt ganz rechts (vor dem Menü)
-    html+='<td style="color:var(--tx3);font-family:\'Space Mono\',monospace">'+r.points+'</td>';
+    // Punkte des Spiels + Solo-Badge rechts
+    let ptsLabel=''+r.points;
+    if(r.solo){ptsLabel=r.points+'/'+r.points*3;const soloLabel=r.soloType?(soloMap[r.soloType]||r.soloType.substring(0,2)):'S';ptsLabel+=' <span class="round-badge badge-solo" title="'+(r.soloType||'Solo')+'">'+soloLabel+'</span>'}
+    html+='<td style="color:var(--tx3);font-family:\'Space Mono\',monospace;white-space:nowrap">'+ptsLabel+'</td>';
     if(viewingArchive){
       html+='<td></td>';
     }else{
@@ -1220,13 +1221,20 @@ function shareTabelle(){
   if(!table)return;
   const maxRows=8;
   const clone=table.cloneNode(true);
-  // Expand-Rows und Menü-Spalten entfernen
+  // Volle Spielernamen im Header statt Kürzel
+  const src=viewingArchive||state;
+  const all=viewingArchive?[...viewingArchive.players]:getHistoricalPlayers();
+  const headerThs=clone.querySelectorAll('thead th');
+  all.forEach((p,i)=>{
+    const th=headerThs[i+1];// +1 wegen # Spalte
+    if(th)th.innerHTML=p;
+  });
+  // Expand-Rows entfernen
   clone.querySelectorAll('.expand-row').forEach(r=>r.remove());
   const rows=clone.querySelectorAll('tbody tr');
   const total=rows.length;
   if(total>maxRows){
     for(let i=0;i<total-maxRows;i++)rows[i].remove();
-    // Trennzeile einfügen
     const sep=document.createElement('tr');
     const td=document.createElement('td');
     td.colSpan=clone.querySelector('thead tr').children.length;
@@ -1237,12 +1245,11 @@ function shareTabelle(){
   }
   // Letzte Menü-Spalte (⋮) aus allen Zeilen entfernen
   clone.querySelectorAll('tr').forEach(r=>{const last=r.lastElementChild;if(last&&(last.querySelector('.row-menu-wrap')||last.textContent.trim()===''))last.remove()});
-  // Menü-Header (leeres th) entfernen
   const ths=clone.querySelectorAll('thead th');
   if(ths.length&&ths[ths.length-1].textContent.trim()==='')ths[ths.length-1].remove();
   // Temporäres Container-Element
   const wrap=document.createElement('div');
-  wrap.style.cssText='position:fixed;left:-9999px;top:0;background:var(--bg2);padding:16px;border-radius:8px;max-width:420px;font-family:inherit';
+  wrap.style.cssText='position:fixed;left:-9999px;top:0;background:var(--bg2);padding:16px;border-radius:8px;font-family:inherit';
   wrap.appendChild(clone);
   document.body.appendChild(wrap);
   captureAndShare(wrap,'doppelkopf-tabelle.png').then(()=>wrap.remove()).catch(()=>wrap.remove());
@@ -1324,6 +1331,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.31',d:'27.05.2026 14:32',t:'Tabelle: Solo-Badge (Bu, Da, S) von der #-Spalte in die Punkte-Spalte verschoben. Solo-Punkte zeigen jetzt beide Werte (z.B. 4/12). Teilen: Volle Spielernamen statt Kürzel im Header.'},
     {v:'4.30',d:'27.05.2026 14:27',t:'Tabelle teilen: Zeigt jetzt Spaltenköpfe + letzte 8 Spiele (statt schwarzem Bild). Menü-Spalte wird beim Teilen ausgeblendet.'},
     {v:'4.29',d:'27.05.2026 14:13',t:'Teilen-Button auch bei archivierten Spielen sichtbar – Tabelle und Statistik aus dem Archiv können jetzt geteilt werden.'},
     {v:'4.28',d:'27.05.2026 13:47',t:'Statistik: Spieler nach Punkten sortiert mit Rang-Anzeige. Tabelle: Ranking-Header entfernt (Stände sieht man in der letzten Zeile), Streak-Icons (🔥💀) in Spaltenköpfe verschoben. Easter-Egg-Banner von Eingabe in Tabelle verschoben. Teilen beschleunigt (geringere Bildauflösung). Eingabe: Responsive Größen – Buttons und Numpad passen sich an die Bildschirmhöhe an (besser auf iPhone/iOS).'},
