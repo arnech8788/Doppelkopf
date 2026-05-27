@@ -63,7 +63,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.28 · 27.05.2026 13:47</div>
+    <div style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5">v4.29 · 27.05.2026 14:13</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -904,7 +904,7 @@ function renderTabelle(scrollToBottom){
   }else if(banner){banner.remove()}
   // Share button visibility
   const shareBtn=tabelleScreen.querySelector('.share-btn');
-  if(shareBtn)shareBtn.style.display=viewingArchive?'none':'';
+  if(shareBtn)shareBtn.style.display='';
   if(!rounds.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>Noch keine Daten.</div>';return}
   if(!all.length){document.getElementById('standsCard').innerHTML='';document.getElementById('tableWrap').innerHTML='<div class="empty-state">Alle Spieler wurden entfernt.</div>';return}
   const tStreaks=getWinStreaks(all);
@@ -1003,7 +1003,7 @@ function renderStats(){
   }else if(banner){banner.remove()}
   // Share button visibility
   const shareBtn=statsScreen.querySelector('.share-btn');
-  if(shareBtn)shareBtn.style.display=viewingArchive?'none':'';
+  if(shareBtn)shareBtn.style.display='';
   const rounds=src.rounds;
   if(!rounds.length){c.innerHTML='<div class="card"><div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Spiele ein paar Spiele f\u00fcr Statistiken.</div></div>';return}
   const totals={},wins={},losses={},soloWins={},soloLosses={},gamesPlayed={};
@@ -1288,6 +1288,7 @@ function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.29',d:'27.05.2026 14:13',t:'Teilen-Button auch bei archivierten Spielen sichtbar – Tabelle und Statistik aus dem Archiv können jetzt geteilt werden.'},
     {v:'4.28',d:'27.05.2026 13:47',t:'Statistik: Spieler nach Punkten sortiert mit Rang-Anzeige. Tabelle: Ranking-Header entfernt (Stände sieht man in der letzten Zeile), Streak-Icons (🔥💀) in Spaltenköpfe verschoben. Easter-Egg-Banner von Eingabe in Tabelle verschoben. Teilen beschleunigt (geringere Bildauflösung). Eingabe: Responsive Größen – Buttons und Numpad passen sich an die Bildschirmhöhe an (besser auf iPhone/iOS).'},
     {v:'4.27',d:'26.05.2026 16:27',t:'Einheitliche App-Dialoge: Alle Browser-Popups (alert/confirm) durch eigene Toast-Benachrichtigungen und Bestätigungs-Modals im App-Design ersetzt.'},
     {v:'4.26',d:'26.05.2026 12:48',t:'Eingabe noch kompakter: Punkte-\u00dcberschrift entfernt (Placeholder im Feld), Spieler antippen + Legende in einer Zeile, Buttons nochmals verkleinert, weniger Abstand zwischen Titel und Punktefeld. Edit-Modal identisch.'},
