@@ -1149,6 +1149,104 @@ function buildPairings(all){
   document.getElementById('pairCard').innerHTML=html;
 }
 
+function buildHighlights(all,rounds,src){
+  if(rounds.length<2)return '';
+  const items=[];
+  // Größter Gewinn
+  let maxGain={val:0,player:'',round:0};
+  let maxLoss={val:0,player:'',round:0};
+  rounds.forEach((r,i)=>{
+    all.forEach(p=>{
+      if(!r.playing.includes(p))return;
+      const s=r.scores[p]||0;
+      if(s>maxGain.val){maxGain={val:s,player:p,round:i+1}}
+      if(s<maxLoss.val){maxLoss={val:s,player:p,round:i+1}}
+    });
+  });
+  if(maxGain.val>0)items.push({icon:'🎯',label:'Größter Gewinn',val:maxGain.player+': +'+maxGain.val+' (Spiel '+maxGain.round+')'});
+  if(maxLoss.val<0)items.push({icon:'💥',label:'Größter Verlust',val:maxLoss.player+': '+maxLoss.val+' (Spiel '+maxLoss.round+')'});
+  // Längste Siegesserie
+  let bestWinStreak={len:0,player:'',from:0,to:0};
+  let bestLoseStreak={len:0,player:'',from:0,to:0};
+  all.forEach(p=>{
+    let wStreak=0,wFrom=0,lStreak=0,lFrom=0;
+    rounds.forEach((r,i)=>{
+      if(!r.playing.includes(p))return;
+      if(r.winners.includes(p)){
+        if(wStreak===0)wFrom=i+1;
+        wStreak++;
+        if(wStreak>bestWinStreak.len){bestWinStreak={len:wStreak,player:p,from:wFrom,to:i+1}}
+        lStreak=0;
+      }else{
+        if(lStreak===0)lFrom=i+1;
+        lStreak++;
+        if(lStreak>bestLoseStreak.len){bestLoseStreak={len:lStreak,player:p,from:lFrom,to:i+1}}
+        wStreak=0;
+      }
+    });
+  });
+  if(bestWinStreak.len>=2)items.push({icon:'🔥',label:'Längste Siegesserie',val:bestWinStreak.player+': '+bestWinStreak.len+' Siege (Spiel '+bestWinStreak.from+'–'+bestWinStreak.to+')'});
+  if(bestLoseStreak.len>=2)items.push({icon:'💀',label:'Längste Pechserie',val:bestLoseStreak.player+': '+bestLoseStreak.len+' Niederlagen (Spiel '+bestLoseStreak.from+'–'+bestLoseStreak.to+')'});
+  // Comeback des Abends
+  let bestComeback={delta:0,player:'',low:0,end:0};
+  all.forEach(p=>{
+    let cum=0,lowest=0;
+    rounds.forEach(r=>{
+      if(r.playing.includes(p))cum+=(r.scores[p]||0);
+      if(cum<lowest)lowest=cum;
+    });
+    if(lowest<0){
+      const delta=cum-lowest;
+      if(delta>bestComeback.delta)bestComeback={delta,player:p,low:lowest,end:cum};
+    }
+  });
+  if(bestComeback.delta>0)items.push({icon:'📈',label:'Comeback des Abends',val:bestComeback.player+': '+bestComeback.low+' → '+(bestComeback.end>0?'+':'')+bestComeback.end+' (+'+bestComeback.delta+')'});
+  // Spieldauer
+  if(src.gameStartTime&&rounds.length&&rounds[rounds.length-1].timestamp){
+    const totalMs=rounds[rounds.length-1].timestamp-src.gameStartTime;
+    if(totalMs>0){
+      const avgMs=totalMs/rounds.length;
+      items.push({icon:'⏱️',label:'Spieldauer',val:formatHighlightDuration(totalMs)+' (Ø '+formatHighlightDuration(avgMs)+' pro Spiel)'});
+    }
+  }
+  // Wendepunkt
+  let leaders=[];
+  let running={};all.forEach(p=>running[p]=0);
+  rounds.forEach((r,i)=>{
+    all.forEach(p=>running[p]+=(r.scores[p]||0));
+    let leader=all[0];all.forEach(p=>{if(running[p]>running[leader])leader=p});
+    leaders.push(leader);
+  });
+  let lastChangeIdx=-1,finalLeader=leaders[leaders.length-1];
+  for(let i=leaders.length-1;i>0;i--){
+    if(leaders[i]!==leaders[i-1]){lastChangeIdx=i;break}
+  }
+  if(lastChangeIdx>0)items.push({icon:'🔄',label:'Wendepunkt',val:'Spiel '+(lastChangeIdx+1)+': '+finalLeader+' übernimmt Führung'});
+  else if(leaders.length>0)items.push({icon:'🔄',label:'Wendepunkt',val:'Führung von Anfang an: '+finalLeader});
+  // HTML bauen
+  if(!items.length)return '';
+  let html='<div class="section-label" style="margin-top:20px">Highlights des Abends</div>';
+  html+='<div class="card" style="font-size:12px">';
+  items.forEach((item,i)=>{
+    const border=i<items.length-1?'border-bottom:1px solid var(--bdr);':'';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;'+border+'">';
+    html+='<span style="color:var(--tx3)">'+item.icon+' '+item.label+'</span>';
+    html+='<span style="font-weight:500;text-align:right">'+item.val+'</span>';
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+function formatHighlightDuration(ms){
+  const totalSec=Math.floor(ms/1000);
+  const h=Math.floor(totalSec/3600);
+  const m=Math.floor((totalSec%3600)/60);
+  const s=totalSec%60;
+  if(h>0)return h+'h '+m+'min';
+  if(m>0)return m+':'+String(s).padStart(2,'0')+'min';
+  return s+'s';
+}
+
 function openCalcModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5"><h3 style="margin:0">Punkte zählen</h3><div id="calcResultSticky" style="font-family:\'Space Mono\',monospace;font-size:28px;font-weight:700;color:var(--acc)">0</div></div>';
   html+='<div class="section-label">Spielart</div>';
