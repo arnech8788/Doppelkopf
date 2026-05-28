@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.45 · 28.05.2026 17:10</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.46 · 28.05.2026 17:36</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -296,7 +296,7 @@ function showNameModal(){
       if(val.length<2){hint.style.display='none';return}
       const match=await findSpielerByName(val);
       if(match){
-        hint.innerHTML='<b>'+match.name+'</b> existiert bereits. <a href="#" onclick="claimExistingSpieler(\''+match.id+'\');return false" style="color:var(--primary)">Das bin ich (neues Gerät)</a>';
+        hint.innerHTML='<b>'+match.name+'</b> existiert bereits. <a href="#" onclick="claimExistingSpieler(\''+match.id+'\');return false" style="color:var(--acc)">Das bin ich (neues Gerät)</a>';
         hint.style.display='block';
       }else{
         hint.style.display='none';
@@ -856,9 +856,9 @@ function renderTurnierIndicator(){
     if(own&&own.id===t.schreiberId)roleBadge=' · <span class="schreiber-badge">Schreiber</span>';
     else if(own)roleBadge=' · <span class="zuschauer-badge">Zuschauer</span>';
   }
-  // Self-Rotation: Kein Tisch zugewiesen
-  if(!t.tischId&&!t.isHost&&turnierConfigCache&&turnierConfigCache.tableMode==='rotation'){
-    roleBadge=' \u00b7 <a href="#" onclick="openSelfRotationChoice();return false" style="color:var(--primary);font-weight:600">Tisch wählen!</a>';
+  // Self-Rotation: Kein Tisch zugewiesen (auch für Host der mitspielt)
+  if(!t.tischId&&turnierConfigCache&&turnierConfigCache.tableMode==='rotation'){
+    roleBadge=' \u00b7 <a href="#" onclick="openSelfRotationChoice();return false" style="color:var(--acc);font-weight:600">Tisch wählen!</a>';
   }
   el.innerHTML='<div class="turnier-banner" onclick="openTurnierDashboard()" style="cursor:pointer">'+label+roleBadge+' \u00b7 <span style="color:var(--grn)">Live</span></div>';
 }
@@ -967,7 +967,7 @@ function renderTurnierSetup(){
       +'<button class="btn btn-secondary" style="flex:1" onclick="openJoinTurnier()">Beitreten</button>'
       +'</div>';
     if(archiv.length){
-      html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene'+(archiv.length===1?'s':'')+' Turnier'+(archiv.length>1?'e':'')+'</button></div>';
+      html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene'+(archiv.length===1?'s':'')+' Turnier'+(archiv.length>1?'e':'')+'</button></div>';
     }
     el.innerHTML=html;
     return;
@@ -982,7 +982,7 @@ function renderTurnierSetup(){
     html+='<div>Du bist Spielleiter</div>';
   }else if(t.isPlayer){
     if(t.tischId)html+='<div>Spieler an '+t.tischName+'</div>';
-    else html+='<div>Spieler (kein Tisch zugewiesen)</div>';
+    else html+='<div>Spieler (noch kein Tisch)</div>';
   }else{
     html+='<div>Tisch '+t.tischNummer+': '+t.tischName+'</div>';
   }
@@ -996,6 +996,12 @@ function renderTurnierSetup(){
   }
   if(t.isHost&&t.tischId){
     html+='<button class="btn btn-secondary" style="flex:1" onclick="hostLeaveTisch()">Tisch verlassen</button>';
+  }
+  if(t.isPlayer&&!t.tischId){
+    html+='<button class="btn btn-secondary" style="flex:1" onclick="openPlayerTischWahl()">Tisch beitreten</button>';
+  }
+  if(t.isPlayer&&t.tischId){
+    html+='<button class="btn btn-secondary" style="flex:1" onclick="openPlayerTischWahl()">Tisch wechseln</button>';
   }
   if(t.isHost){
     html+='<button class="btn btn-secondary" style="flex:1" onclick="endTurnier()">Beenden</button>';
@@ -1085,7 +1091,7 @@ function renderWizardStep(){
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div style="display:flex;gap:4px;margin:12px 0">';
   for(let i=1;i<=4;i++){
-    html+='<div style="flex:1;height:3px;border-radius:2px;background:'+(i<=w.step?'var(--primary)':'var(--bg3)')+'"></div>';
+    html+='<div style="flex:1;height:3px;border-radius:2px;background:'+(i<=w.step?'var(--acc)':'var(--bg3)')+'"></div>';
   }
   html+='</div>';
   if(w.step===1)html+=renderWizardStep1();
@@ -1359,7 +1365,7 @@ function checkTurnierUrlParam(){
   history.replaceState(null,'',location.pathname);
   const code=turnier.replace('DK','').replace('dk','');
   if(!/^\d{4}$/.test(code))return;
-  if(state.turnier&&!state.turnier.isHost){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'.','info');return}
+  if(state.turnier&&!state.turnier.isHost&&!state.turnier.isPlayer){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'.','info');return}
   setTimeout(()=>{
     openJoinTurnier(code,tisch||null);
   },500);
@@ -1370,7 +1376,7 @@ let joinTurnierData=null;
 let joinSelectedTischId=null;
 
 function openJoinTurnier(prefillCode,prefillTisch){
-  if(state.turnier&&!state.turnier.isHost){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'. Bitte erst verlassen.','error');return}
+  if(state.turnier&&!state.turnier.isHost&&!state.turnier.isPlayer){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'. Bitte erst verlassen.','error');return}
   joinTurnierData=null;joinSelectedTischId=null;joinSelectedPlayers=[];joinTurnierConfig=null;
   const el=document.getElementById('turnierJoinContent');
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
@@ -1428,7 +1434,9 @@ async function loadJoinTurnierInfo(code,prefillTisch){
     if(data.config.playerMode===4&&!(state.turnier&&state.turnier.isHost)){
       let html='<div style="font-size:12px;color:var(--grn);margin-bottom:12px">Turnier gefunden!'+(data.name?' <b>'+data.name+'</b>':'')+'</div>';
       if(!ownSpieler){
-        html+='<div style="font-size:12px;color:var(--red)">Bitte zuerst deinen Namen registrieren (Setup öffnen).</div>';
+        html+='<div style="font-size:12px;color:var(--tx2);margin-bottom:12px">Bitte zuerst deinen Namen eingeben um beizutreten.</div>'
+          +'<input type="text" id="joinPlayerNameInput" placeholder="Vor- und Nachname" style="width:100%;box-sizing:border-box;font-size:14px;padding:10px;margin-bottom:8px;border:1px solid var(--bdr);border-radius:var(--r-sm);background:var(--bg);color:var(--tx)">'
+          +'<button class="btn btn-primary" style="width:100%" onclick="createAndJoinAsPlayer(\''+code+'\')">Registrieren &amp; beitreten</button>';
         el.innerHTML=html;return;
       }
       const teilnehmerIds=data.teilnehmer?Object.keys(data.teilnehmer):[];
@@ -1468,7 +1476,7 @@ async function loadJoinTurnierInfo(code,prefillTisch){
       tischArr.forEach(t=>{
         const spielerNames=(t.spielerIds||[]).map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
         const rounds=t.rounds?t.rounds.length:0;
-        html+='<div class="card turnier-tisch-card" style="cursor:pointer;padding:10px;margin-bottom:6px;border:2px solid '+(joinSelectedTischId===t.id?'var(--primary)':'var(--bdr)')+'" onclick="selectJoinTisch(\''+t.id+'\')">'
+        html+='<div class="card turnier-tisch-card" style="cursor:pointer;padding:10px;margin-bottom:6px;border:2px solid '+(joinSelectedTischId===t.id?'var(--acc)':'var(--bdr)')+'" onclick="selectJoinTisch(\''+t.id+'\')">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<div style="font-weight:600;font-size:14px">Tisch '+t.nummer+(t.name&&t.name!=='Tisch '+t.nummer?' – '+t.name:'')+'</div>'
           +'<div style="font-size:11px;color:var(--tx3)">'+rounds+' Runden</div></div>'
@@ -1510,7 +1518,7 @@ async function loadJoinTurnierInfo(code,prefillTisch){
 function selectJoinTisch(tischId){
   joinSelectedTischId=tischId;
   document.querySelectorAll('#joinTurnierInfo .turnier-tisch-card').forEach(el=>{
-    el.style.borderColor=el.getAttribute('onclick').includes("'"+tischId+"'")?'var(--primary)':'var(--bdr)';
+    el.style.borderColor=el.getAttribute('onclick').includes("'"+tischId+"'")?'var(--acc)':'var(--bdr)';
   });
   const playerEl=document.getElementById('joinPlayerSelect');
   if(playerEl)playerEl.style.display='none';
@@ -1627,9 +1635,28 @@ async function registerAsPlayer(code,spielerId){
   }catch(e){showToast('Fehler: '+e.message,'error')}
 }
 
+async function createAndJoinAsPlayer(code){
+  const nameInput=document.getElementById('joinPlayerNameInput');
+  if(!nameInput)return;
+  const name=nameInput.value.trim();
+  if(!name){showToast('Bitte Namen eingeben.','error');return}
+  const spieler=await createSpieler(name);
+  if(!spieler){showToast('Fehler beim Erstellen.','error');return}
+  await registerAsPlayer(code,spieler.id);
+}
+
 async function joinAsPlayer(code,tischId,spielerId){
   if(!initFirebase())return;
   try{
+    // Vom alten Tisch entfernen falls vorhanden
+    if(state.turnier&&state.turnier.tischId&&state.turnier.tischId!==tischId){
+      const oldRef=firebase.database().ref('turniere/DK'+code+'/tische/'+state.turnier.tischId+'/spielerIds');
+      const oldSnap=await oldRef.get();
+      if(oldSnap.exists()){
+        const oldIds=(oldSnap.val()||[]).filter(id=>id!==spielerId);
+        await oldRef.set(oldIds);
+      }
+    }
     const tischRef=firebase.database().ref('turniere/DK'+code+'/tische/'+tischId);
     const snap=await tischRef.get();
     const tisch=snap.val();
@@ -1641,12 +1668,53 @@ async function joinAsPlayer(code,tischId,spielerId){
       await tischRef.child('spielerIds').set(spielerIds);
     }
     await firebase.database().ref('turniere/DK'+code+'/teilnehmer/'+spielerId).set(true);
-    state.turnier={code:code,tischId:tischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:false,isPlayer:true,turnierName:joinTurnierData&&joinTurnierData.name||null,schreiberId:tisch.schreiberId||null};
+    const wasHost=state.turnier&&state.turnier.isHost;
+    state.turnier={code:code,tischId:tischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:!!wasHost,isPlayer:true,turnierName:(joinTurnierData&&joinTurnierData.name)||(state.turnier&&state.turnier.turnierName)||null,schreiberId:tisch.schreiberId||null};
     save();
-    closeJoinTurnier();
+    closeJoinTurnier();closeTurnierDashboard();
     renderTurnierSetup();renderTurnierIndicator();
+    syncTischPlayersToSetup(spielerIds);
     showToast('Tisch '+(tisch.nummer||'')+' beigetreten!','info');
   }catch(e){showToast('Fehler: '+e.message,'error')}
+}
+
+async function openPlayerTischWahl(){
+  if(!state.turnier)return;
+  if(!initFirebase())return;
+  document.getElementById('turnierModal').classList.add('show');
+  const el=document.getElementById('turnierModalContent');
+  el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade Tische...</div>';
+  const snap=await firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').get();
+  const tische=snap.val()||{};
+  await loadSpielerDB();
+  const deviceId=getDeviceId();
+  const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
+  if(!ownSpieler){showToast('Spieler nicht gefunden. Bitte zuerst im Setup einen Namen eingeben.','error');return}
+  const code=state.turnier.code;
+  const tischArr=Object.entries(tische).map(([id,t])=>({id,...t}));
+  tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">'+(state.turnier.tischId?'Tisch wechseln':'Tisch beitreten')+'</h3>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  if(!tischArr.length){
+    html+='<div class="card" style="text-align:center;color:var(--tx3);padding:24px;margin-top:12px">Noch keine Tische vorhanden.</div>';
+  }else{
+    html+='<div style="font-size:13px;color:var(--tx2);margin:12px 0">Wähle einen Tisch.</div>';
+    tischArr.forEach(t=>{
+      const spielerNames=(t.spielerIds||[]).map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
+      const count=(t.spielerIds||[]).length;
+      const isFull=count>=4;
+      const alreadyHere=(t.spielerIds||[]).includes(ownSpieler.id);
+      html+='<div class="card turnier-tisch-card" style="cursor:'+(isFull&&!alreadyHere?'not-allowed':'pointer')+';padding:12px;margin-bottom:8px;border:2px solid '+(alreadyHere?'var(--grn)':'var(--bdr)')+';'+(isFull&&!alreadyHere?'opacity:.5':'')+'" '
+        +(isFull&&!alreadyHere?'':'onclick="joinAsPlayer(\''+code+'\',\''+t.id+'\',\''+ownSpieler.id+'\')"')+'>'
+        +'<div style="display:flex;justify-content:space-between"><div style="font-weight:600">'+(t.name||'Tisch '+t.nummer)+'</div>'
+        +'<div style="font-size:12px;color:var(--tx3)">'+count+'/4</div></div>'
+        +'<div style="font-size:12px;color:var(--tx2);margin-top:2px">'+(spielerNames||'Noch leer')+(alreadyHere?' (du)':'')+'</div></div>';
+    });
+  }
+  el.innerHTML=html;
 }
 
 async function joinTurnier(){
@@ -2186,8 +2254,11 @@ function showTurnierQRCodes(){
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg> Zurück</button>'
     +'<h3 style="margin:0">Tisch-QR-Codes</h3><div style="width:32px"></div></div>';
 
+  // Anzahl basiert auf existierenden Tischen + ein paar Reserve
+  const existingCount=Object.keys(lastTischeSnapshot||{}).length;
+  const qrCount=Math.max(existingCount+2,4);
   html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">QR-Codes ausdrucken und auf die Tische legen. Spieler scannen den Code um direkt dem richtigen Tisch beizutreten.</div>';
-  for(let i=1;i<=10;i++){
+  for(let i=1;i<=qrCount;i++){
     const url=baseUrl+'?turnier=DK'+code+'&tisch='+i;
     const qrImg=generateQR(url,4);
     html+='<div class="card" style="display:flex;align-items:center;gap:16px;padding:12px">'
@@ -2317,9 +2388,9 @@ async function openCoHostSelect(){
   candidates.forEach(s=>{
     const isHost=coHostSelected.includes(s.id);
     html+='<div data-cid="'+s.id+'" onclick="toggleCoHost(\''+s.id+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bdr);cursor:pointer;background:'+(isHost?'var(--bg3)':'transparent')+'">'
-      +'<span class="cohost-check" style="width:22px;height:22px;border-radius:50%;border:2px solid '+(isHost?'var(--primary)':'var(--bdr)')+';display:flex;align-items:center;justify-content:center;font-size:14px;color:'+(isHost?'var(--primary)':'transparent')+'">&#10003;</span>'
+      +'<span class="cohost-check" style="width:22px;height:22px;border-radius:50%;border:2px solid '+(isHost?'var(--acc)':'var(--bdr)')+';display:flex;align-items:center;justify-content:center;font-size:14px;color:'+(isHost?'var(--acc)':'transparent')+'">&#10003;</span>'
       +'<span style="flex:1;font-size:14px">'+(s.short||s.name)+'</span>'
-      +(isHost?'<span style="font-size:11px;color:var(--primary)">Admin</span>':'')
+      +(isHost?'<span style="font-size:11px;color:var(--acc)">Admin</span>':'')
       +'</div>';
   });
   html+='</div>';
@@ -2334,7 +2405,7 @@ function toggleCoHost(id){
     const sel=coHostSelected.includes(cid);
     el.style.background=sel?'var(--bg3)':'transparent';
     const check=el.querySelector('.cohost-check');
-    if(check){check.style.borderColor=sel?'var(--primary)':'var(--bdr)';check.style.color=sel?'var(--primary)':'transparent';check.innerHTML='&#10003;'}
+    if(check){check.style.borderColor=sel?'var(--acc)':'var(--bdr)';check.style.color=sel?'var(--acc)':'transparent';check.innerHTML='&#10003;'}
     const badge=el.querySelector('span:last-child');
     if(badge&&badge.style.fontSize==='11px'){if(sel)badge.textContent='Admin';else badge.textContent=''}
   });
@@ -2352,8 +2423,23 @@ async function hostJoinTisch(){
   if(!state.turnier||!state.turnier.isHost)return;
   openJoinTurnier(state.turnier.code);
 }
-function hostLeaveTisch(){
-  if(!state.turnier||!state.turnier.isHost)return;
+async function hostLeaveTisch(){
+  if(!state.turnier||!state.turnier.isHost||!state.turnier.tischId)return;
+  // Host aus Firebase-spielerIds entfernen
+  if(initFirebase()){
+    try{
+      const deviceId=getDeviceId();
+      const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
+      if(ownSpieler){
+        const ref=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+state.turnier.tischId+'/spielerIds');
+        const snap=await ref.get();
+        if(snap.exists()){
+          const ids=(snap.val()||[]).filter(id=>id!==ownSpieler.id);
+          await ref.set(ids);
+        }
+      }
+    }catch(e){console.warn('hostLeaveTisch:',e)}
+  }
   state.turnier.tischId=null;
   state.turnier.tischName=null;
   state.turnier.tischNummer=null;
@@ -2619,7 +2705,7 @@ function renderEingabe(){
   }
   const turnierReadOnly=state.turnier&&!state.turnier.isHost&&state.turnier.schreiberId&&(()=>{const d=getDeviceId();const o=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(d));return o&&o.id!==state.turnier.schreiberId})();
   if(turnierReadOnly){
-    html+='<div style="text-align:center;color:var(--tx3);font-size:13px;padding:16px;border:1px dashed var(--bdr);border-radius:var(--r);margin-top:8px">Du bist Zuschauer an diesem Tisch. Nur der Schreiber kann Runden eintragen.<br><a href="#" onclick="transferSchreiber();return false" style="font-size:12px;color:var(--primary)">Schreiber-Rolle übernehmen anfragen</a></div>';
+    html+='<div style="text-align:center;color:var(--tx3);font-size:13px;padding:16px;border:1px dashed var(--bdr);border-radius:var(--r);margin-top:8px">Du bist Zuschauer an diesem Tisch. Nur der Schreiber kann Runden eintragen.<br><a href="#" onclick="transferSchreiber();return false" style="font-size:12px;color:var(--acc)">Schreiber-Rolle übernehmen anfragen</a></div>';
   }else{
     html+='<div style="display:flex;gap:6px;margin-top:4px"><button class="btn btn-primary" style="flex:1.5;padding:10px 10px;font-size:13px" onclick="saveNewRound()">'+ICO.check+' '+vocab.spiel+' speichern</button><button class="btn btn-secondary" style="flex:1;padding:10px 10px;font-size:13px'+(lastUndo?';opacity:.7':';opacity:.35;pointer-events:none')+'" onclick="undoLastRound()">'+ICO.backspace+' Rückg\u00e4ngig</button></div>';
   }
@@ -3696,6 +3782,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.46',d:'28.05.2026 17:36',t:'Turnier: 8 Bugfixes \u2013 Spieler ohne Tisch bekommt Beitreten-Button, Tischwechsel entfernt vom alten Tisch, Host-Tisch-Verlassen bereinigt Firebase, Self-Rotation auch f\u00fcr mitspielenden Host, Tisch-Auswahl visuelles Feedback gefixt, QR-Codes basieren auf Tischanzahl, Spieler-App Registrierung direkt im Beitreten-Dialog, var(--primary) komplett durch var(--acc) ersetzt.'},
     {v:'4.45',d:'28.05.2026 17:02',t:'Turnier: Textkorrekturen (Firebase-Referenzen entfernt, Wizard-Beschreibungen), Konfigurationsübersicht im Setup für Spielleiter mit Änderungsmöglichkeit (Sichtbarkeit, Gesamtwertung), Spieler-App Beitritt für bereits registrierte Spieler verbessert.'},
     {v:'4.44',d:'28.05.2026 16:36',t:'Turnier Phase 3: Rotation \u2013 Spielleiter startet Tischwechsel (manuell oder nach X Runden). Host-Zuweisung per Tisch-UI oder Selbstwahl durch Spieler. Gesamtwertung mit Podium \u00fcber alle Rotationen. Rotations-Historie im Dashboard.'},
     {v:'4.43',d:'28.05.2026 16:21',t:'Turnier: 4-Spieler-Pflicht beim Beitreten entfernt – Spieler können auch nachträglich ergänzt werden. „+ Spieler"-Button mit Checkbox „Spieler hat kein eigenes Handy" statt zwei separate Buttons.'},
