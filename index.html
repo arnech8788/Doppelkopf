@@ -106,6 +106,9 @@
 
 <button class="info-btn" onclick="openInfoModal()">i</button>
 <button class="theme-btn" id="themeBtn" onclick="toggleTheme()"><svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></button>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
@@ -140,6 +143,58 @@ const ACHIEVEMENTS={
     marathon:{name:'Marathon',emoji:'🏃',desc:'50 Spiele an einem Abend'}
   }
 };
+const FIREBASE_CONFIG={
+  apiKey:"PLACEHOLDER",
+  authDomain:"PLACEHOLDER.firebaseapp.com",
+  databaseURL:"https://PLACEHOLDER-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"PLACEHOLDER",
+  storageBucket:"PLACEHOLDER.firebasestorage.app",
+  messagingSenderId:"000000000000",
+  appId:"1:000000000000:web:0000000000000000000000"
+};
+let firebaseApp=null;
+let firebaseDb=null;
+let turnierListener=null;
+let spielerCache=[];
+
+function initFirebase(){
+  if(firebaseApp)return true;
+  try{
+    if(typeof firebase==='undefined')return false;
+    firebaseApp=firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseDb=firebase.database();
+    return true;
+  }catch(e){
+    console.error('Firebase init failed:',e);
+    return false;
+  }
+}
+
+function getDeviceId(){
+  let id=localStorage.getItem('doko-v4-deviceId');
+  if(!id){
+    id=crypto.randomUUID?crypto.randomUUID().replace(/-/g,'').slice(0,16):Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b=>b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('doko-v4-deviceId',id);
+  }
+  return id;
+}
+
+function generateSpielerShort(name,existingNames){
+  const first=name.split(' ')[0];
+  const collision=existingNames.filter(n=>n.split(' ')[0]===first);
+  if(collision.length===0)return first;
+  const parts=name.split(' ');
+  if(parts.length>1)return first+' '+parts[parts.length-1][0]+'.';
+  return name;
+}
+
+function generateQR(text,size){
+  const qr=qrcode(0,'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(size||4,0);
+}
+
 let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10};
 let currentPts='';
 let editingRound=null;

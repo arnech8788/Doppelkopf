@@ -30,6 +30,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url=e.request.url;
+  if(url.includes('firebasedatabase.app')||url.includes('firebaseio.com')||url.includes('gstatic.com/firebasejs')||url.includes('cdnjs.cloudflare.com/ajax/libs/qrcode'))return;
   e.respondWith(
     fetch(e.request).then(response => {
       const clone = response.clone();
