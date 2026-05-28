@@ -72,6 +72,7 @@
   </div>
 
   <div class="screen" id="screen-eingabe">
+    <div id="turnierIndicator"></div>
     <div id="bockIndicator"></div>
     <div id="successMsg" class="success-msg"></div>
     <div id="eingabeContent"></div>
@@ -476,6 +477,7 @@ function showScreen(id){
       el.dataset.roundCount=state.rounds.length;
     }
   }
+  if(id==='eingabe')renderTurnierIndicator();
   if(id==='tabelle')renderTabelle(true);
   if(id==='stats')renderStats();
 }
@@ -782,6 +784,13 @@ function renderArchiveList(){
   });
   if(archive.length>=2)html+='<button class="btn btn-secondary" style="margin-top:12px;width:100%" onclick="openAllTimeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg> Ewige Tabelle</button>';
   el.innerHTML=html;
+}
+function renderTurnierIndicator(){
+  const el=document.getElementById('turnierIndicator');
+  if(!el)return;
+  if(!state.turnier||state.turnier.isHost){el.innerHTML='';el.style.display='none';return}
+  el.style.display='block';
+  el.innerHTML='<div class="turnier-banner">DK-'+state.turnier.code+' &middot; '+state.turnier.tischName+' &middot; <span style="color:var(--grn)">Live</span></div>';
 }
 function renderTurnierSetup(){
   const el=document.getElementById('turnierSetupContent');

@@ -260,3 +260,4 @@ tr.clickable:active{background:var(--bg3)}
 .confirm-modal .confirm-cancel{background:var(--bg3);color:var(--tx2);border:1px solid var(--bdr)}
 .confirm-modal .confirm-action{background:var(--acc);color:#fff;border:none}
 .confirm-modal .confirm-action.danger{background:var(--red)}
+.turnier-banner{text-align:center;font-size:12px;font-weight:500;color:var(--tx2);background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);padding:6px 12px;margin-bottom:8px}
