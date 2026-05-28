@@ -1213,6 +1213,96 @@ function syncToFirebase(){
   }).catch(e=>console.error('Sync error:',e));
 }
 
+function openTurnierDashboard(){
+  if(!state.turnier)return;
+  if(!initFirebase()){showToast('Firebase nicht verfuegbar.','error');return}
+  document.getElementById('turnierModal').classList.add('show');
+  renderTurnierDashboard({});
+  if(turnierListener){
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
+  }
+  turnierListener=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').on('value',snap=>{
+    renderTurnierDashboard(snap.val()||{});
+  });
+}
+
+function closeTurnierDashboard(){
+  document.getElementById('turnierModal').classList.remove('show');
+  if(turnierListener&&state.turnier){
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
+    turnierListener=null;
+  }
+}
+document.getElementById('turnierModal').addEventListener('click',function(e){if(e.target===this)closeTurnierDashboard()});
+
+function renderTurnierDashboard(tische){
+  const el=document.getElementById('turnierModalContent');
+  if(!state.turnier)return;
+  const code=state.turnier.code;
+  const tischArr=Object.entries(tische).map(([id,t])=>({id,...t}));
+  const totalRounds=tischArr.reduce((s,t)=>s+(t.rounds?t.rounds.length:0),0);
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Turnier DK-'+code+'</h3>'
+    +'<div style="display:flex;gap:6px">'
+    +'<button onclick="showTurnierQRCodes()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" title="Tisch-QR-Codes">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/></svg></button>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>';
+
+  html+='<div style="font-size:13px;color:var(--tx2);margin:12px 0">'+tischArr.length+' Tisch'+(tischArr.length!==1?'e':'')+' &middot; '+totalRounds+' Spiele gesamt</div>';
+
+  if(!tischArr.length){
+    html+='<div class="card" style="text-align:center;color:var(--tx3);padding:32px">Noch keine Tische beigetreten.</div>';
+  }else{
+    tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+    tischArr.forEach(t=>{
+      const rounds=t.rounds||[];
+      const spielerIds=t.spielerIds||[];
+      let leader='–';let leaderPts=0;
+      if(rounds.length&&spielerIds.length){
+        const totals={};spielerIds.forEach(p=>totals[p]=0);
+        rounds.forEach(r=>{if(r.scores){spielerIds.forEach(p=>{totals[p]+=(r.scores[p]||0)})}});
+        const sorted=spielerIds.slice().sort((a,b)=>(totals[b]||0)-(totals[a]||0));
+        leader=sorted[0];leaderPts=totals[leader]||0;
+        const s=spielerCache.find(s=>s.id===leader);
+        if(s)leader=s.short||s.name;
+      }
+      const syncTime=t.lastSync?new Date(t.lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'–';
+      html+='<div class="card turnier-tisch-card" style="cursor:pointer" onclick="showTurnierDetail(\''+t.id+'\')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<div style="font-weight:600;font-size:15px">'+(t.name||'Tisch '+(t.nummer||'?'))+'</div>'
+        +'<div style="font-size:11px;color:var(--tx3)">'+syncTime+'</div></div>'
+        +'<div style="font-size:13px;color:var(--tx2);margin-top:4px">'
+        +(rounds.length?leader+': '+leaderPts+' Pkt. &middot; '+rounds.length+' Runden':'Noch keine Runden')
+        +'</div></div>';
+    });
+  }
+  el.innerHTML=html;
+}
+
+function showTurnierQRCodes(){
+  const el=document.getElementById('turnierModalContent');
+  const code=state.turnier.code;
+  const baseUrl=location.origin+location.pathname;
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<button onclick="openTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;gap:4px;padding:0 10px;font-size:13px">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg> Zurueck</button>'
+    +'<h3 style="margin:0">Tisch-QR-Codes</h3><div style="width:32px"></div></div>';
+
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">QR-Codes ausdrucken und auf die Tische legen. Spieler scannen den Code um direkt dem richtigen Tisch beizutreten.</div>';
+  for(let i=1;i<=10;i++){
+    const url=baseUrl+'?turnier=DK'+code+'&tisch='+i;
+    const qrImg=generateQR(url,4);
+    html+='<div class="card" style="display:flex;align-items:center;gap:16px;padding:12px">'
+      +'<img src="'+qrImg+'" style="width:80px;height:80px;image-rendering:pixelated;border-radius:4px">'
+      +'<div><div style="font-weight:600;font-size:15px">Tisch '+i+'</div>'
+      +'<div style="font-size:11px;color:var(--tx3);word-break:break-all;margin-top:2px">DK-'+code+' &middot; Tisch '+i+'</div></div></div>';
+  }
+  el.innerHTML=html;
+}
+
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
