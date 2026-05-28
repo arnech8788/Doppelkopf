@@ -68,7 +68,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.36 · 27.05.2026 23:12</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.37 · 28.05.2026 12:32</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -809,6 +809,214 @@ function renderTurnierSetup(){
   }
   html+='</div>';
   el.innerHTML=html;
+}
+let turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true},selectedPlayers:[]};
+
+function openCreateTurnier(){
+  turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true},selectedPlayers:[]};
+  document.getElementById('turnierCreateModal').classList.add('show');
+  renderWizardStep();
+}
+function closeCreateTurnier(){document.getElementById('turnierCreateModal').classList.remove('show')}
+document.getElementById('turnierCreateModal').addEventListener('click',function(e){if(e.target===this)closeCreateTurnier()});
+
+function renderWizardStep(){
+  const el=document.getElementById('turnierCreateContent');
+  const w=turnierWizard;
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Turnier erstellen</h3>'
+    +'<button onclick="closeCreateTurnier()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div style="display:flex;gap:4px;margin:12px 0">';
+  for(let i=1;i<=4;i++){
+    html+='<div style="flex:1;height:3px;border-radius:2px;background:'+(i<=w.step?'var(--primary)':'var(--bg3)')+'"></div>';
+  }
+  html+='</div>';
+  if(w.step===1)html+=renderWizardStep1();
+  else if(w.step===2)html+=renderWizardStep2();
+  else if(w.step===3)html+=renderWizardStep3();
+  else if(w.step===4)html+=renderWizardStep4();
+  el.innerHTML=html;
+}
+
+function renderWizardStep1(){
+  const modes=[
+    {id:1,name:'Feste Liste',desc:'Du waehlst alle Spieler vorab aus. Tische waehlen daraus.'},
+    {id:2,name:'Liste + Ergaenzung',desc:'Wie feste Liste, aber Tische koennen eigene Spieler ergaenzen.'},
+    {id:3,name:'Freie Eingabe',desc:'Jeder Tisch traegt seine Spieler selbst ein.'},
+    {id:4,name:'Spieler-App',desc:'Jeder Spieler tritt selbst bei und sieht eigene Ergebnisse. (Erst ab Phase 2 – aktuell wie Liste + Ergaenzung)'}
+  ];
+  let html='<div class="section-label">Spieler-Modus</div>';
+  modes.forEach(m=>{
+    const sel=turnierWizard.config.playerMode===m.id;
+    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.playerMode='+m.id+';renderWizardStep()">'
+      +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
+      +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
+  });
+  html+='<div style="margin-top:16px;display:flex;justify-content:flex-end">'
+    +'<button class="btn btn-primary" onclick="turnierWizard.step=2;renderWizardStep()">Weiter</button></div>';
+  return html;
+}
+
+function renderWizardStep2(){
+  const c=turnierWizard.config;
+  let html='<div class="section-label">Tisch-Modus</div>';
+  [{id:'fixed',name:'Feste Tische',desc:'Spieler bleiben den ganzen Abend am gleichen Tisch.'},
+   {id:'rotation',name:'Rotation',desc:'Spieler wechseln zwischen Tischen.'}].forEach(m=>{
+    const sel=c.tableMode===m.id;
+    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.tableMode=\''+m.id+'\';renderWizardStep()">'
+      +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
+      +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
+  });
+  if(c.tableMode==='rotation'){
+    html+='<div class="section-label" style="margin-top:12px">Wer steuert den Wechsel?</div>';
+    [{id:'host',name:'Spielleiter',desc:'Du gibst die neue Tischaufteilung vor.'},
+     {id:'self',name:'Freier Wechsel',desc:'Spieler wechseln selbst (z.B. Cocktail Hopping).'}].forEach(m=>{
+      const sel=c.rotationType===m.id;
+      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.rotationType=\''+m.id+'\';renderWizardStep()">'
+        +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
+        +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
+    });
+    html+='<div class="section-label" style="margin-top:12px">Wann wird gewechselt?</div>';
+    [{id:'manual',name:'Manuell',desc:'Du loest den Wechsel im Dashboard aus.'},
+     {id:'afterRounds',name:'Nach X Runden',desc:'Automatischer Hinweis nach einer bestimmten Rundenzahl.'}].forEach(m=>{
+      const sel=c.rotationTrigger===m.id;
+      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.rotationTrigger=\''+m.id+'\';renderWizardStep()">'
+        +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
+        +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
+    });
+    if(c.rotationTrigger==='afterRounds'){
+      html+='<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px">Runden pro Rotation:</span>'
+        +'<input type="number" id="wizRotRounds" value="'+(c.rotationAfterRounds||4)+'" min="1" max="20" style="width:60px;font-size:14px;padding:6px" onchange="turnierWizard.config.rotationAfterRounds=parseInt(this.value)||4"></div>';
+    }
+  }
+  html+='<div style="margin-top:16px;display:flex;justify-content:space-between">'
+    +'<button class="btn btn-secondary" onclick="turnierWizard.step=1;renderWizardStep()">Zurueck</button>'
+    +'<button class="btn btn-primary" onclick="wizardToStep3()">Weiter</button></div>';
+  return html;
+}
+
+function wizardToStep3(){
+  const c=turnierWizard.config;
+  if(c.tableMode==='rotation'&&!c.rotationType){showToast('Bitte Wechsel-Steuerung waehlen.','error');return}
+  if(c.tableMode==='rotation'&&!c.rotationTrigger){showToast('Bitte Wechsel-Trigger waehlen.','error');return}
+  if(c.tableMode==='fixed'){c.rotationType=null;c.rotationTrigger=null;c.rotationAfterRounds=null}
+  turnierWizard.step=3;
+  if(c.playerMode===3){turnierWizard.step=4}
+  renderWizardStep();
+}
+
+function renderWizardStep3(){
+  let html='<div class="section-label">Spieler auswaehlen</div>'
+    +'<div style="font-size:12px;color:var(--tx3);margin-bottom:8px">Waehle die Turnier-Teilnehmer aus der Spieler-Datenbank.</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px">'
+    +'<input type="text" id="wizPlayerSearch" placeholder="Spieler suchen..." style="flex:1;font-size:13px;padding:8px" oninput="renderWizardPlayerList()">'
+    +'<button class="btn btn-secondary" style="width:auto;padding:8px 12px;font-size:12px" onclick="openWizardAddPlayer()">+ Neu</button></div>'
+    +'<div id="wizPlayerList"></div>'
+    +'<div id="wizSelectedPlayers" style="margin-top:12px"></div>'
+    +'<div style="margin-top:16px;display:flex;justify-content:space-between">'
+    +'<button class="btn btn-secondary" onclick="turnierWizard.step=2;renderWizardStep()">Zurueck</button>'
+    +'<button class="btn btn-primary" onclick="turnierWizard.step=4;renderWizardStep()">Weiter</button></div>';
+  setTimeout(()=>renderWizardPlayerList(),0);
+  return html;
+}
+
+function renderWizardPlayerList(){
+  const search=(document.getElementById('wizPlayerSearch')||{}).value||'';
+  const term=search.toLowerCase().trim();
+  const filtered=term?spielerCache.filter(s=>s.name.toLowerCase().includes(term)):spielerCache;
+  const listEl=document.getElementById('wizPlayerList');
+  const selEl=document.getElementById('wizSelectedPlayers');
+  if(!listEl)return;
+  const selIds=turnierWizard.selectedPlayers.map(s=>s.id);
+  let html='';
+  filtered.forEach(s=>{
+    const isSel=selIds.includes(s.id);
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--bdr);cursor:pointer;background:'+(isSel?'var(--bg3)':'transparent')+'" onclick="toggleWizPlayer(\''+s.id+'\')">'
+      +'<span style="font-size:14px">'+s.name+'</span>'
+      +'<span style="font-size:18px;color:'+(isSel?'var(--grn)':'var(--tx3)')+'">'+( isSel?'&#10003;':'&#43;')+'</span></div>';
+  });
+  if(!filtered.length)html='<div style="padding:12px;text-align:center;color:var(--tx3);font-size:13px">Keine Spieler gefunden.</div>';
+  listEl.innerHTML=html;
+  if(selEl){
+    selEl.innerHTML=selIds.length?'<div style="font-size:12px;color:var(--tx3);margin-bottom:4px">'+selIds.length+' Spieler ausgewaehlt:</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'+turnierWizard.selectedPlayers.map(s=>'<span class="turnier-chip">'+s.short+'<button onclick="event.stopPropagation();toggleWizPlayer(\''+s.id+'\')" style="background:none;border:none;color:var(--tx3);cursor:pointer;padding:0 0 0 4px;font-size:14px">&times;</button></span>').join('')+'</div>':'';
+  }
+}
+
+function toggleWizPlayer(id){
+  const idx=turnierWizard.selectedPlayers.findIndex(s=>s.id===id);
+  if(idx>=0){turnierWizard.selectedPlayers.splice(idx,1)}
+  else{const s=spielerCache.find(s=>s.id===id);if(s)turnierWizard.selectedPlayers.push(s)}
+  renderWizardPlayerList();
+}
+
+async function openWizardAddPlayer(){
+  const name=prompt('Neuen Spieler hinzufuegen (Vor- und Nachname):');
+  if(!name||name.trim().length<2)return;
+  const existing=await findSpielerByName(name.trim());
+  if(existing){showToast('Spieler existiert bereits.','error');return}
+  const s=await createSpieler(name.trim());
+  if(s)renderWizardPlayerList();
+}
+
+function renderWizardStep4(){
+  const c=turnierWizard.config;
+  const modeNames={1:'Feste Liste',2:'Liste + Ergaenzung',3:'Freie Eingabe',4:'Spieler-App (aktuell: Liste + Ergaenzung)'};
+  const tableNames={fixed:'Feste Tische',rotation:'Rotation'};
+  let html='<div class="section-label">Zusammenfassung</div><div class="card" style="font-size:13px">';
+  html+='<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span style="color:var(--tx3)">Spieler-Modus:</span> '+modeNames[c.playerMode]+'</div>';
+  html+='<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span style="color:var(--tx3)">Tisch-Modus:</span> '+tableNames[c.tableMode];
+  if(c.tableMode==='rotation'){
+    html+=' ('+({host:'Spielleiter-Zuweisung',self:'Freier Wechsel'}[c.rotationType]||'')+', ';
+    html+=(c.rotationTrigger==='afterRounds'?'nach '+c.rotationAfterRounds+' Runden':'manuell')+')';
+  }
+  html+='</div>';
+  if(c.playerMode!==3){
+    html+='<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span style="color:var(--tx3)">Teilnehmer:</span> '+turnierWizard.selectedPlayers.length+' Spieler</div>';
+  }
+  html+='<div style="padding:6px 0"><span style="color:var(--tx3)">Gesamtwertung:</span> '+(c.scoringEnabled?'Ja':'Nein')+'</div>';
+  html+='</div>';
+  html+='<div class="toggle-row" style="margin-top:12px;padding:8px 0"><span class="toggle-label">Gesamtwertung</span>'
+    +'<button class="toggle'+(c.scoringEnabled?' on':'')+'" onclick="turnierWizard.config.scoringEnabled=!turnierWizard.config.scoringEnabled;this.classList.toggle(\'on\');renderWizardStep()"></button></div>';
+  html+='<div style="margin-top:16px;display:flex;justify-content:space-between">'
+    +'<button class="btn btn-secondary" onclick="turnierWizard.step='+(c.playerMode===3?2:3)+';renderWizardStep()">Zurueck</button>'
+    +'<button class="btn btn-primary" onclick="submitCreateTurnier()">Turnier erstellen</button></div>';
+  return html;
+}
+
+async function submitCreateTurnier(){
+  if(!initFirebase()){showToast('Firebase nicht verfuegbar.','error');return}
+  const c=turnierWizard.config;
+  if(c.playerMode!==3&&turnierWizard.selectedPlayers.length<4){
+    showToast('Bitte mindestens 4 Spieler auswaehlen.','error');return;
+  }
+  const code=String(Math.floor(1000+Math.random()*9000));
+  const dbRef=firebase.database().ref('turniere/DK'+code);
+  try{
+    const snap=await dbRef.get();
+    if(snap.exists()){showToast('Code-Kollision. Bitte erneut versuchen.','error');return}
+    const turnierData={
+      created:firebase.database.ServerValue.TIMESTAMP,
+      lastActivity:firebase.database.ServerValue.TIMESTAMP,
+      status:'active',
+      config:c
+    };
+    await dbRef.set(turnierData);
+    if(c.playerMode!==3){
+      const teilnehmer={};
+      turnierWizard.selectedPlayers.forEach(s=>{teilnehmer[s.id]=true});
+      await dbRef.child('teilnehmer').set(teilnehmer);
+    }
+    state.turnier={code:code,tischId:null,tischName:null,tischNummer:null,isHost:true,isPlayer:false};
+    save();
+    closeCreateTurnier();
+    renderTurnierSetup();
+    showTurnierShareModal(code);
+  }catch(e){
+    console.error('createTurnier error:',e);
+    showToast('Fehler: '+e.message,'error');
+  }
 }
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
@@ -2077,6 +2285,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.37',d:'28.05.2026 12:32',t:'Turnier-Wizard: 4-Schritte-Assistent zum Erstellen von Turnieren mit Spieler-Modus, Tisch-Modus, Spielerauswahl und Zusammenfassung.'},
     {v:'4.36',d:'27.05.2026 23:12',t:'Schnellstart: Karte im Setup zeigt die letzte Spielrunde – ein Tap lädt die Spieler und wechselt direkt zur Eingabe.'},
     {v:'4.35',d:'27.05.2026 22:36',t:'Achievements: Pro-Abend-Badges (Hot Streak, Comeback Kid, Solist, Unbesiegbar, Pechvogel) und Saison-Badges (Stammgast, Veteran, Solokönig, Dominator, Dauersieger, Marathon) – werden live per Toast + Mini-Konfetti freigeschaltet und in der Statistik angezeigt. Uhrzeitanzeige im Archiv und Ewiger Tabelle.'},
     {v:'4.34',d:'27.05.2026 22:00',t:'Ewige Tabelle: Saisonübergreifende Statistik über alle archivierten Spielabende – Rangliste mit Gesamt-Punkten, Siegen, Soli und Platz-1-Zähler, Punkteverlauf-Chart über Spielabende und Platzierungstabelle. Erreichbar über Button im Archiv-Bereich (ab 2 archivierten Spielen).'},
