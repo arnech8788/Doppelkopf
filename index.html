@@ -414,6 +414,7 @@ function load(){
   renderPlayerTags();renderQuickStart();renderSoloTypes();renderArchiveList();renderTurnierSetup();
   if(getAllPlayers().length>=4)showScreen('eingabe');
   checkFirstStart();
+  checkTurnierUrlParam();
 }
 function save(){
   state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
@@ -1017,6 +1018,50 @@ async function submitCreateTurnier(){
     console.error('createTurnier error:',e);
     showToast('Fehler: '+e.message,'error');
   }
+}
+function showTurnierShareModal(code){
+  const url=location.origin+location.pathname+'?turnier=DK'+code;
+  const qrImg=generateQR(url,6);
+  const el=document.getElementById('turnierModalContent');
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Turnier DK-'+code+'</h3>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div style="text-align:center;margin:24px 0">'
+    +'<div style="font-size:32px;font-weight:700;letter-spacing:4px;margin-bottom:16px">DK-'+code+'</div>'
+    +'<img src="'+qrImg+'" style="width:200px;height:200px;image-rendering:pixelated;border-radius:var(--r-sm)">'
+    +'<div style="font-size:12px;color:var(--tx3);margin-top:8px;word-break:break-all">'+url+'</div></div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:16px">';
+  if(navigator.share){
+    html+='<button class="btn btn-primary" style="flex:1" onclick="shareTurnierCode(\''+code+'\')">Teilen</button>';
+  }
+  html+='<button class="btn btn-secondary" style="flex:1" onclick="copyTurnierLink(\''+code+'\')">Link kopieren</button></div>';
+  html+='<button class="btn btn-primary" style="width:100%" onclick="openTurnierDashboard()">Zum Dashboard</button>';
+  el.innerHTML=html;
+  document.getElementById('turnierModal').classList.add('show');
+}
+function shareTurnierCode(code){
+  const url=location.origin+location.pathname+'?turnier=DK'+code;
+  navigator.share({title:'Doppelkopf Turnier',text:'Tritt dem Turnier bei! Code: DK-'+code,url:url}).catch(()=>{});
+}
+function copyTurnierLink(code){
+  const url=location.origin+location.pathname+'?turnier=DK'+code;
+  navigator.clipboard.writeText(url).then(()=>showToast('Link kopiert!','info')).catch(()=>{
+    showToast('DK-'+code,'info');
+  });
+}
+function checkTurnierUrlParam(){
+  const params=new URLSearchParams(location.search);
+  const turnier=params.get('turnier');
+  const tisch=params.get('tisch');
+  if(!turnier)return;
+  history.replaceState(null,'',location.pathname);
+  const code=turnier.replace('DK','').replace('dk','');
+  if(!/^\d{4}$/.test(code))return;
+  if(state.turnier){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'.','info');return}
+  setTimeout(()=>{
+    openJoinTurnier(code,tisch||null);
+  },500);
 }
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
