@@ -1200,6 +1200,19 @@ async function joinTurnier(){
   }
 }
 
+function syncToFirebase(){
+  if(!state.turnier||state.turnier.isHost||!state.turnier.tischId)return;
+  if(!initFirebase())return;
+  const ref=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+state.turnier.tischId);
+  ref.update({
+    spielerIds:getAllPlayers(),
+    rounds:state.rounds,
+    lastSync:firebase.database.ServerValue.TIMESTAMP
+  }).then(()=>{
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/lastActivity').set(firebase.database.ServerValue.TIMESTAMP);
+  }).catch(e=>console.error('Sync error:',e));
+}
+
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
@@ -1509,7 +1522,7 @@ function undoLastRound(){
   if(!lastUndo)return;
   state.rounds.pop();
   state.bockQueue=lastUndo.bockQueueBefore;
-  save();
+  save();syncToFirebase();
   renderEingabe();
   currentPts=''+lastUndo.round.points;
   updatePtsDisplay();
@@ -1755,7 +1768,7 @@ function finalizeRound(round){
   if(isBockRound()&&state.bockQueue>0)state.bockQueue--;
   const triggerBock=document.getElementById('triggerBockToggle');
   if(triggerBock&&triggerBock.classList.contains('on'))state.bockQueue+=state.bockCount;
-  save();
+  save();syncToFirebase();
   const soloWin=round.solo&&round.winners.length===1;
   if(soloWin)setTimeout(launchConfetti,300);
   else{
@@ -1851,14 +1864,14 @@ function saveEditRound(){
   }
   const oldSoloType=state.rounds[editingRound].soloType;
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
-  save();invalidateEingabeCache();closeEditModal();renderTabelle(false);
+  save();syncToFirebase();invalidateEingabeCache();closeEditModal();renderTabelle(false);
 }
 async function deleteRound(i){
   if(!await showConfirm('Spiel '+(i+1)+' löschen?','Löschen',true))return;
   const deletedRound=state.rounds[i];
   if(deletedRound.bock){state.bockQueue++}
   state.rounds.splice(i,1);
-  save();invalidateEingabeCache();renderTabelle(false);
+  save();syncToFirebase();invalidateEingabeCache();renderTabelle(false);
 }
 function moveRound(i,dir){
   const j=i+dir;if(j<0||j>=state.rounds.length)return;
