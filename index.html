@@ -1348,6 +1348,52 @@ async function leaveTurnier(silent){
   if(!silent)showToast('Turnier verlassen.','info');
 }
 
+async function showTurnierDetail(tischId){
+  if(!initFirebase())return;
+  const el=document.getElementById('turnierModalContent');
+  try{
+    const snap=await firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+tischId).get();
+    const t=snap.val();
+    if(!t){el.innerHTML='<p>Tisch nicht gefunden.</p>';return}
+    const rounds=t.rounds||[];
+    const spielerIds=t.spielerIds||[];
+    const totals={};spielerIds.forEach(p=>totals[p]=0);
+    rounds.forEach(r=>{if(r.scores){spielerIds.forEach(p=>{totals[p]+=(r.scores[p]||0)})}});
+    const sorted=spielerIds.slice().sort((a,b)=>(totals[b]||0)-(totals[a]||0));
+    function nameOf(id){const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}
+    let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+      +'<button onclick="openTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;gap:4px;padding:0 10px;font-size:13px">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg> Zurueck</button>'
+      +'<h3 style="margin:0">'+(t.name||'Tisch '+(t.nummer||'?'))+'</h3><div style="width:32px"></div></div>';
+    html+='<div style="margin:12px 0;font-size:13px;color:var(--tx2)">'+rounds.length+' Runden gespielt</div>';
+    html+='<div class="card">';
+    sorted.forEach((p,i)=>{
+      const pts=totals[p]||0;
+      const col=pts>0?'var(--grn)':pts<0?'var(--red)':'var(--tx2)';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0'+(i<sorted.length-1?';border-bottom:1px solid var(--bdr)':'')+'">'
+        +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--tx3);width:20px">#'+(i+1)+'</span><span style="font-weight:500">'+nameOf(p)+'</span></div>'
+        +'<span style="font-weight:600;color:'+col+'">'+pts+'</span></div>';
+    });
+    html+='</div>';
+    if(rounds.length){
+      html+='<div class="section-label" style="margin-top:12px">Letzte Runden</div><div class="card" style="max-height:250px;overflow-y:auto">';
+      rounds.slice().reverse().slice(0,15).forEach((r,i)=>{
+        const idx=rounds.length-i;
+        const winnersStr=(r.winners||[]).map(id=>nameOf(id)).join(', ');
+        html+='<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px'+(i<Math.min(rounds.length,15)-1?';border-bottom:1px solid var(--bdr)':'')+'">'
+          +'<span style="color:var(--tx3);width:30px">#'+idx+'</span>'
+          +'<span style="flex:1">'+winnersStr+'</span>'
+          +'<span style="font-weight:500">'+r.points+' Pkt.</span></div>';
+      });
+      html+='</div>';
+    }
+    el.innerHTML=html;
+  }catch(e){
+    console.error('showTurnierDetail error:',e);
+    showToast('Fehler beim Laden.','error');
+  }
+}
+
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
