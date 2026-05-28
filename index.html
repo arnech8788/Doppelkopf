@@ -68,7 +68,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.39 · 28.05.2026 15:19</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.40 · 28.05.2026 15:39</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -464,6 +464,7 @@ function load(){
   if(getAllPlayers().length>=4)showScreen('eingabe');
   checkFirstStart();
   checkTurnierUrlParam();
+  restoreTischPlayers();
 }
 function save(){
   state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
@@ -836,7 +837,7 @@ function renderArchiveList(){
 function renderTurnierIndicator(){
   const el=document.getElementById('turnierIndicator');
   if(!el)return;
-  if(!state.turnier||state.turnier.isHost){el.innerHTML='';el.style.display='none';return}
+  if(!state.turnier||!state.turnier.tischId){el.innerHTML='';el.style.display='none';return}
   el.style.display='block';
   el.innerHTML='<div class="turnier-banner">DK-'+state.turnier.code+' &middot; '+state.turnier.tischName+' &middot; <span style="color:var(--grn)">Live</span></div>';
 }
@@ -850,7 +851,7 @@ function renderTurnierSetup(){
       +'<button class="btn btn-secondary" style="flex:1" onclick="openJoinTurnier()">Beitreten</button>'
       +'</div>';
     if(archiv.length){
-      html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene Turnier'+(archiv.length>1?'e':'')+'</button></div>';
+      html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene'+(archiv.length===1?'s':'')+' Turnier'+(archiv.length>1?'e':'')+'</button></div>';
     }
     el.innerHTML=html;
     return;
@@ -858,13 +859,21 @@ function renderTurnierSetup(){
   const t=state.turnier;
   let html='<div style="font-size:13px;color:var(--tx2);margin-bottom:8px">'
     +'<div style="font-weight:600;font-size:15px;margin-bottom:4px">DK-'+t.code+'</div>';
-  if(t.isHost){
+  if(t.isHost&&t.tischId){
+    html+='<div>Spielleiter &middot; Tisch '+t.tischNummer+': '+t.tischName+'</div>';
+  }else if(t.isHost){
     html+='<div>Du bist Spielleiter</div>';
   }else{
     html+='<div>Tisch '+t.tischNummer+': '+t.tischName+'</div>';
   }
   html+='</div><div style="display:flex;gap:8px">';
   html+='<button class="btn btn-primary" style="flex:1" onclick="openTurnierDashboard()">Dashboard</button>';
+  if(t.isHost&&!t.tischId){
+    html+='<button class="btn btn-secondary" style="flex:1" onclick="hostJoinTisch()">Tisch beitreten</button>';
+  }
+  if(t.isHost&&t.tischId){
+    html+='<button class="btn btn-secondary" style="flex:1" onclick="hostLeaveTisch()">Tisch verlassen</button>';
+  }
   if(t.isHost){
     html+='<button class="btn btn-secondary" style="flex:1" onclick="endTurnier()">Beenden</button>';
   }else{
@@ -1124,7 +1133,7 @@ function checkTurnierUrlParam(){
   history.replaceState(null,'',location.pathname);
   const code=turnier.replace('DK','').replace('dk','');
   if(!/^\d{4}$/.test(code))return;
-  if(state.turnier){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'.','info');return}
+  if(state.turnier&&!state.turnier.isHost){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'.','info');return}
   setTimeout(()=>{
     openJoinTurnier(code,tisch||null);
   },500);
@@ -1135,7 +1144,7 @@ let joinTurnierData=null;
 let joinSelectedTischId=null;
 
 function openJoinTurnier(prefillCode,prefillTisch){
-  if(state.turnier){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'. Bitte erst verlassen.','error');return}
+  if(state.turnier&&!state.turnier.isHost){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'. Bitte erst verlassen.','error');return}
   joinTurnierData=null;joinSelectedTischId=null;joinSelectedPlayers=[];joinTurnierConfig=null;
   const el=document.getElementById('turnierJoinContent');
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
@@ -1339,6 +1348,15 @@ function syncTischPlayersToSetup(spielerIds){
   });
   save();renderPlayerTags();
 }
+async function restoreTischPlayers(){
+  if(!state.turnier||!state.turnier.tischId)return;
+  if(!initFirebase())return;
+  try{
+    await loadSpielerDB();
+    const snap=await firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+state.turnier.tischId+'/spielerIds').get();
+    if(snap.exists())syncTischPlayersToSetup(snap.val());
+  }catch(e){console.warn('restoreTischPlayers:',e)}
+}
 
 async function joinTurnier(){
   const code=document.getElementById('joinCodeInput').value.trim();
@@ -1350,10 +1368,11 @@ async function joinTurnier(){
     const tischObj=joinTurnierData.tische||{};
     const tisch=tischObj[joinSelectedTischId];
     if(!tisch){showToast('Tisch nicht mehr vorhanden.','error');return}
-    state.turnier={code:code,tischId:joinSelectedTischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:false,isPlayer:false};
+    const wasHost=state.turnier&&state.turnier.isHost;
+    state.turnier={code:code,tischId:joinSelectedTischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:!!wasHost,isPlayer:false};
     syncTischPlayersToSetup(tisch.spielerIds||[]);
     closeJoinTurnier();
-    renderTurnierSetup();
+    renderTurnierSetup();renderTurnierIndicator();
     showToast('Turnier DK-'+code+' beigetreten ('+state.turnier.tischName+')!','info');
     return;
   }
@@ -1401,10 +1420,11 @@ async function joinTurnier(){
       lastSync:firebase.database.ServerValue.TIMESTAMP
     });
     await turnierRef.update({lastActivity:firebase.database.ServerValue.TIMESTAMP});
-    state.turnier={code:code,tischId:tischId,tischName:tischName,tischNummer:tischNummer,isHost:false,isPlayer:false};
+    const wasHost=state.turnier&&state.turnier.isHost;
+    state.turnier={code:code,tischId:tischId,tischName:tischName,tischNummer:tischNummer,isHost:!!wasHost,isPlayer:false};
     syncTischPlayersToSetup(spielerIds);
     closeJoinTurnier();
-    renderTurnierSetup();
+    renderTurnierSetup();renderTurnierIndicator();
     showToast('Turnier DK-'+code+' beigetreten (Tisch '+tischNummer+')!','info');
   }catch(e){
     console.error('joinTurnier error:',e);
@@ -1413,7 +1433,7 @@ async function joinTurnier(){
 }
 
 function syncToFirebase(){
-  if(!state.turnier||state.turnier.isHost||!state.turnier.tischId)return;
+  if(!state.turnier||!state.turnier.tischId)return;
   if(!initFirebase())return;
   const ref=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+state.turnier.tischId);
   ref.update({
@@ -1458,8 +1478,8 @@ function renderTurnierDashboard(tische){
     +'<h3 style="margin:0">Turnier DK-'+code+'</h3>'
     +'<div style="display:flex;gap:6px">';
   if(state.turnier.isHost){
-    html+='<button onclick="addCoHost()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" title="Co-Spielleiter ernennen">'
-      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></button>';
+    html+='<button onclick="openCoHostSelect()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" title="Admins verwalten">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></button>';
   }
   html+='<button onclick="showTurnierQRCodes()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" title="Tisch-QR-Codes">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/></svg></button>'
@@ -1617,7 +1637,8 @@ async function endTurnier(){
   }
 }
 
-async function addCoHost(){
+let coHostSelected=[];
+async function openCoHostSelect(){
   if(!state.turnier||!state.turnier.isHost)return;
   if(!initFirebase())return;
   await loadSpielerDB();
@@ -1625,14 +1646,62 @@ async function addCoHost(){
   const data=snap.val();
   const hosts=data.hosts?Object.keys(data.hosts):[];
   const teilnehmer=data.teilnehmer?Object.keys(data.teilnehmer):[];
-  const candidates=spielerCache.filter(s=>teilnehmer.includes(s.id)&&!hosts.includes(s.id));
-  if(!candidates.length){showToast('Keine weiteren Teilnehmer verfügbar.','error');return}
-  const name=await showPrompt('Co-Spielleiter ernennen:\n'+candidates.map((s,i)=>(i+1)+'. '+(s.short||s.name)).join('\n')+'\n\nNummer eingeben:','Nummer','Ernennen');
-  if(!name)return;
-  const idx=parseInt(name)-1;
-  if(idx<0||idx>=candidates.length){showToast('Ungültige Auswahl.','error');return}
-  await firebase.database().ref('turniere/DK'+state.turnier.code+'/hosts/'+candidates[idx].id).set(true);
-  showToast((candidates[idx].short||candidates[idx].name)+' ist jetzt Co-Spielleiter.','info');
+  const candidates=spielerCache.filter(s=>teilnehmer.includes(s.id));
+  if(!candidates.length){showToast('Keine Teilnehmer vorhanden.','error');return}
+  coHostSelected=hosts.slice();
+  const el=document.getElementById('turnierModalContent');
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<button onclick="openTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;gap:4px;padding:0 10px;font-size:13px">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg> Zurück</button>'
+    +'<h3 style="margin:0">Admins</h3><div style="width:32px"></div></div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">Wähle Spieler als Co-Spielleiter aus. Diese können das Dashboard und alle Tische sehen und verwalten.</div>';
+  html+='<div id="coHostList">';
+  candidates.forEach(s=>{
+    const isHost=coHostSelected.includes(s.id);
+    html+='<div data-cid="'+s.id+'" onclick="toggleCoHost(\''+s.id+'\')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bdr);cursor:pointer;background:'+(isHost?'var(--bg3)':'transparent')+'">'
+      +'<span class="cohost-check" style="width:22px;height:22px;border-radius:50%;border:2px solid '+(isHost?'var(--primary)':'var(--bdr)')+';display:flex;align-items:center;justify-content:center;font-size:14px;color:'+(isHost?'var(--primary)':'transparent')+'">&#10003;</span>'
+      +'<span style="flex:1;font-size:14px">'+(s.short||s.name)+'</span>'
+      +(isHost?'<span style="font-size:11px;color:var(--primary)">Admin</span>':'')
+      +'</div>';
+  });
+  html+='</div>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveCoHosts()">Speichern</button>';
+  el.innerHTML=html;
+}
+function toggleCoHost(id){
+  const idx=coHostSelected.indexOf(id);
+  if(idx>=0)coHostSelected.splice(idx,1);else coHostSelected.push(id);
+  document.querySelectorAll('#coHostList [data-cid]').forEach(el=>{
+    const cid=el.dataset.cid;
+    const sel=coHostSelected.includes(cid);
+    el.style.background=sel?'var(--bg3)':'transparent';
+    const check=el.querySelector('.cohost-check');
+    if(check){check.style.borderColor=sel?'var(--primary)':'var(--bdr)';check.style.color=sel?'var(--primary)':'transparent';check.innerHTML='&#10003;'}
+    const badge=el.querySelector('span:last-child');
+    if(badge&&badge.style.fontSize==='11px'){if(sel)badge.textContent='Admin';else badge.textContent=''}
+  });
+}
+async function saveCoHosts(){
+  if(!state.turnier)return;
+  const hostsObj={};
+  coHostSelected.forEach(id=>hostsObj[id]=true);
+  await firebase.database().ref('turniere/DK'+state.turnier.code+'/hosts').set(hostsObj);
+  const count=coHostSelected.length;
+  showToast(count+' Admin'+(count!==1?'s':'')+' gespeichert.','info');
+  openTurnierDashboard();
+}
+async function hostJoinTisch(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  openJoinTurnier(state.turnier.code);
+}
+function hostLeaveTisch(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  state.turnier.tischId=null;
+  state.turnier.tischName=null;
+  state.turnier.tischNummer=null;
+  save();
+  renderTurnierSetup();renderTurnierIndicator();
+  showToast('Tisch verlassen. Du bist weiterhin Spielleiter.','info');
 }
 
 async function leaveTurnier(silent){
@@ -2964,6 +3033,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.40',d:'28.05.2026 15:39',t:'Turnier: Admins verwalten per Checkbox-Liste statt Nummereingabe (Schild-Icon). Spielleiter kann jetzt selbst Tische beitreten und mitspielen. Spieler-Sync vom Tisch ins Setup beim App-Start. Korrekte Grammatik bei Turnier-Archiv (vergangenes/vergangene).'},
     {v:'4.39',d:'28.05.2026 15:19',t:'Turnier: Turnier-Archiv – beendete Turniere können von allen Teilnehmern eingesehen werden. Co-Spielleiter – Spielleiter kann weitere Admins ernennen. Eindeutige Kurznamen (keine Duplikate mehr). Schöner Dialog statt Browser-Prompt beim Spieler hinzufügen. Tisch-Spieler werden automatisch ins lokale Setup übernommen.'},
     {v:'4.38',d:'28.05.2026 13:58',t:'Turnier: Verbesserter Beitritts-Flow – vorhandene Tische werden mit Spielern angezeigt und sind direkt auswählbar. Eindeutige Tischnummern mit automatischem Vorschlag der nächsten freien Nummer. Eigener Name wird automatisch als Spieler eingetragen (auch im normalen Spiel). Abfrage ob bestehende lokale Runden übernommen werden sollen. Spieler an jedem Tisch im Dashboard sichtbar.'},
     {v:'4.37',d:'28.05.2026 12:54',t:'Turnier-Modus Phase 1: Turnier erstellen mit 6-stelligem Code (DK-XXXX) und Konfiguration (4 Spieler-Modi, Tisch-Modus, Rotation). Globale Spieler-Datenbank in Firebase mit Geräte-Verknüpfung. Tische treten per Code, QR-Code oder Link bei. Spielstände werden nach jeder Runde automatisch gesynct. Spielleiter sieht Live-Dashboard mit allen Tischen und Detail-Ansicht. Tisch-QR-Codes zum Ausdrucken.'},
