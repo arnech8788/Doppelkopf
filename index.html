@@ -68,7 +68,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.37 · 28.05.2026 12:54</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.38 · 28.05.2026 13:58</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -255,7 +255,15 @@ async function checkFirstStart(){
   if(!initFirebase())return;
   const deviceId=getDeviceId();
   const existing=await findSpielerByDevice(deviceId);
-  if(existing)return;
+  if(existing){
+    const short=existing.short||existing.name.split(' ')[0];
+    if(!state.players.includes(short)){
+      state.players.push(short);
+      if(!state.knownNames.includes(short))state.knownNames.push(short);
+      save();renderPlayerTags();
+    }
+    return;
+  }
   showNameModal();
 }
 
@@ -295,8 +303,16 @@ async function submitName(){
     showToast('Name existiert bereits. Klicke "Das bin ich" falls du es bist, oder wähle einen anderen Namen.','error');
     return;
   }
-  await createSpieler(name);
+  const spieler=await createSpieler(name);
   document.getElementById('nameModal').classList.remove('show');
+  if(spieler){
+    const short=spieler.short||name.split(' ')[0];
+    if(!state.players.includes(short)){
+      state.players.push(short);
+      if(!state.knownNames.includes(short))state.knownNames.push(short);
+      save();renderPlayerTags();
+    }
+  }
   showToast('Willkommen, '+name.split(' ')[0]+'!','info');
 }
 
@@ -305,6 +321,14 @@ async function claimExistingSpieler(spielerId){
   await addDeviceToSpieler(spielerId,deviceId);
   document.getElementById('nameModal').classList.remove('show');
   const spieler=spielerCache.find(s=>s.id===spielerId);
+  if(spieler){
+    const short=spieler.short||spieler.name.split(' ')[0];
+    if(!state.players.includes(short)){
+      state.players.push(short);
+      if(!state.knownNames.includes(short))state.knownNames.push(short);
+      save();renderPlayerTags();
+    }
+  }
   showToast('Gerät verknüpft mit '+(spieler?spieler.name:'Spieler')+'!','info');
 }
 
@@ -1074,8 +1098,12 @@ function checkTurnierUrlParam(){
 }
 let joinTurnierConfig=null;
 let joinSelectedPlayers=[];
+let joinTurnierData=null;
+let joinSelectedTischId=null;
 
 function openJoinTurnier(prefillCode,prefillTisch){
+  if(state.turnier){showToast('Du bist bereits in Turnier DK-'+state.turnier.code+'. Bitte erst verlassen.','error');return}
+  joinTurnierData=null;joinSelectedTischId=null;joinSelectedPlayers=[];joinTurnierConfig=null;
   const el=document.getElementById('turnierJoinContent');
   el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
     +'<h3 style="margin:0">Turnier beitreten</h3>'
@@ -1084,64 +1112,140 @@ function openJoinTurnier(prefillCode,prefillTisch){
     +'<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Turnier-Code</label>'
     +'<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:var(--tx2)">DK-</span>'
     +'<input type="text" id="joinCodeInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" value="'+(prefillCode||'')+'" placeholder="4729" style="font-size:16px;padding:10px;letter-spacing:4px;text-align:center;flex:1"></div></div>'
-    +'<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Tischnummer</label>'
-    +'<input type="number" id="joinTischNummer" value="'+(prefillTisch||'')+'" min="1" max="99" placeholder="z.B. 3" style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div>'
-    +'<div style="margin-bottom:16px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Tischname (optional)</label>'
-    +'<input type="text" id="joinTischName" placeholder="z.B. Küche, Wohnzimmer..." style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div>'
-    +'<div id="joinPlayerSelect" style="margin-bottom:16px"></div>'
-    +'<button class="btn btn-primary" style="width:100%" onclick="joinTurnier()">Beitreten</button>';
+    +'<div id="joinTurnierInfo" style="margin-bottom:16px"></div>';
   document.getElementById('turnierJoinModal').classList.add('show');
   if(!prefillCode)document.getElementById('joinCodeInput').focus();
   const codeInput=document.getElementById('joinCodeInput');
   let codeDebounce=null;
   codeInput.addEventListener('input',function(){
     clearTimeout(codeDebounce);
-    codeDebounce=setTimeout(()=>{if(this.value.length===4)loadJoinPlayerSelect(this.value)},300);
+    codeDebounce=setTimeout(()=>{if(this.value.length===4)loadJoinTurnierInfo(this.value,null)},300);
   });
-  if(prefillCode&&prefillCode.length===4)setTimeout(()=>loadJoinPlayerSelect(prefillCode),100);
+  if(prefillCode&&prefillCode.length===4)setTimeout(()=>loadJoinTurnierInfo(prefillCode,prefillTisch),100);
 }
 
 function closeJoinTurnier(){document.getElementById('turnierJoinModal').classList.remove('show')}
 document.getElementById('turnierJoinModal').addEventListener('click',function(e){if(e.target===this)closeJoinTurnier()});
 
-async function loadJoinPlayerSelect(code){
-  const el=document.getElementById('joinPlayerSelect');
+async function loadJoinTurnierInfo(code,prefillTisch){
+  const el=document.getElementById('joinTurnierInfo');
   if(!el)return;
   if(!initFirebase()){el.innerHTML='';return}
   try{
     const snap=await firebase.database().ref('turniere/DK'+code).get();
-    if(!snap.exists()){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier nicht gefunden.</div>';joinTurnierConfig=null;return}
+    if(!snap.exists()){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier nicht gefunden.</div>';joinTurnierConfig=null;joinTurnierData=null;return}
     const data=snap.val();
-    if(data.status!=='active'){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier ist beendet.</div>';joinTurnierConfig=null;return}
+    if(data.status!=='active'){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier ist beendet.</div>';joinTurnierConfig=null;joinTurnierData=null;return}
     joinTurnierConfig=data.config;
+    joinTurnierData=data;
     joinSelectedPlayers=[];
-    if(data.config.playerMode===3){
-      el.innerHTML='<div style="font-size:12px;color:var(--grn)">Turnier gefunden! Freie Spielereingabe – nutze deine lokale Spielerliste.</div>';
-      return;
-    }
-    const teilnehmerIds=data.teilnehmer?Object.keys(data.teilnehmer):[];
-    const tische=data.tische?Object.values(data.tische):[];
-    const usedIds=new Set();
-    tische.forEach(t=>{if(t.spielerIds)t.spielerIds.forEach(id=>usedIds.add(id))});
+    joinSelectedTischId=null;
     await loadSpielerDB();
-    const available=spielerCache.filter(s=>teilnehmerIds.includes(s.id));
-    let html='<label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Spieler an diesem Tisch (4 wählen)</label>';
-    html+='<div id="joinPlayerList">';
-    available.forEach(s=>{
-      const used=usedIds.has(s.id);
-      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--bdr);'+(used?'opacity:.4;':'cursor:pointer;')+'" '
-        +(used?'title="Bereits an anderem Tisch"':'onclick="toggleJoinPlayer(\''+s.id+'\')"')+' data-pid="'+s.id+'">'
-        +'<span style="font-size:13px">'+s.name+(used?' (vergeben)':'')+'</span>'
-        +'<span class="join-check" style="font-size:18px;color:var(--tx3)">&#43;</span></div>';
-    });
-    html+='</div>';
-    if(data.config.playerMode===2){
-      html+='<button class="btn btn-secondary" style="margin-top:8px;font-size:12px;padding:6px 12px" onclick="addJoinPlayer()">+ Eigenen Spieler</button>';
+
+    const tischeObj=data.tische||{};
+    const tischArr=Object.entries(tischeObj).map(([id,t])=>({id,...t}));
+    tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+    const usedNummern=tischArr.map(t=>t.nummer).filter(Boolean);
+    let nextFree=1;
+    while(usedNummern.includes(nextFree))nextFree++;
+
+    let html='<div style="font-size:12px;color:var(--grn);margin-bottom:12px">Turnier gefunden!</div>';
+
+    // Vorhandene Tische anzeigen
+    if(tischArr.length){
+      html+='<div class="section-label">Vorhandene Tische</div>';
+      html+='<div style="margin-bottom:12px">';
+      tischArr.forEach(t=>{
+        const spielerNames=(t.spielerIds||[]).map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
+        const rounds=t.rounds?t.rounds.length:0;
+        html+='<div class="card turnier-tisch-card" style="cursor:pointer;padding:10px;margin-bottom:6px;border:2px solid '+(joinSelectedTischId===t.id?'var(--primary)':'var(--bdr)')+'" onclick="selectJoinTisch(\''+t.id+'\')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div style="font-weight:600;font-size:14px">Tisch '+t.nummer+(t.name&&t.name!=='Tisch '+t.nummer?' – '+t.name:'')+'</div>'
+          +'<div style="font-size:11px;color:var(--tx3)">'+rounds+' Runden</div></div>'
+          +'<div style="font-size:12px;color:var(--tx2);margin-top:2px">'+(spielerNames||'Keine Spieler')+'</div>'
+          +'</div>';
+      });
+      html+='</div>';
+      html+='<div style="text-align:center;font-size:12px;color:var(--tx3);margin-bottom:8px">– oder –</div>';
     }
+
+    // Neuen Tisch erstellen
+    html+='<div class="section-label">Neuen Tisch erstellen</div>';
+    html+='<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +'<div style="flex:0 0 80px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Nummer</label>'
+      +'<input type="number" id="joinTischNummer" value="'+(prefillTisch||nextFree)+'" min="1" max="99" style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div>'
+      +'<div style="flex:1"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Name (optional)</label>'
+      +'<input type="text" id="joinTischName" placeholder="z.B. Küche, Wohnzimmer..." style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div></div>';
+
+    // Tischnummer-Eingabe deselektiert vorhandenen Tisch
+    html+='<div id="joinPlayerSelect" style="margin-bottom:12px"></div>';
+    html+='<button class="btn btn-primary" style="width:100%" onclick="joinTurnier()">Beitreten</button>';
     el.innerHTML=html;
+
+    // Event: Nummer-Eingabe deselektiert bestehenden Tisch
+    const numInput=document.getElementById('joinTischNummer');
+    if(numInput)numInput.addEventListener('input',function(){joinSelectedTischId=null;loadJoinTurnierInfo(code,null)});
+
+    // Spieler-Auswahl laden (nur für neuen Tisch, nicht Modus 3)
+    renderJoinPlayerSelect(data);
+
+    // Auto-pre-select eigenen Spieler
+    autoPreselectOwnPlayer();
   }catch(e){
-    console.error('loadJoinPlayerSelect error:',e);
+    console.error('loadJoinTurnierInfo error:',e);
     el.innerHTML='<div style="font-size:12px;color:var(--red)">Fehler beim Laden.</div>';
+  }
+}
+
+function selectJoinTisch(tischId){
+  joinSelectedTischId=tischId;
+  document.querySelectorAll('#joinTurnierInfo .turnier-tisch-card').forEach(el=>{
+    el.style.borderColor=el.getAttribute('onclick').includes("'"+tischId+"'")?'var(--primary)':'var(--bdr)';
+  });
+  const playerEl=document.getElementById('joinPlayerSelect');
+  if(playerEl)playerEl.style.display='none';
+}
+
+function renderJoinPlayerSelect(data){
+  const el=document.getElementById('joinPlayerSelect');
+  if(!el)return;
+  if(data.config.playerMode===3){
+    el.innerHTML='<div style="font-size:12px;color:var(--tx3)">Freie Spielereingabe – nutze deine lokale Spielerliste.</div>';
+    return;
+  }
+  const teilnehmerIds=data.teilnehmer?Object.keys(data.teilnehmer):[];
+  const tische=data.tische?Object.values(data.tische):[];
+  const usedIds=new Set();
+  tische.forEach(t=>{if(t.spielerIds)t.spielerIds.forEach(id=>usedIds.add(id))});
+  const available=spielerCache.filter(s=>teilnehmerIds.includes(s.id));
+  let html='<label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Spieler an diesem Tisch (4 wählen)</label>';
+  html+='<div id="joinPlayerList">';
+  available.forEach(s=>{
+    const used=usedIds.has(s.id);
+    const sel=joinSelectedPlayers.includes(s.id);
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--bdr);'+(used?'opacity:.4;':'cursor:pointer;')+'background:'+(sel?'var(--bg3)':'transparent')+'" '
+      +(used?'title="Bereits an anderem Tisch"':'onclick="toggleJoinPlayer(\''+s.id+'\')"')+' data-pid="'+s.id+'">'
+      +'<span style="font-size:13px">'+s.name+(used?' (vergeben)':'')+'</span>'
+      +'<span class="join-check" style="font-size:18px;color:'+(sel?'var(--grn)':'var(--tx3)')+'">'+( sel?'&#10003;':'&#43;')+'</span></div>';
+  });
+  html+='</div>';
+  if(data.config.playerMode===2){
+    html+='<button class="btn btn-secondary" style="margin-top:8px;font-size:12px;padding:6px 12px" onclick="addJoinPlayer()">+ Eigenen Spieler</button>';
+  }
+  el.innerHTML=html;
+}
+
+function autoPreselectOwnPlayer(){
+  const deviceId=getDeviceId();
+  const own=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
+  if(own&&!joinSelectedPlayers.includes(own.id)){
+    joinSelectedPlayers.push(own.id);
+    const el=document.querySelector('#joinPlayerList [data-pid="'+own.id+'"]');
+    if(el){
+      el.style.background='var(--bg3)';
+      const check=el.querySelector('.join-check');
+      if(check){check.innerHTML='&#10003;';check.style.color='var(--grn)'}
+    }
   }
 }
 
@@ -1156,6 +1260,9 @@ function toggleJoinPlayer(id){
     if(check){check.innerHTML=sel?'&#10003;':'&#43;';check.style.color=sel?'var(--grn)':'var(--tx3)'}
     el.style.background=sel?'var(--bg3)':'transparent';
   });
+  // Deselect existing table when choosing players for new table
+  joinSelectedTischId=null;
+  document.querySelectorAll('#joinTurnierInfo .turnier-tisch-card').forEach(el=>{el.style.borderColor='var(--bdr)'});
 }
 
 async function addJoinPlayer(){
@@ -1165,22 +1272,45 @@ async function addJoinPlayer(){
   if(!s)return;
   const code=document.getElementById('joinCodeInput').value.trim();
   await firebase.database().ref('turniere/DK'+code+'/teilnehmer/'+s.id).set(true);
-  loadJoinPlayerSelect(code);
+  loadJoinTurnierInfo(code,null);
 }
 
 async function joinTurnier(){
   const code=document.getElementById('joinCodeInput').value.trim();
+  if(!/^\d{4}$/.test(code)){showToast('Bitte 4-stelligen Code eingeben.','error');return}
+  if(!initFirebase()){showToast('Firebase nicht verfügbar.','error');return}
+
+  // Einem vorhandenen Tisch beitreten
+  if(joinSelectedTischId&&joinTurnierData){
+    const tischObj=joinTurnierData.tische||{};
+    const tisch=tischObj[joinSelectedTischId];
+    if(!tisch){showToast('Tisch nicht mehr vorhanden.','error');return}
+    state.turnier={code:code,tischId:joinSelectedTischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:false,isPlayer:false};
+    save();
+    closeJoinTurnier();
+    renderTurnierSetup();
+    showToast('Turnier DK-'+code+' beigetreten ('+state.turnier.tischName+')!','info');
+    return;
+  }
+
+  // Neuen Tisch erstellen
   const tischNummer=parseInt(document.getElementById('joinTischNummer').value)||0;
   const tischName=document.getElementById('joinTischName').value.trim()||('Tisch '+tischNummer);
-  if(!/^\d{4}$/.test(code)){showToast('Bitte 4-stelligen Code eingeben.','error');return}
   if(!tischNummer){showToast('Bitte Tischnummer eingeben.','error');return}
-  if(!initFirebase()){showToast('Firebase nicht verfügbar.','error');return}
+
   try{
     const turnierRef=firebase.database().ref('turniere/DK'+code);
     const snap=await turnierRef.get();
     if(!snap.exists()){showToast('Turnier nicht gefunden.','error');return}
-    if(snap.val().status!=='active'){showToast('Turnier ist beendet.','error');return}
-    const config=snap.val().config;
+    const turnierData=snap.val();
+    if(turnierData.status!=='active'){showToast('Turnier ist beendet.','error');return}
+
+    // Prüfe ob Tischnummer schon vergeben ist
+    const tischeObj=turnierData.tische||{};
+    const nummerVergeben=Object.values(tischeObj).some(t=>t.nummer===tischNummer);
+    if(nummerVergeben){showToast('Tisch '+tischNummer+' existiert bereits. Bitte andere Nummer wählen.','error');return}
+
+    const config=turnierData.config;
     let spielerIds=[];
     if(config.playerMode===3){
       spielerIds=getAllPlayers();
@@ -1188,13 +1318,21 @@ async function joinTurnier(){
       if(joinSelectedPlayers.length!==4){showToast('Bitte genau 4 Spieler wählen.','error');return}
       spielerIds=joinSelectedPlayers.slice();
     }
+
+    // Bestehende lokale Runden übernehmen?
+    let rounds=[];
+    if(state.rounds.length>0){
+      const useExisting=await showConfirm('Du hast '+state.rounds.length+' Runde'+(state.rounds.length>1?'n':'')+' eingetragen. Sollen diese für den Tisch übernommen werden?','Übernehmen');
+      if(useExisting)rounds=state.rounds;
+    }
+
     const tischRef=turnierRef.child('tische').push();
     const tischId=tischRef.key;
     await tischRef.set({
       name:tischName,
       nummer:tischNummer,
       spielerIds:spielerIds,
-      rounds:state.rounds.length?state.rounds:[],
+      rounds:rounds.length?rounds:[],
       lastSync:firebase.database.ServerValue.TIMESTAMP
     });
     await turnierRef.update({lastActivity:firebase.database.ServerValue.TIMESTAMP});
@@ -1202,7 +1340,7 @@ async function joinTurnier(){
     save();
     closeJoinTurnier();
     renderTurnierSetup();
-    showToast('Turnier DK-'+code+' beigetreten!','info');
+    showToast('Turnier DK-'+code+' beigetreten (Tisch '+tischNummer+')!','info');
   }catch(e){
     console.error('joinTurnier error:',e);
     showToast('Fehler: '+e.message,'error');
@@ -1277,12 +1415,14 @@ function renderTurnierDashboard(tische){
         const s=spielerCache.find(s=>s.id===leader);
         if(s)leader=s.short||s.name;
       }
+      const spielerNames=spielerIds.map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
       const syncTime=t.lastSync?new Date(t.lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'–';
       html+='<div class="card turnier-tisch-card" style="cursor:pointer" onclick="showTurnierDetail(\''+t.id+'\')">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<div style="font-weight:600;font-size:15px">'+(t.name||'Tisch '+(t.nummer||'?'))+'</div>'
         +'<div style="font-size:11px;color:var(--tx3)">'+syncTime+'</div></div>'
-        +'<div style="font-size:13px;color:var(--tx2);margin-top:4px">'
+        +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+(spielerNames||'Keine Spieler')+'</div>'
+        +'<div style="font-size:13px;color:var(--tx2);margin-top:2px">'
         +(rounds.length?leader+': '+leaderPts+' Pkt. &middot; '+rounds.length+' Runden':'Noch keine Runden')
         +'</div></div>';
     });
@@ -2661,6 +2801,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.38',d:'28.05.2026 13:58',t:'Turnier: Verbesserter Beitritts-Flow – vorhandene Tische werden mit Spielern angezeigt und sind direkt auswählbar. Eindeutige Tischnummern mit automatischem Vorschlag der nächsten freien Nummer. Eigener Name wird automatisch als Spieler eingetragen (auch im normalen Spiel). Abfrage ob bestehende lokale Runden übernommen werden sollen. Spieler an jedem Tisch im Dashboard sichtbar.'},
     {v:'4.37',d:'28.05.2026 12:54',t:'Turnier-Modus Phase 1: Turnier erstellen mit 6-stelligem Code (DK-XXXX) und Konfiguration (4 Spieler-Modi, Tisch-Modus, Rotation). Globale Spieler-Datenbank in Firebase mit Geräte-Verknüpfung. Tische treten per Code, QR-Code oder Link bei. Spielstände werden nach jeder Runde automatisch gesynct. Spielleiter sieht Live-Dashboard mit allen Tischen und Detail-Ansicht. Tisch-QR-Codes zum Ausdrucken.'},
     {v:'4.36',d:'27.05.2026 23:12',t:'Schnellstart: Karte im Setup zeigt die letzte Spielrunde – ein Tap lädt die Spieler und wechselt direkt zur Eingabe.'},
     {v:'4.35',d:'27.05.2026 22:36',t:'Achievements: Pro-Abend-Badges (Hot Streak, Comeback Kid, Solist, Unbesiegbar, Pechvogel) und Saison-Badges (Stammgast, Veteran, Solokönig, Dominator, Dauersieger, Marathon) – werden live per Toast + Mini-Konfetti freigeschaltet und in der Statistik angezeigt. Uhrzeitanzeige im Archiv und Ewiger Tabelle.'},
