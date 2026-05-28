@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.46 · 28.05.2026 17:36</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.47 · 28.05.2026 17:47</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1420,7 +1420,7 @@ async function loadJoinTurnierInfo(code,prefillTisch){
     const deviceId=getDeviceId();
     const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
     const hostsObj=data.hosts||{};
-    if(ownSpieler&&hostsObj[ownSpieler.id]){
+    if(ownSpieler&&hostsObj[ownSpieler.id]&&!(state.turnier&&state.turnier.isHost)){
       el.innerHTML='<div style="font-size:12px;color:var(--grn);margin-bottom:12px">Turnier gefunden! Du bist als Spielleiter eingetragen.</div>'
         +'<button class="btn btn-primary" style="width:100%" onclick="joinAsCoHost(\''+code+'\')">Als Spielleiter beitreten</button>';
       return;
@@ -3782,6 +3782,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.47',d:'28.05.2026 17:47',t:'Turnier: Spielleiter kann jetzt Tische erstellen und beitreten \u2013 Co-Host-Erkennung blockiert nicht mehr den eigenen Host.'},
     {v:'4.46',d:'28.05.2026 17:36',t:'Turnier: 8 Bugfixes \u2013 Spieler ohne Tisch bekommt Beitreten-Button, Tischwechsel entfernt vom alten Tisch, Host-Tisch-Verlassen bereinigt Firebase, Self-Rotation auch f\u00fcr mitspielenden Host, Tisch-Auswahl visuelles Feedback gefixt, QR-Codes basieren auf Tischanzahl, Spieler-App Registrierung direkt im Beitreten-Dialog, var(--primary) komplett durch var(--acc) ersetzt.'},
     {v:'4.45',d:'28.05.2026 17:02',t:'Turnier: Textkorrekturen (Firebase-Referenzen entfernt, Wizard-Beschreibungen), Konfigurationsübersicht im Setup für Spielleiter mit Änderungsmöglichkeit (Sichtbarkeit, Gesamtwertung), Spieler-App Beitritt für bereits registrierte Spieler verbessert.'},
     {v:'4.44',d:'28.05.2026 16:36',t:'Turnier Phase 3: Rotation \u2013 Spielleiter startet Tischwechsel (manuell oder nach X Runden). Host-Zuweisung per Tisch-UI oder Selbstwahl durch Spieler. Gesamtwertung mit Podium \u00fcber alle Rotationen. Rotations-Historie im Dashboard.'},
