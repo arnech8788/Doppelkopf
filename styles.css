@@ -261,6 +261,8 @@ tr.clickable:active{background:var(--bg3)}
 .confirm-modal .confirm-action{background:var(--acc);color:#fff;border:none}
 .confirm-modal .confirm-action.danger{background:var(--red)}
 .turnier-banner{text-align:center;font-size:12px;font-weight:500;color:var(--tx2);background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);padding:6px 12px;margin-bottom:8px}
+.schreiber-badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--grn);color:#fff;font-weight:600;vertical-align:middle}
+.zuschauer-badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--bg3);color:var(--tx3);font-weight:600;vertical-align:middle}
 .wizard-option{padding:12px;border:2px solid var(--bdr);border-radius:var(--r-sm);margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
 .wizard-option:active{transform:scale(.98)}
 .wizard-option.selected{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,transparent)}
