@@ -263,9 +263,16 @@ tr.clickable:active{background:var(--bg3)}
 .turnier-banner{text-align:center;font-size:12px;font-weight:500;color:var(--tx2);background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r-sm);padding:6px 12px;margin-bottom:8px}
 .schreiber-badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--grn);color:#fff;font-weight:600;vertical-align:middle}
 .zuschauer-badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--bg3);color:var(--tx3);font-weight:600;vertical-align:middle}
+.turnier-tabs{display:flex;gap:0;margin:12px 0 0;border-bottom:2px solid var(--bdr)}
+.turnier-tab{flex:1;padding:8px 4px;text-align:center;font-size:13px;font-weight:500;color:var(--tx3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;font-family:inherit}
+.turnier-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.zuweisung-tisch{border:2px dashed var(--bdr);border-radius:var(--r);padding:12px;margin-bottom:12px;min-height:60px}
+.zuweisung-tisch.has-players{border-style:solid;border-color:var(--acc)}
+.zuweisung-chip{display:inline-block;padding:4px 10px;border-radius:16px;font-size:12px;font-weight:500;margin:3px;cursor:pointer;border:1px solid var(--bdr);background:var(--bg3);transition:background .15s,border-color .15s}
+.zuweisung-chip.assigned{background:color-mix(in srgb,var(--acc) 15%,transparent);border-color:var(--acc);color:var(--acc)}
 .wizard-option{padding:12px;border:2px solid var(--bdr);border-radius:var(--r-sm);margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
 .wizard-option:active{transform:scale(.98)}
-.wizard-option.selected{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,transparent)}
+.wizard-option.selected{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
 .turnier-chip{display:inline-flex;align-items:center;gap:2px;background:var(--bg3);border:1px solid var(--bdr);border-radius:20px;padding:4px 10px;font-size:12px;font-weight:500}
 .turnier-tisch-card{transition:transform .1s}
 .turnier-tisch-card:active{transform:scale(.98)}

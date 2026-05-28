@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.43 · 28.05.2026 16:21</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.44 · 28.05.2026 16:36</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -856,7 +856,11 @@ function renderTurnierIndicator(){
     if(own&&own.id===t.schreiberId)roleBadge=' · <span class="schreiber-badge">Schreiber</span>';
     else if(own)roleBadge=' · <span class="zuschauer-badge">Zuschauer</span>';
   }
-  el.innerHTML='<div class="turnier-banner" onclick="openTurnierDashboard()" style="cursor:pointer">'+label+roleBadge+' · <span style="color:var(--grn)">Live</span></div>';
+  // Self-Rotation: Kein Tisch zugewiesen
+  if(!t.tischId&&!t.isHost&&turnierConfigCache&&turnierConfigCache.tableMode==='rotation'){
+    roleBadge=' \u00b7 <a href="#" onclick="openSelfRotationChoice();return false" style="color:var(--primary);font-weight:600">Tisch wählen!</a>';
+  }
+  el.innerHTML='<div class="turnier-banner" onclick="openTurnierDashboard()" style="cursor:pointer">'+label+roleBadge+' \u00b7 <span style="color:var(--grn)">Live</span></div>';
 }
 
 async function transferSchreiber(){
@@ -1234,6 +1238,10 @@ async function submitCreateTurnier(){
       turnierWizard.selectedPlayers.forEach(s=>{teilnehmer[s.id]=true});
       await dbRef.child('teilnehmer').set(teilnehmer);
     }
+    if(c.tableMode==='rotation'){
+      await dbRef.child('currentRotation').set(0);
+      await dbRef.child('rotationen/0').set({status:'active',startedAt:firebase.database.ServerValue.TIMESTAMP});
+    }
     state.turnier={code:code,tischId:null,tischName:null,tischNummer:null,isHost:true,isPlayer:false,turnierName:turnierName||null};
     save();
     closeCreateTurnier();
@@ -1530,7 +1538,15 @@ async function restoreTischPlayers(){
   try{
     await loadSpielerDB();
     const snap=await firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+state.turnier.tischId+'/spielerIds').get();
-    if(snap.exists())syncTischPlayersToSetup(snap.val());
+    if(snap.exists()){
+      const ids=snap.val();
+      if(Array.isArray(ids)&&ids.length===0){
+        state.turnier.tischId=null;state.turnier.tischName=null;state.turnier.tischNummer=null;
+        save();renderTurnierSetup();renderTurnierIndicator();
+        return;
+      }
+      syncTischPlayersToSetup(ids);
+    }
   }catch(e){console.warn('restoreTischPlayers:',e)}
 }
 
@@ -1666,6 +1682,11 @@ function syncToFirebase(){
 }
 
 let turnierConfigCache=null;
+let dashboardTab='tische';
+let lastTischeSnapshot={};
+let rotationenCache=null;
+let zuweisungData={tische:{},spielerZuweisung:{}};
+let zuweisungActiveTisch=null;
 async function openTurnierDashboard(){
   if(!state.turnier)return;
   if(!initFirebase()){showToast('Firebase nicht verfügbar.','error');return}
@@ -1675,11 +1696,16 @@ async function openTurnierDashboard(){
     const cs=await firebase.database().ref('turniere/DK'+state.turnier.code+'/config').get();
     turnierConfigCache=cs.val();
   }catch(e){}
+  try{
+    const rs=await firebase.database().ref('turniere/DK'+state.turnier.code+'/rotationen').get();
+    rotationenCache=rs.val();
+  }catch(e){rotationenCache=null}
   if(turnierListener){
     firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
   }
   turnierListener=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').on('value',snap=>{
-    renderTurnierDashboard(snap.val()||{});
+    lastTischeSnapshot=snap.val()||{};
+    renderTurnierDashboard(lastTischeSnapshot);
   });
 }
 
@@ -1696,9 +1722,10 @@ function renderTurnierDashboard(tische){
   const el=document.getElementById('turnierModalContent');
   if(!state.turnier)return;
   const code=state.turnier.code;
+  const config=turnierConfigCache;
+  const isRotation=config&&config.tableMode==='rotation';
   let tischArr=Object.entries(tische).map(([id,t])=>({id,...t}));
-  // Sichtbarkeit: Nicht-Host sieht nur eigenen Tisch wenn playersVisible=false
-  const canSeeAll=state.turnier.isHost||(turnierConfigCache&&turnierConfigCache.playersVisible);
+  const canSeeAll=state.turnier.isHost||(config&&config.playersVisible);
   if(!canSeeAll&&state.turnier.tischId){
     tischArr=tischArr.filter(t=>t.id===state.turnier.tischId);
   }
@@ -1716,37 +1743,372 @@ function renderTurnierDashboard(tische){
     +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>';
 
+  // Tab-Navigation
+  html+='<div class="turnier-tabs">'
+    +'<button class="turnier-tab'+(dashboardTab==='tische'?' active':'')+'" onclick="dashboardTab=\'tische\';renderTurnierDashboard(lastTischeSnapshot)">Tische</button>'
+    +'<button class="turnier-tab'+(dashboardTab==='gesamt'?' active':'')+'" onclick="dashboardTab=\'gesamt\';renderTurnierDashboard(lastTischeSnapshot)">Gesamtwertung</button>';
+  if(isRotation){
+    html+='<button class="turnier-tab'+(dashboardTab==='historie'?' active':'')+'" onclick="dashboardTab=\'historie\';renderTurnierDashboard(lastTischeSnapshot)">Historie</button>';
+  }
+  html+='</div>';
+
   html+='<div style="font-size:13px;color:var(--tx2);margin:12px 0">'+tischArr.length+' Tisch'+(tischArr.length!==1?'e':'')+' &middot; '+totalRounds+' Spiele gesamt</div>';
 
-  if(!tischArr.length){
-    html+='<div class="card" style="text-align:center;color:var(--tx3);padding:32px">Noch keine Tische beigetreten.</div>';
-  }else{
-    tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+  function nameOf(id){const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}
+
+  if(dashboardTab==='tische'){
+    // Auto-Rotation Trigger Banner
+    if(isRotation&&state.turnier.isHost&&config.rotationTrigger==='afterRounds'){
+      const targetRounds=config.rotationAfterRounds||4;
+      const allReady=tischArr.length>0&&tischArr.every(t=>(t.rounds||[]).length>=targetRounds);
+      if(allReady){
+        html+='<div class="card" style="background:color-mix(in srgb,var(--acc) 10%,var(--bg));border:1px solid var(--acc);padding:12px;margin-bottom:12px;text-align:center">'
+          +'<div style="font-weight:600;color:var(--acc);margin-bottom:6px">Alle Tische haben '+targetRounds+' Runden gespielt!</div>'
+          +'<button class="btn btn-primary" onclick="startRotation()">Rotation jetzt starten</button></div>';
+      }else{
+        const minRounds=tischArr.reduce((m,t)=>Math.min(m,(t.rounds||[]).length),Infinity);
+        if(tischArr.length)html+='<div style="font-size:11px;color:var(--tx3);margin-bottom:8px;text-align:center">Rotation nach '+targetRounds+' Runden (aktuell langsamster Tisch: '+minRounds+')</div>';
+      }
+    }
+    if(!tischArr.length){
+      html+='<div class="card" style="text-align:center;color:var(--tx3);padding:32px">Noch keine Tische beigetreten.</div>';
+    }else{
+      tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+      tischArr.forEach(t=>{
+        const rounds=t.rounds||[];
+        const spielerIds=t.spielerIds||[];
+        let leader='\u2013';let leaderPts=0;
+        if(rounds.length&&spielerIds.length){
+          const totals={};spielerIds.forEach(p=>totals[p]=0);
+          rounds.forEach(r=>{if(r.scores){spielerIds.forEach(p=>{totals[p]+=(r.scores[p]||0)})}});
+          const sorted=spielerIds.slice().sort((a,b)=>(totals[b]||0)-(totals[a]||0));
+          leader=nameOf(sorted[0]);leaderPts=totals[sorted[0]]||0;
+        }
+        const spielerNames=spielerIds.map(id=>nameOf(id)).join(', ');
+        const syncTime=t.lastSync?new Date(t.lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'\u2013';
+        html+='<div class="card turnier-tisch-card" style="cursor:pointer" onclick="showTurnierDetail(\''+t.id+'\')">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div style="font-weight:600;font-size:15px">'+(t.name||'Tisch '+(t.nummer||'?'))+'</div>'
+          +'<div style="font-size:11px;color:var(--tx3)">'+syncTime+'</div></div>'
+          +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+(spielerNames||'Keine Spieler')+'</div>'
+          +'<div style="font-size:13px;color:var(--tx2);margin-top:2px">'
+          +(rounds.length?leader+': '+leaderPts+' Pkt. &middot; '+rounds.length+' Runden':'Noch keine Runden')
+          +'</div></div>';
+      });
+    }
+    // Rotation starten Button
+    if(isRotation&&state.turnier.isHost){
+      html+='<div style="margin-top:16px;display:flex;gap:8px">'
+        +'<button class="btn btn-primary" style="flex:1" onclick="startRotation()">Rotation starten</button></div>';
+    }
+
+  }else if(dashboardTab==='gesamt'){
+    // Gesamtwertung: Punkte über alle Tische + vergangene Rotationen
+    const playerTotals={};
     tischArr.forEach(t=>{
       const rounds=t.rounds||[];
       const spielerIds=t.spielerIds||[];
-      let leader='–';let leaderPts=0;
-      if(rounds.length&&spielerIds.length){
-        const totals={};spielerIds.forEach(p=>totals[p]=0);
-        rounds.forEach(r=>{if(r.scores){spielerIds.forEach(p=>{totals[p]+=(r.scores[p]||0)})}});
-        const sorted=spielerIds.slice().sort((a,b)=>(totals[b]||0)-(totals[a]||0));
-        leader=sorted[0];leaderPts=totals[leader]||0;
-        const s=spielerCache.find(s=>s.id===leader);
-        if(s)leader=s.short||s.name;
-      }
-      const spielerNames=spielerIds.map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
-      const syncTime=t.lastSync?new Date(t.lastSync).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'–';
-      html+='<div class="card turnier-tisch-card" style="cursor:pointer" onclick="showTurnierDetail(\''+t.id+'\')">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center">'
-        +'<div style="font-weight:600;font-size:15px">'+(t.name||'Tisch '+(t.nummer||'?'))+'</div>'
-        +'<div style="font-size:11px;color:var(--tx3)">'+syncTime+'</div></div>'
-        +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+(spielerNames||'Keine Spieler')+'</div>'
-        +'<div style="font-size:13px;color:var(--tx2);margin-top:2px">'
-        +(rounds.length?leader+': '+leaderPts+' Pkt. &middot; '+rounds.length+' Runden':'Noch keine Runden')
-        +'</div></div>';
+      rounds.forEach(r=>{
+        if(!r.scores)return;
+        spielerIds.forEach(id=>{
+          if(!playerTotals[id])playerTotals[id]={pts:0,rounds:0,wins:0};
+          playerTotals[id].pts+=(r.scores[id]||0);
+          playerTotals[id].rounds++;
+          if((r.winners||[]).includes(id))playerTotals[id].wins++;
+        });
+      });
     });
+    if(rotationenCache){
+      Object.values(rotationenCache).forEach(rot=>{
+        if(!rot.tische)return;
+        Object.values(rot.tische).forEach(snap=>{
+          const rounds=snap.rounds||[];
+          const spielerIds=snap.spielerIds||[];
+          rounds.forEach(r=>{
+            if(!r.scores)return;
+            spielerIds.forEach(id=>{
+              if(!playerTotals[id])playerTotals[id]={pts:0,rounds:0,wins:0};
+              playerTotals[id].pts+=(r.scores[id]||0);
+              playerTotals[id].rounds++;
+              if((r.winners||[]).includes(id))playerTotals[id].wins++;
+            });
+          });
+        });
+      });
+    }
+    const sorted=Object.entries(playerTotals).sort((a,b)=>b[1].pts-a[1].pts);
+    if(!sorted.length){
+      html+='<div class="card" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Runden gespielt.</div>';
+    }else{
+      if(sorted.length>=3){
+        html+='<div style="display:flex;align-items:flex-end;justify-content:center;gap:8px;margin:16px 0 20px">';
+        [1,0,2].forEach(idx=>{
+          if(idx>=sorted.length)return;
+          const [id,d]=sorted[idx];
+          const displayName=nameOf(id);
+          const col=d.pts>0?'var(--grn)':d.pts<0?'var(--red)':'var(--tx2)';
+          const heights=['120px','90px','70px'];
+          const medals=['1.','2.','3.'];
+          html+='<div style="text-align:center;width:80px">'
+            +'<div style="font-size:11px;color:var(--tx3)">'+medals[idx]+'</div>'
+            +'<div style="font-size:13px;font-weight:600;margin:2px 0">'+displayName+'</div>'
+            +'<div style="font-size:18px;font-weight:700;color:'+col+'">'+d.pts+'</div>'
+            +'<div style="background:var(--bg3);border-radius:var(--r-sm) var(--r-sm) 0 0;height:'+heights[idx]+';margin-top:4px"></div>'
+            +'</div>';
+        });
+        html+='</div>';
+      }
+      html+='<div class="card" style="overflow:hidden">';
+      sorted.forEach(([id,d],i)=>{
+        const displayName=nameOf(id);
+        const col=d.pts>0?'var(--grn)':d.pts<0?'var(--red)':'var(--tx2)';
+        const avg=d.rounds?Math.round(d.pts/d.rounds*10)/10:0;
+        html+='<div style="display:flex;align-items:center;padding:8px 12px;font-size:13px'+(i<sorted.length-1?';border-bottom:1px solid var(--bdr)':'')+'">'
+          +'<span style="width:24px;color:var(--tx3);font-weight:600">#'+(i+1)+'</span>'
+          +'<span style="flex:1;font-weight:500">'+displayName+'</span>'
+          +'<span style="width:50px;text-align:right;font-size:11px;color:var(--tx3)">'+d.rounds+' R</span>'
+          +'<span style="width:45px;text-align:right;font-size:11px;color:var(--tx3)">'+avg+'/R</span>'
+          +'<span style="width:50px;text-align:right;font-weight:600;color:'+col+'">'+d.pts+'</span>'
+          +'</div>';
+      });
+      html+='</div>';
+    }
+
+  }else if(dashboardTab==='historie'){
+    if(!rotationenCache||!Object.keys(rotationenCache).length){
+      html+='<div class="card" style="text-align:center;color:var(--tx3);padding:24px">Noch keine Rotationen durchgeführt.</div>';
+    }else{
+      const rotArr=Object.entries(rotationenCache).sort((a,b)=>parseInt(b[0])-parseInt(a[0]));
+      rotArr.forEach(([rotNr,rot])=>{
+        const isActive=rot.status==='active';
+        const startDate=rot.startedAt?new Date(rot.startedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'\u2013';
+        html+='<div class="section-label" style="margin-top:12px">Runde '+(parseInt(rotNr)+1)+(isActive?' (aktiv)':'')+' \u00b7 '+startDate+'</div>';
+        if(!rot.tische){
+          html+='<div class="card" style="font-size:13px;color:var(--tx3)">Keine Tisch-Daten</div>';
+          return;
+        }
+        const tischSnaps=Object.values(rot.tische);
+        tischSnaps.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+        tischSnaps.forEach(snap=>{
+          const spielerNames=(snap.spielerIds||[]).map(id=>nameOf(id)).join(', ');
+          const rounds=snap.rounds||[];
+          let leader='\u2013';let leaderPts=0;
+          if(rounds.length&&snap.spielerIds&&snap.spielerIds.length){
+            const totals={};snap.spielerIds.forEach(p=>totals[p]=0);
+            rounds.forEach(r=>{if(r.scores){snap.spielerIds.forEach(p=>{totals[p]+=(r.scores[p]||0)})}});
+            const srt=snap.spielerIds.slice().sort((a,b)=>(totals[b]||0)-(totals[a]||0));
+            leader=nameOf(srt[0]);leaderPts=totals[srt[0]]||0;
+          }
+          html+='<div class="card" style="padding:10px;margin-bottom:6px">'
+            +'<div style="font-weight:600;font-size:14px">'+(snap.name||'Tisch '+(snap.nummer||'?'))+'</div>'
+            +'<div style="font-size:12px;color:var(--tx2);margin-top:2px">'+spielerNames+'</div>';
+          if(rounds.length){
+            html+='<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+leader+': '+leaderPts+' Pkt. \u00b7 '+rounds.length+' Runden</div>';
+          }
+          html+='</div>';
+        });
+      });
+    }
   }
   el.innerHTML=html;
+}
+
+async function startRotation(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  if(!initFirebase())return;
+  const config=turnierConfigCache;
+  if(!config||config.tableMode!=='rotation')return;
+  if(!await showConfirm('Rotation starten? Die aktuelle Tischbesetzung wird gespeichert und Spieler wechseln die Tische.','Rotation starten'))return;
+
+  const turnierRef=firebase.database().ref('turniere/DK'+state.turnier.code);
+  const snap=await turnierRef.get();
+  const data=snap.val();
+  const tische=data.tische||{};
+  const currentRot=data.currentRotation||0;
+
+  const snapshot={};
+  Object.entries(tische).forEach(([id,t])=>{
+    snapshot[id]={spielerIds:t.spielerIds||[],nummer:t.nummer,name:t.name||null,rounds:t.rounds||[]};
+  });
+
+  const updates={};
+  updates['rotationen/'+currentRot+'/status']='ended';
+  updates['rotationen/'+currentRot+'/endedAt']=firebase.database.ServerValue.TIMESTAMP;
+  updates['rotationen/'+currentRot+'/tische']=snapshot;
+
+  const nextRot=currentRot+1;
+  updates['rotationen/'+nextRot+'/status']='active';
+  updates['rotationen/'+nextRot+'/startedAt']=firebase.database.ServerValue.TIMESTAMP;
+  updates['currentRotation']=nextRot;
+  updates['lastActivity']=firebase.database.ServerValue.TIMESTAMP;
+
+  await turnierRef.update(updates);
+
+  // rotationenCache aktualisieren
+  try{
+    const rs=await firebase.database().ref('turniere/DK'+state.turnier.code+'/rotationen').get();
+    rotationenCache=rs.val();
+  }catch(e){}
+
+  if(config.rotationType==='host'){
+    openTischZuweisung(tische);
+  }else{
+    const clearUpdates={};
+    Object.keys(tische).forEach(id=>{
+      clearUpdates['tische/'+id+'/spielerIds']=[];
+      clearUpdates['tische/'+id+'/rounds']=[];
+    });
+    await turnierRef.update(clearUpdates);
+    if(state.turnier.tischId){
+      state.turnier.tischId=null;state.turnier.tischName=null;state.turnier.tischNummer=null;
+      save();renderTurnierSetup();renderTurnierIndicator();
+    }
+    showToast('Rotation gestartet! Spieler können jetzt neue Tische wählen.','info');
+  }
+}
+
+function openTischZuweisung(tische){
+  const el=document.getElementById('turnierModalContent');
+  const tischArr=Object.entries(tische).map(([id,t])=>({id,...t}));
+  tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+  const allSpieler=new Set();
+  tischArr.forEach(t=>(t.spielerIds||[]).forEach(id=>allSpieler.add(id)));
+  zuweisungData={tische:{},spielerZuweisung:{}};
+  tischArr.forEach(t=>{zuweisungData.tische[t.id]={id:t.id,nummer:t.nummer,name:t.name}});
+  allSpieler.forEach(id=>{zuweisungData.spielerZuweisung[id]=null});
+  zuweisungActiveTisch=null;
+  renderZuweisung();
+}
+
+function renderZuweisung(){
+  const el=document.getElementById('turnierModalContent');
+  const tischArr=Object.values(zuweisungData.tische).sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+  const allSpieler=Object.keys(zuweisungData.spielerZuweisung);
+  function nameOf(id){const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Tisch-Zuweisung</h3>'
+    +'<div style="font-size:12px;color:var(--tx3)">Tippe Tisch, dann Spieler</div></div>';
+
+  const unassigned=allSpieler.filter(id=>!zuweisungData.spielerZuweisung[id]);
+  if(unassigned.length){
+    html+='<div class="section-label" style="margin-top:12px">Nicht zugewiesen ('+unassigned.length+')</div><div style="margin-bottom:12px">';
+    unassigned.forEach(id=>{
+      html+='<span class="zuweisung-chip" onclick="assignSpieler(\''+id+'\')">'+nameOf(id)+'</span>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div class="section-label">Tische</div>';
+  tischArr.forEach(t=>{
+    const assigned=allSpieler.filter(id=>zuweisungData.spielerZuweisung[id]===t.id);
+    const isActive=zuweisungActiveTisch===t.id;
+    html+='<div class="zuweisung-tisch'+(assigned.length?' has-players':'')+'" style="'+(isActive?'border-color:var(--acc);background:color-mix(in srgb,var(--acc) 5%,transparent)':'')+'" onclick="zuweisungActiveTisch=\''+t.id+'\';renderZuweisung()">'
+      +'<div style="font-weight:600;font-size:14px;margin-bottom:6px">'+(t.name||'Tisch '+t.nummer)+' ('+assigned.length+'/4)</div>';
+    assigned.forEach(id=>{
+      html+='<span class="zuweisung-chip assigned" onclick="event.stopPropagation();unassignSpieler(\''+id+'\')">'+nameOf(id)+' &times;</span>';
+    });
+    if(!assigned.length)html+='<div style="font-size:12px;color:var(--tx3)">Tippe hier, dann wähle Spieler</div>';
+    html+='</div>';
+  });
+
+  const allAssigned=!unassigned.length;
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:12px'+(allAssigned?'':';opacity:.5;pointer-events:none')+'" onclick="saveTischZuweisung()">Zuweisung speichern'+(allAssigned?'':' ('+unassigned.length+' offen)')+'</button>';
+  el.innerHTML=html;
+}
+
+function assignSpieler(spielerId){
+  if(!zuweisungActiveTisch){showToast('Bitte zuerst einen Tisch auswählen.','info');return}
+  const assigned=Object.values(zuweisungData.spielerZuweisung).filter(t=>t===zuweisungActiveTisch).length;
+  if(assigned>=4){showToast('Tisch ist voll (4 Spieler).','error');return}
+  zuweisungData.spielerZuweisung[spielerId]=zuweisungActiveTisch;
+  renderZuweisung();
+}
+
+function unassignSpieler(spielerId){
+  zuweisungData.spielerZuweisung[spielerId]=null;
+  renderZuweisung();
+}
+
+async function saveTischZuweisung(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  if(!initFirebase())return;
+  const unassigned=Object.entries(zuweisungData.spielerZuweisung).filter(([id,t])=>!t);
+  if(unassigned.length){showToast(unassigned.length+' Spieler noch nicht zugewiesen.','error');return}
+  const turnierRef=firebase.database().ref('turniere/DK'+state.turnier.code);
+  const updates={};
+  Object.keys(zuweisungData.tische).forEach(tischId=>{
+    const spielerIds=Object.entries(zuweisungData.spielerZuweisung)
+      .filter(([id,t])=>t===tischId).map(([id])=>id);
+    updates['tische/'+tischId+'/spielerIds']=spielerIds;
+    updates['tische/'+tischId+'/rounds']=[];
+  });
+  updates['lastActivity']=firebase.database.ServerValue.TIMESTAMP;
+  await turnierRef.update(updates);
+  showToast('Neue Tischbesetzung gespeichert!','info');
+  openTurnierDashboard();
+}
+
+async function openSelfRotationChoice(){
+  if(!state.turnier)return;
+  if(!initFirebase())return;
+  document.getElementById('turnierModal').classList.add('show');
+  const el=document.getElementById('turnierModalContent');
+  el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade Tische...</div>';
+  const snap=await firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').get();
+  const tische=snap.val()||{};
+  await loadSpielerDB();
+  const deviceId=getDeviceId();
+  const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
+  if(!ownSpieler){showToast('Spieler nicht gefunden.','error');return}
+  const tischArr=Object.entries(tische).map(([id,t])=>({id,...t}));
+  tischArr.sort((a,b)=>(a.nummer||99)-(b.nummer||99));
+
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Neuen Tisch wählen</h3>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div style="font-size:13px;color:var(--tx2);margin:12px 0">Rotation! Wähle deinen neuen Tisch.</div>';
+  tischArr.forEach(t=>{
+    const spielerNames=(t.spielerIds||[]).map(id=>{const s=spielerCache.find(s=>s.id===id);return s?(s.short||s.name):id}).join(', ');
+    const count=(t.spielerIds||[]).length;
+    const isFull=count>=4;
+    const alreadyHere=(t.spielerIds||[]).includes(ownSpieler.id);
+    html+='<div class="card turnier-tisch-card" style="cursor:'+(isFull&&!alreadyHere?'not-allowed':'pointer')+';padding:12px;margin-bottom:8px;border:2px solid '+(alreadyHere?'var(--grn)':'var(--bdr)')+';'+(isFull&&!alreadyHere?'opacity:.5':'')+'" '
+      +(isFull&&!alreadyHere?'':'onclick="selfJoinTisch(\''+t.id+'\',\''+ownSpieler.id+'\')"')+'>'
+      +'<div style="display:flex;justify-content:space-between"><div style="font-weight:600">'+(t.name||'Tisch '+t.nummer)+'</div>'
+      +'<div style="font-size:12px;color:var(--tx3)">'+count+'/4</div></div>'
+      +'<div style="font-size:12px;color:var(--tx2);margin-top:2px">'+(spielerNames||'Noch leer')+(alreadyHere?' (du)':'')+'</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+async function selfJoinTisch(tischId,spielerId){
+  if(!initFirebase())return;
+  const tischRef=firebase.database().ref('turniere/DK'+state.turnier.code+'/tische/'+tischId);
+  const snap=await tischRef.get();
+  const tisch=snap.val();
+  if(!tisch){showToast('Tisch nicht gefunden.','error');return}
+  const spielerIds=tisch.spielerIds||[];
+  if(spielerIds.includes(spielerId)){
+    state.turnier.tischId=tischId;
+    state.turnier.tischName=tisch.name||('Tisch '+tisch.nummer);
+    state.turnier.tischNummer=tisch.nummer;
+    state.turnier.schreiberId=tisch.schreiberId||null;
+    save();closeTurnierDashboard();renderTurnierSetup();renderTurnierIndicator();
+    showToast('Mit '+(tisch.name||'Tisch '+tisch.nummer)+' verbunden!','info');
+    return;
+  }
+  if(spielerIds.length>=4){showToast('Tisch ist voll.','error');return}
+  spielerIds.push(spielerId);
+  await tischRef.child('spielerIds').set(spielerIds);
+  state.turnier.tischId=tischId;
+  state.turnier.tischName=tisch.name||('Tisch '+tisch.nummer);
+  state.turnier.tischNummer=tisch.nummer;
+  state.turnier.schreiberId=tisch.schreiberId||null;
+  save();closeTurnierDashboard();renderTurnierSetup();renderTurnierIndicator();
+  syncTischPlayersToSetup(spielerIds);
+  showToast('Tisch '+(tisch.nummer||'')+' beigetreten!','info');
 }
 
 function showTurnierQRCodes(){
@@ -3269,6 +3631,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.44',d:'28.05.2026 16:36',t:'Turnier Phase 3: Rotation \u2013 Spielleiter startet Tischwechsel (manuell oder nach X Runden). Host-Zuweisung per Tisch-UI oder Selbstwahl durch Spieler. Gesamtwertung mit Podium \u00fcber alle Rotationen. Rotations-Historie im Dashboard.'},
     {v:'4.43',d:'28.05.2026 16:21',t:'Turnier: 4-Spieler-Pflicht beim Beitreten entfernt – Spieler können auch nachträglich ergänzt werden. „+ Spieler"-Button mit Checkbox „Spieler hat kein eigenes Handy" statt zwei separate Buttons.'},
     {v:'4.42',d:'28.05.2026 16:10',t:'Turnier Phase 2: Spieler-App (Modus 4) – Einzelspieler treten bei und wählen ihren Tisch. „Meine Spiele"-Ansicht zeigt eigene Punkte und Runden über alle Tische. Schreiber-Rolle pro Tisch mit Abgabe-Funktion und Zuschauer-Modus. Sichtbarkeits-Steuerung: Spielleiter bestimmt ob Spieler andere Tische sehen. Spieler ohne Gerät können manuell hinzugefügt werden.'},
     {v:'4.41',d:'28.05.2026 15:56',t:'Turnier: Turnier-Indikator auf allen Screens sichtbar (klickbar zum Dashboard). Turniername vergeben (optional beim Erstellen). Name wird in Dashboard, Archiv und Indikator angezeigt.'},
