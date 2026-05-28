@@ -1063,6 +1063,143 @@ function checkTurnierUrlParam(){
     openJoinTurnier(code,tisch||null);
   },500);
 }
+let joinTurnierConfig=null;
+let joinSelectedPlayers=[];
+
+function openJoinTurnier(prefillCode,prefillTisch){
+  const el=document.getElementById('turnierJoinContent');
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<h3 style="margin:0">Turnier beitreten</h3>'
+    +'<button onclick="closeJoinTurnier()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>'
+    +'<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Turnier-Code</label>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:var(--tx2)">DK-</span>'
+    +'<input type="text" id="joinCodeInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" value="'+(prefillCode||'')+'" placeholder="4729" style="font-size:16px;padding:10px;letter-spacing:4px;text-align:center;flex:1"></div></div>'
+    +'<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Tischnummer</label>'
+    +'<input type="number" id="joinTischNummer" value="'+(prefillTisch||'')+'" min="1" max="99" placeholder="z.B. 3" style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div>'
+    +'<div style="margin-bottom:16px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Tischname (optional)</label>'
+    +'<input type="text" id="joinTischName" placeholder="z.B. Kueche, Wohnzimmer..." style="font-size:14px;padding:10px;width:100%;box-sizing:border-box"></div>'
+    +'<div id="joinPlayerSelect" style="margin-bottom:16px"></div>'
+    +'<button class="btn btn-primary" style="width:100%" onclick="joinTurnier()">Beitreten</button>';
+  document.getElementById('turnierJoinModal').classList.add('show');
+  if(!prefillCode)document.getElementById('joinCodeInput').focus();
+  const codeInput=document.getElementById('joinCodeInput');
+  let codeDebounce=null;
+  codeInput.addEventListener('input',function(){
+    clearTimeout(codeDebounce);
+    codeDebounce=setTimeout(()=>{if(this.value.length===4)loadJoinPlayerSelect(this.value)},300);
+  });
+  if(prefillCode&&prefillCode.length===4)setTimeout(()=>loadJoinPlayerSelect(prefillCode),100);
+}
+
+function closeJoinTurnier(){document.getElementById('turnierJoinModal').classList.remove('show')}
+document.getElementById('turnierJoinModal').addEventListener('click',function(e){if(e.target===this)closeJoinTurnier()});
+
+async function loadJoinPlayerSelect(code){
+  const el=document.getElementById('joinPlayerSelect');
+  if(!el)return;
+  if(!initFirebase()){el.innerHTML='';return}
+  try{
+    const snap=await firebase.database().ref('turniere/DK'+code).get();
+    if(!snap.exists()){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier nicht gefunden.</div>';joinTurnierConfig=null;return}
+    const data=snap.val();
+    if(data.status!=='active'){el.innerHTML='<div style="font-size:12px;color:var(--red)">Turnier ist beendet.</div>';joinTurnierConfig=null;return}
+    joinTurnierConfig=data.config;
+    joinSelectedPlayers=[];
+    if(data.config.playerMode===3){
+      el.innerHTML='<div style="font-size:12px;color:var(--grn)">Turnier gefunden! Freie Spielereingabe – nutze deine lokale Spielerliste.</div>';
+      return;
+    }
+    const teilnehmerIds=data.teilnehmer?Object.keys(data.teilnehmer):[];
+    const tische=data.tische?Object.values(data.tische):[];
+    const usedIds=new Set();
+    tische.forEach(t=>{if(t.spielerIds)t.spielerIds.forEach(id=>usedIds.add(id))});
+    await loadSpielerDB();
+    const available=spielerCache.filter(s=>teilnehmerIds.includes(s.id));
+    let html='<label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Spieler an diesem Tisch (4 waehlen)</label>';
+    html+='<div id="joinPlayerList">';
+    available.forEach(s=>{
+      const used=usedIds.has(s.id);
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-bottom:1px solid var(--bdr);'+(used?'opacity:.4;':'cursor:pointer;')+'" '
+        +(used?'title="Bereits an anderem Tisch"':'onclick="toggleJoinPlayer(\''+s.id+'\')"')+' data-pid="'+s.id+'">'
+        +'<span style="font-size:13px">'+s.name+(used?' (vergeben)':'')+'</span>'
+        +'<span class="join-check" style="font-size:18px;color:var(--tx3)">&#43;</span></div>';
+    });
+    html+='</div>';
+    if(data.config.playerMode===2){
+      html+='<button class="btn btn-secondary" style="margin-top:8px;font-size:12px;padding:6px 12px" onclick="addJoinPlayer()">+ Eigenen Spieler</button>';
+    }
+    el.innerHTML=html;
+  }catch(e){
+    console.error('loadJoinPlayerSelect error:',e);
+    el.innerHTML='<div style="font-size:12px;color:var(--red)">Fehler beim Laden.</div>';
+  }
+}
+
+function toggleJoinPlayer(id){
+  const idx=joinSelectedPlayers.indexOf(id);
+  if(idx>=0){joinSelectedPlayers.splice(idx,1)}
+  else{if(joinSelectedPlayers.length>=4){showToast('Maximal 4 Spieler.','error');return}joinSelectedPlayers.push(id)}
+  document.querySelectorAll('#joinPlayerList [data-pid]').forEach(el=>{
+    const pid=el.dataset.pid;
+    const sel=joinSelectedPlayers.includes(pid);
+    const check=el.querySelector('.join-check');
+    if(check){check.innerHTML=sel?'&#10003;':'&#43;';check.style.color=sel?'var(--grn)':'var(--tx3)'}
+    el.style.background=sel?'var(--bg3)':'transparent';
+  });
+}
+
+async function addJoinPlayer(){
+  const name=prompt('Spieler hinzufuegen (Vor- und Nachname):');
+  if(!name||name.trim().length<2)return;
+  const s=await createSpieler(name.trim());
+  if(!s)return;
+  const code=document.getElementById('joinCodeInput').value.trim();
+  await firebase.database().ref('turniere/DK'+code+'/teilnehmer/'+s.id).set(true);
+  loadJoinPlayerSelect(code);
+}
+
+async function joinTurnier(){
+  const code=document.getElementById('joinCodeInput').value.trim();
+  const tischNummer=parseInt(document.getElementById('joinTischNummer').value)||0;
+  const tischName=document.getElementById('joinTischName').value.trim()||('Tisch '+tischNummer);
+  if(!/^\d{4}$/.test(code)){showToast('Bitte 4-stelligen Code eingeben.','error');return}
+  if(!tischNummer){showToast('Bitte Tischnummer eingeben.','error');return}
+  if(!initFirebase()){showToast('Firebase nicht verfuegbar.','error');return}
+  try{
+    const turnierRef=firebase.database().ref('turniere/DK'+code);
+    const snap=await turnierRef.get();
+    if(!snap.exists()){showToast('Turnier nicht gefunden.','error');return}
+    if(snap.val().status!=='active'){showToast('Turnier ist beendet.','error');return}
+    const config=snap.val().config;
+    let spielerIds=[];
+    if(config.playerMode===3){
+      spielerIds=getAllPlayers();
+    }else{
+      if(joinSelectedPlayers.length!==4){showToast('Bitte genau 4 Spieler waehlen.','error');return}
+      spielerIds=joinSelectedPlayers.slice();
+    }
+    const tischRef=turnierRef.child('tische').push();
+    const tischId=tischRef.key;
+    await tischRef.set({
+      name:tischName,
+      nummer:tischNummer,
+      spielerIds:spielerIds,
+      rounds:state.rounds.length?state.rounds:[],
+      lastSync:firebase.database.ServerValue.TIMESTAMP
+    });
+    await turnierRef.update({lastActivity:firebase.database.ServerValue.TIMESTAMP});
+    state.turnier={code:code,tischId:tischId,tischName:tischName,tischNummer:tischNummer,isHost:false,isPlayer:false};
+    save();
+    closeJoinTurnier();
+    renderTurnierSetup();
+    showToast('Turnier DK-'+code+' beigetreten!','info');
+  }catch(e){
+    console.error('joinTurnier error:',e);
+    showToast('Fehler: '+e.message,'error');
+  }
+}
+
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
