@@ -96,6 +96,8 @@
 <div class="modal-overlay" id="debugModal" style="align-items:stretch;padding:0"><div class="modal" id="debugModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px;overflow-y:auto"></div></div>
 <div class="modal-overlay" id="allTimeModal" style="align-items:stretch;padding:0"><div class="modal" id="allTimeModalContent" style="border-radius:0;border:none;max-height:100vh;height:100vh;padding:16px;overflow-y:auto"></div></div>
 
+<div class="modal-overlay" id="nameModal" style="align-items:center"><div class="modal" id="nameModalContent" style="border-radius:var(--r);border:1px solid var(--bdr);padding:24px;max-width:340px;width:90%"></div></div>
+
 <div id="updateToast" class="update-toast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
   <span>Neue Version verfügbar – wird automatisch geladen…</span>
@@ -193,6 +195,109 @@ function generateQR(text,size){
   qr.addData(text);
   qr.make();
   return qr.createDataURL(size||4,0);
+}
+
+async function loadSpielerDB(){
+  if(!initFirebase())return[];
+  try{
+    const snap=await firebase.database().ref('spieler').once('value');
+    const data=snap.val()||{};
+    spielerCache=Object.entries(data).map(([id,s])=>({id,...s}));
+    return spielerCache;
+  }catch(e){
+    console.error('loadSpielerDB error:',e);
+    return spielerCache;
+  }
+}
+
+async function findSpielerByDevice(deviceId){
+  const all=await loadSpielerDB();
+  return all.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId))||null;
+}
+
+async function findSpielerByName(name){
+  const all=await loadSpielerDB();
+  return all.find(s=>s.name.toLowerCase()===name.toLowerCase())||null;
+}
+
+async function createSpieler(name){
+  if(!initFirebase())return null;
+  const id=crypto.randomUUID?crypto.randomUUID().replace(/-/g,'').slice(0,8):Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const deviceId=getDeviceId();
+  const allNames=(await loadSpielerDB()).map(s=>s.name);
+  const short=generateSpielerShort(name,allNames);
+  const spieler={name,short,deviceIds:[deviceId],createdAt:firebase.database.ServerValue.TIMESTAMP};
+  await firebase.database().ref('spieler/'+id).set(spieler);
+  spielerCache.push({id,...spieler,deviceIds:[deviceId]});
+  return{id,...spieler,deviceIds:[deviceId]};
+}
+
+async function addDeviceToSpieler(spielerId,deviceId){
+  if(!initFirebase())return;
+  const ref=firebase.database().ref('spieler/'+spielerId+'/deviceIds');
+  const snap=await ref.once('value');
+  const ids=snap.val()||[];
+  if(!ids.includes(deviceId)){
+    ids.push(deviceId);
+    await ref.set(ids);
+  }
+}
+
+async function checkFirstStart(){
+  if(!initFirebase())return;
+  const deviceId=getDeviceId();
+  const existing=await findSpielerByDevice(deviceId);
+  if(existing)return;
+  showNameModal();
+}
+
+function showNameModal(){
+  const el=document.getElementById('nameModalContent');
+  el.innerHTML='<h3 style="margin-bottom:4px">Willkommen!</h3>'
+    +'<p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Gib deinen Namen ein. Er wird fuer Turniere verwendet und kann spaeter nicht geaendert werden.</p>'
+    +'<input type="text" id="nameInput" placeholder="Vor- und Nachname" style="font-size:15px;padding:10px;width:100%;box-sizing:border-box;margin-bottom:12px">'
+    +'<div id="nameMatchHint" style="font-size:12px;color:var(--tx3);margin-bottom:12px;display:none"></div>'
+    +'<button class="btn btn-primary" onclick="submitName()">Speichern</button>';
+  document.getElementById('nameModal').classList.add('show');
+  const input=document.getElementById('nameInput');
+  input.focus();
+  let debounce=null;
+  input.addEventListener('input',function(){
+    clearTimeout(debounce);
+    debounce=setTimeout(async()=>{
+      const val=input.value.trim();
+      const hint=document.getElementById('nameMatchHint');
+      if(val.length<2){hint.style.display='none';return}
+      const match=await findSpielerByName(val);
+      if(match){
+        hint.innerHTML='<b>'+match.name+'</b> existiert bereits. <a href="#" onclick="claimExistingSpieler(\''+match.id+'\');return false" style="color:var(--primary)">Das bin ich (neues Geraet)</a>';
+        hint.style.display='block';
+      }else{
+        hint.style.display='none';
+      }
+    },400);
+  });
+}
+
+async function submitName(){
+  const name=document.getElementById('nameInput').value.trim();
+  if(!name||name.length<2){showToast('Bitte mindestens 2 Zeichen eingeben.','error');return}
+  const existing=await findSpielerByName(name);
+  if(existing){
+    showToast('Name existiert bereits. Klicke "Das bin ich" falls du es bist, oder waehle einen anderen Namen.','error');
+    return;
+  }
+  await createSpieler(name);
+  document.getElementById('nameModal').classList.remove('show');
+  showToast('Willkommen, '+name.split(' ')[0]+'!','info');
+}
+
+async function claimExistingSpieler(spielerId){
+  const deviceId=getDeviceId();
+  await addDeviceToSpieler(spielerId,deviceId);
+  document.getElementById('nameModal').classList.remove('show');
+  const spieler=spielerCache.find(s=>s.id===spielerId);
+  showToast('Geraet verknuepft mit '+(spieler?spieler.name:'Spieler')+'!','info');
 }
 
 let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10};
@@ -301,6 +406,7 @@ function load(){
   document.getElementById('archiveMax').value=state.archiveMax||10;
   renderPlayerTags();renderQuickStart();renderSoloTypes();renderArchiveList();
   if(getAllPlayers().length>=4)showScreen('eingabe');
+  checkFirstStart();
 }
 function save(){
   state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
