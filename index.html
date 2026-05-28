@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.45 · 28.05.2026 17:02</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.45 · 28.05.2026 17:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -1065,6 +1065,7 @@ async function toggleTurnierConfig(key){
   await firebase.database().ref('turniere/DK'+state.turnier.code+'/config/'+key).set(turnierConfigCache[key]);
   renderEditConfig(turnierConfigCache);
   renderTurnierSetup();
+}
 let turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false},selectedPlayers:[]};
 
 function openCreateTurnier(){
