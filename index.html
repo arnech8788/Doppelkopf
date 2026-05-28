@@ -1303,6 +1303,42 @@ function showTurnierQRCodes(){
   el.innerHTML=html;
 }
 
+async function endTurnier(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  if(!await showConfirm('Turnier DK-'+state.turnier.code+' beenden? Tische koennen danach nicht mehr beitreten.','Beenden',true))return;
+  if(!initFirebase())return;
+  try{
+    await firebase.database().ref('turniere/DK'+state.turnier.code+'/status').set('ended');
+    if(turnierListener){
+      firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
+      turnierListener=null;
+    }
+    closeTurnierDashboard();
+    state.turnier=null;
+    save();
+    renderTurnierSetup();
+    showToast('Turnier beendet.','info');
+  }catch(e){
+    console.error('endTurnier error:',e);
+    showToast('Fehler: '+e.message,'error');
+  }
+}
+
+async function leaveTurnier(silent){
+  if(!state.turnier||state.turnier.isHost)return;
+  if(!silent&&!await showConfirm('Turnier verlassen? Deine Daten bleiben fuer den Spielleiter sichtbar.','Verlassen'))return;
+  if(turnierListener&&state.turnier){
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
+    turnierListener=null;
+  }
+  closeTurnierDashboard();
+  state.turnier=null;
+  save();
+  renderTurnierSetup();
+  renderTurnierIndicator();
+  if(!silent)showToast('Turnier verlassen.','info');
+}
+
 async function deleteArchived(id){
   if(!await showConfirm('Archiviertes Spiel wirklich löschen?','Löschen',true))return;
   deleteArchivedGame(id);
