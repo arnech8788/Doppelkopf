@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.44 · 28.05.2026 16:36</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.45 · 28.05.2026 17:02</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -953,6 +953,13 @@ async function openMeineSpiele(){
 function renderTurnierSetup(){
   const el=document.getElementById('turnierSetupContent');
   if(!el)return;
+  // Config nachladen für Host-Anzeige
+  if(state.turnier&&state.turnier.isHost&&!turnierConfigCache&&initFirebase()){
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/config').get().then(cs=>{
+      turnierConfigCache=cs.val();
+      renderTurnierSetup();
+    }).catch(()=>{});
+  }
   if(!state.turnier){
     const archiv=JSON.parse(localStorage.getItem('doko-v4-turnierArchiv')||'[]');
     let html='<div style="display:flex;gap:8px;margin-top:4px">'
@@ -996,8 +1003,68 @@ function renderTurnierSetup(){
     html+='<button class="btn btn-secondary" style="flex:1" onclick="leaveTurnier()">Verlassen</button>';
   }
   html+='</div>';
+  // Konfigurationsübersicht für Spielleiter
+  if(t.isHost&&turnierConfigCache){
+    const c=turnierConfigCache;
+    const mNames={1:'Feste Liste',2:'Liste + Ergänzung',3:'Freie Eingabe',4:'Spieler-App'};
+    const tNames={fixed:'Feste Tische',rotation:'Rotation'};
+    html+='<div style="margin-top:8px;font-size:12px;color:var(--tx3);background:var(--bg3);border-radius:var(--r-sm);padding:8px 10px;cursor:pointer" onclick="openEditTurnierConfig()">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500;color:var(--tx2)">Einstellungen</span>'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="9 18 15 12 9 6"/></svg></div>'
+      +'<div style="margin-top:4px">'+mNames[c.playerMode]+' · '+tNames[c.tableMode];
+    if(c.tableMode==='rotation'){
+      html+=' · '+({host:'Spielleiter-Zuweisung',self:'Freier Wechsel'}[c.rotationType]||'');
+      if(c.rotationTrigger==='afterRounds')html+=' · nach '+c.rotationAfterRounds+' Runden';
+      else html+=' · manuell';
+    }
+    html+='</div><div style="margin-top:2px">Sichtbarkeit: '+(c.playersVisible?'Alle Tische':'Nur eigener Tisch')+'</div></div>';
+  }
   el.innerHTML=html;
 }
+
+async function openEditTurnierConfig(){
+  if(!state.turnier||!state.turnier.isHost)return;
+  if(!initFirebase())return;
+  document.getElementById('turnierModal').classList.add('show');
+  const el=document.getElementById('turnierModalContent');
+  const code=state.turnier.code;
+  let c=turnierConfigCache;
+  if(!c){
+    try{const cs=await firebase.database().ref('turniere/DK'+code+'/config').get();c=cs.val();turnierConfigCache=c}catch(e){return}
+  }
+  if(!c)return;
+  renderEditConfig(c);
+}
+
+function renderEditConfig(c){
+  const el=document.getElementById('turnierModalContent');
+  const mNames={1:'Feste Liste',2:'Liste + Ergänzung',3:'Freie Eingabe',4:'Spieler-App'};
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Einstellungen</h3>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div class="card" style="font-size:13px;margin-top:12px">'
+    +'<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span style="color:var(--tx3)">Spieler-Modus:</span> '+mNames[c.playerMode]+'</div>'
+    +'<div style="padding:6px 0;border-bottom:1px solid var(--bdr)"><span style="color:var(--tx3)">Tisch-Modus:</span> '+(c.tableMode==='fixed'?'Feste Tische':'Rotation');
+  if(c.tableMode==='rotation'){
+    html+=' ('+({host:'Spielleiter-Zuweisung',self:'Freier Wechsel'}[c.rotationType]||'')+', ';
+    html+=(c.rotationTrigger==='afterRounds'?'nach '+c.rotationAfterRounds+' Runden':'manuell')+')';
+  }
+  html+='</div></div>';
+  html+='<div class="toggle-row" style="margin-top:12px;padding:8px 0"><span class="toggle-label">Gesamtwertung</span>'
+    +'<button class="toggle'+(c.scoringEnabled?' on':'')+'" onclick="toggleTurnierConfig(\'scoringEnabled\')"></button></div>';
+  html+='<div class="toggle-row" style="padding:8px 0"><span class="toggle-label">Spieler sehen andere Tische</span>'
+    +'<button class="toggle'+(c.playersVisible?' on':'')+'" onclick="toggleTurnierConfig(\'playersVisible\')"></button></div>';
+  el.innerHTML=html;
+}
+
+async function toggleTurnierConfig(key){
+  if(!state.turnier||!state.turnier.isHost)return;
+  if(!initFirebase()||!turnierConfigCache)return;
+  turnierConfigCache[key]=!turnierConfigCache[key];
+  await firebase.database().ref('turniere/DK'+state.turnier.code+'/config/'+key).set(turnierConfigCache[key]);
+  renderEditConfig(turnierConfigCache);
+  renderTurnierSetup();
 let turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false},selectedPlayers:[]};
 
 function openCreateTurnier(){
@@ -1029,10 +1096,10 @@ function renderWizardStep(){
 
 function renderWizardStep1(){
   const modes=[
-    {id:1,name:'Feste Liste',desc:'Du wählst alle Spieler vorab aus. Tische wählen daraus.'},
+    {id:1,name:'Feste Liste',desc:'Du wählst alle Spieler vorab aus. Tische werden daraus besetzt.'},
     {id:2,name:'Liste + Ergänzung',desc:'Wie feste Liste, aber Tische können eigene Spieler ergänzen.'},
     {id:3,name:'Freie Eingabe',desc:'Jeder Tisch trägt seine Spieler selbst ein.'},
-    {id:4,name:'Spieler-App',desc:'Jeder Spieler tritt selbst bei und sieht eigene Ergebnisse. (Erst ab Phase 2 – aktuell wie Liste + Ergänzung)'}
+    {id:4,name:'Spieler-App',desc:'Jeder Spieler tritt selbst bei und sieht eigene Ergebnisse.'}
   ];
   let html='<div class="section-label">Spieler-Modus</div>';
   modes.forEach(m=>{
@@ -1181,7 +1248,7 @@ async function openAddPlayerDialog(context){
 
 function renderWizardStep4(){
   const c=turnierWizard.config;
-  const modeNames={1:'Feste Liste',2:'Liste + Ergänzung',3:'Freie Eingabe',4:'Spieler-App (aktuell: Liste + Ergänzung)'};
+  const modeNames={1:'Feste Liste',2:'Liste + Ergänzung',3:'Freie Eingabe',4:'Spieler-App'};
   const tableNames={fixed:'Feste Tische',rotation:'Rotation'};
   let html='<div class="section-label">Turniername (optional)</div>'
     +'<input type="text" id="turnierNameInput" placeholder="z.B. Doko-Abend Mai 2026" value="'+(turnierWizard.turnierName||'')+'" oninput="turnierWizard.turnierName=this.value" style="width:100%;box-sizing:border-box;font-size:14px;padding:10px;margin-bottom:16px;border:1px solid var(--bdr);border-radius:var(--r-sm);background:var(--bg);color:var(--tx)">';
@@ -1367,8 +1434,7 @@ async function loadJoinTurnierInfo(code,prefillTisch){
       const alreadyJoined=teilnehmerIds.includes(ownSpieler.id);
       html+='<div class="card" style="text-align:center;padding:16px">'
         +'<div style="font-size:14px;font-weight:600;margin-bottom:8px">Hallo, '+(ownSpieler.short||ownSpieler.name)+'!</div>';
-      if(alreadyJoined)html+='<div style="font-size:13px;color:var(--grn);margin-bottom:12px">Du nimmst bereits teil.</div>';
-      else html+='<div style="font-size:13px;color:var(--tx2);margin-bottom:12px">Tritt als Spieler bei.</div>';
+      html+='<div style="font-size:13px;color:var(--tx2);margin-bottom:12px">'+(alreadyJoined?'Du bist registriert. Wähle einen Tisch oder tritt ohne Tisch bei.':'Tritt als Spieler bei.')+'</div>';
       if(tischArr.length){
         html+='<div style="text-align:left;margin-top:12px"><div class="section-label">Tisch wählen</div>';
         tischArr.forEach(t=>{
@@ -1384,9 +1450,7 @@ async function loadJoinTurnierInfo(code,prefillTisch){
         html+='<div style="font-size:13px;color:var(--tx3);margin-top:8px">Noch keine Tische vorhanden.</div>';
       }
       html+='</div>';
-      if(!alreadyJoined){
-        html+='<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="registerAsPlayer(\''+code+'\',\''+ownSpieler.id+'\')">Als Spieler beitreten</button>';
-      }
+      html+='<button class="btn btn-'+(tischArr.length?'secondary':'primary')+'" style="width:100%;margin-top:12px" onclick="registerAsPlayer(\''+code+'\',\''+ownSpieler.id+'\')">Ohne Tisch beitreten</button>';
       el.innerHTML=html;return;
     }
 
@@ -2153,7 +2217,7 @@ async function showTurnierArchiv(){
     +'<h3 style="margin:0">Turnier-Archiv</h3>'
     +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">Tippe auf ein Turnier um die Ergebnisse aus Firebase zu laden.</div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">Tippe auf ein Turnier um die Ergebnisse zu laden.</div>';
   archiv.forEach(a=>{
     const d=new Date(a.date);
     const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -2174,7 +2238,7 @@ async function openArchivTurnier(code){
   el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade...</div>';
   try{
     const snap=await firebase.database().ref('turniere/DK'+code).get();
-    if(!snap.exists()){showToast('Turnier nicht mehr in Firebase vorhanden.','error');closeTurnierDashboard();return}
+    if(!snap.exists()){showToast('Turnier nicht mehr vorhanden.','error');closeTurnierDashboard();return}
     await loadSpielerDB();
     const data=snap.val();
     const tische=data.tische||{};
@@ -3631,6 +3695,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.45',d:'28.05.2026 17:02',t:'Turnier: Textkorrekturen (Firebase-Referenzen entfernt, Wizard-Beschreibungen), Konfigurationsübersicht im Setup für Spielleiter mit Änderungsmöglichkeit (Sichtbarkeit, Gesamtwertung), Spieler-App Beitritt für bereits registrierte Spieler verbessert.'},
     {v:'4.44',d:'28.05.2026 16:36',t:'Turnier Phase 3: Rotation \u2013 Spielleiter startet Tischwechsel (manuell oder nach X Runden). Host-Zuweisung per Tisch-UI oder Selbstwahl durch Spieler. Gesamtwertung mit Podium \u00fcber alle Rotationen. Rotations-Historie im Dashboard.'},
     {v:'4.43',d:'28.05.2026 16:21',t:'Turnier: 4-Spieler-Pflicht beim Beitreten entfernt – Spieler können auch nachträglich ergänzt werden. „+ Spieler"-Button mit Checkbox „Spieler hat kein eigenes Handy" statt zwei separate Buttons.'},
     {v:'4.42',d:'28.05.2026 16:10',t:'Turnier Phase 2: Spieler-App (Modus 4) – Einzelspieler treten bei und wählen ihren Tisch. „Meine Spiele"-Ansicht zeigt eigene Punkte und Runden über alle Tische. Schreiber-Rolle pro Tisch mit Abgabe-Funktion und Zuschauer-Modus. Sichtbarkeits-Steuerung: Spielleiter bestimmt ob Spieler andere Tische sehen. Spieler ohne Gerät können manuell hinzugefügt werden.'},
