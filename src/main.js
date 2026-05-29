@@ -70,7 +70,7 @@ export function setTimerInterval(v){timerInterval=v}
 export async function getDeviceInfo(){
   const info={appVersion:'',browser:'',os:'',model:'',screen:'',viewport:'',dpr:'',theme:'',online:'',sw:''};
   // App-Version aus Fußzeile
-  const verEl=document.querySelector('#screen-setup div[style*="font-size:10px"]');
+  const verEl=document.querySelector('#screen-mehr div[style*="font-size:10px"]');
   info.appVersion=verEl?verEl.textContent.trim():'unbekannt';
   // User-Agent Client Hints (Chromium only)
   try{
@@ -140,12 +140,15 @@ export function save(){
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
 }
 
+// ── Einstellungen (Stub – wird in Task 3 implementiert) ──
+export function openSettings(){}
+
 // ── Screen-Navigation ──
 export function showScreen(id){
-  if(viewingArchive&&(id==='setup'||id==='eingabe'))viewingArchive=null;
+  if(viewingArchive&&(id==='mehr'||id==='eingabe'))viewingArchive=null;
   document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active')});
   document.getElementById('screen-'+id).classList.add('active');
-  document.querySelectorAll('.nav button').forEach((b,i)=>{b.classList.toggle('active',['setup','eingabe','tabelle','stats'][i]===id)});
+  document.querySelectorAll('.bottom-nav button').forEach((b,i)=>{b.classList.toggle('active',['eingabe','tabelle','stats','mehr'][i]===id)});
   if(id==='eingabe'){
     const el=document.getElementById('eingabeContent');
     if(!el.dataset.roundCount||parseInt(el.dataset.roundCount)!==state.rounds.length){
@@ -352,7 +355,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
-    {v:'5.0',d:'29.05.2026',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
+    {v:'5.0',d:'29.05.2026 15:14',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
     {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
     {v:'4.48',d:'29.05.2026 13:10',t:'Teilen-Bilder werden jetzt im Hintergrund vorgerendert \u2013 sofortiges Teilen ohne Wartezeit, höhere Bildqualität (scale 2).'},
     {v:'4.47',d:'28.05.2026 17:47',t:'Turnier: Spielleiter kann jetzt Tische erstellen und beitreten \u2013 Co-Host-Erkennung blockiert nicht mehr den eigenen Host.'},
@@ -547,8 +550,10 @@ export function toggleTheme(){
   updateThemeIcon();
 }
 export function updateThemeIcon(){
+  const el=document.getElementById('themeIcon');
+  if(!el)return;
   const isLight=document.documentElement.getAttribute('data-theme')==='light';
-  document.getElementById('themeIcon').innerHTML=isLight?'<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  el.innerHTML=isLight?'<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
 }
 (function(){
   const saved=localStorage.getItem('doko-theme');
@@ -580,7 +585,7 @@ const updateSW = registerSW({
 Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
-    showScreen, toggleTheme, getChartColors,
+    showScreen, toggleTheme, getChartColors, openSettings,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
   },
