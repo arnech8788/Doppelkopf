@@ -1,5 +1,5 @@
 import Chart from 'chart.js/auto';
-import { state, viewingArchive, COLORS, ACHIEVEMENTS, getChartColors, getHistoricalPlayers } from './main.js';
+import { state, viewingArchive, COLORS, ACHIEVEMENTS, getChartColors, getHistoricalPlayers, getPlayerEmoji } from './main.js';
 import { ICO } from './ui.js';
 
 let chartInstances=[];
@@ -50,9 +50,9 @@ export function renderStats(){
   let html='<div id="shareableStats">';
   html+='<div class="stat-grid">';
   html+='<div class="stat-card"><div class="stat-val">'+rounds.length+'</div><div class="stat-label">Spiele</div></div>';
-  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+'</div><div class="stat-label">Bester Spieler</div></div>';
+  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+bestPlayer+(getPlayerEmoji(bestPlayer)?' '+getPlayerEmoji(bestPlayer):'')+'</div><div class="stat-label">Bester Spieler</div></div>';
   html+='<div class="stat-card"><div class="stat-val">'+rounds.filter(r=>r.solo).length+'</div><div class="stat-label">Soli</div></div>';
-  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+'</div><div class="stat-label">👑 Solokönig</div></div>';
+  html+='<div class="stat-card"><div class="stat-val" style="font-size:16px">'+soloKing+(getPlayerEmoji(soloKing)?' '+getPlayerEmoji(soloKing):'')+'</div><div class="stat-label">👑 Solokönig</div></div>';
   html+='</div>';
   html+=buildHighlights(all,rounds,src);
   html+=buildAchievementSection(all,src);
@@ -62,7 +62,7 @@ export function renderStats(){
     const avg=gamesPlayed[p]?Math.round(totals[p]/gamesPlayed[p]*10)/10:0;
     const winRate=gamesPlayed[p]?Math.round(wins[p]/gamesPlayed[p]*100):0;
     const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
-    html+='<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank '+rc+'" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">'+(i+1)+'</span>'+p+'</span><span class="'+(totals[p]>=0?'pos':'neg')+'" style="font-family:\'Space Mono\',monospace;font-weight:700">'+(totals[p]>0?'+':'')+totals[p]+'</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--tx3);margin-left:26px"><span>Siege: '+winRate+'%</span><span>Schnitt: '+(avg>0?'+':'')+avg+'</span><span>Soli: '+soloWins[p]+'/'+(soloWins[p]+soloLosses[p])+'</span></div></div>';
+    html+='<div style="padding:10px 0;border-bottom:1px solid var(--bdr)"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank '+rc+'" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">'+(i+1)+'</span>'+p+(getPlayerEmoji(p)?' '+getPlayerEmoji(p):'')+'</span><span class="'+(totals[p]>=0?'pos':'neg')+'" style="font-family:\'Space Mono\',monospace;font-weight:700">'+(totals[p]>0?'+':'')+totals[p]+'</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--tx3);margin-left:26px"><span>Siege: '+winRate+'%</span><span>Schnitt: '+(avg>0?'+':'')+avg+'</span><span>Soli: '+soloWins[p]+'/'+(soloWins[p]+soloLosses[p])+'</span></div></div>';
   });
   html+='</div></div>';
   html+='<div class="section-label" style="margin-top:20px">Punkteverlauf</div><div class="card"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>';

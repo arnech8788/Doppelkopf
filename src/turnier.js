@@ -456,6 +456,12 @@ export function renderWizardStep(){
   el.innerHTML=html;
 }
 
+// Wizard-Setter: turnierWizard ist modul-lokal (nicht global), daher muessen
+// onclick-Handler ueber diese exportierten Funktionen gehen statt turnierWizard direkt zu mutieren.
+export function wizardSetConfig(key,val){turnierWizard.config[key]=val;renderWizardStep()}
+export function wizardGoStep(n){turnierWizard.step=n;renderWizardStep()}
+export function wizardToggleConfig(key){turnierWizard.config[key]=!turnierWizard.config[key];renderWizardStep()}
+
 export function renderWizardStep1(){
   const modes=[
     {id:1,name:'Feste Liste',desc:'Du wählst alle Spieler vorab aus. Tische werden daraus besetzt.'},
@@ -466,12 +472,12 @@ export function renderWizardStep1(){
   let html='<div class="section-label">Spieler-Modus</div>';
   modes.forEach(m=>{
     const sel=turnierWizard.config.playerMode===m.id;
-    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.playerMode='+m.id+';renderWizardStep()">'
+    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="wizardSetConfig(\'playerMode\','+m.id+')">'
       +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
       +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
   });
   html+='<div style="margin-top:16px;display:flex;justify-content:flex-end">'
-    +'<button class="btn btn-primary" onclick="turnierWizard.step=2;renderWizardStep()">Weiter</button></div>';
+    +'<button class="btn btn-primary" onclick="wizardGoStep(2)">Weiter</button></div>';
   return html;
 }
 
@@ -481,7 +487,7 @@ export function renderWizardStep2(){
   [{id:'fixed',name:'Feste Tische',desc:'Spieler bleiben den ganzen Abend am gleichen Tisch.'},
    {id:'rotation',name:'Rotation',desc:'Spieler wechseln zwischen Tischen.'}].forEach(m=>{
     const sel=c.tableMode===m.id;
-    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.tableMode=\''+m.id+'\';renderWizardStep()">'
+    html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="wizardSetConfig(\'tableMode\',\''+m.id+'\')">'
       +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
       +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
   });
@@ -490,7 +496,7 @@ export function renderWizardStep2(){
     [{id:'host',name:'Spielleiter',desc:'Du gibst die neue Tischaufteilung vor.'},
      {id:'self',name:'Freier Wechsel',desc:'Spieler wechseln selbst (z.B. Cocktail Hopping).'}].forEach(m=>{
       const sel=c.rotationType===m.id;
-      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.rotationType=\''+m.id+'\';renderWizardStep()">'
+      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="wizardSetConfig(\'rotationType\',\''+m.id+'\')">'
         +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
         +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
     });
@@ -498,7 +504,7 @@ export function renderWizardStep2(){
     [{id:'manual',name:'Manuell',desc:'Du löst den Wechsel im Dashboard aus.'},
      {id:'afterRounds',name:'Nach X Runden',desc:'Automatischer Hinweis nach einer bestimmten Rundenzahl.'}].forEach(m=>{
       const sel=c.rotationTrigger===m.id;
-      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="turnierWizard.config.rotationTrigger=\''+m.id+'\';renderWizardStep()">'
+      html+='<div class="wizard-option'+(sel?' selected':'')+'" onclick="wizardSetConfig(\'rotationTrigger\',\''+m.id+'\')">'
         +'<div style="font-weight:600;font-size:14px">'+m.name+'</div>'
         +'<div style="font-size:12px;color:var(--tx3);margin-top:2px">'+m.desc+'</div></div>';
     });
@@ -508,7 +514,7 @@ export function renderWizardStep2(){
     }
   }
   html+='<div style="margin-top:16px;display:flex;justify-content:space-between">'
-    +'<button class="btn btn-secondary" onclick="turnierWizard.step=1;renderWizardStep()">Zurück</button>'
+    +'<button class="btn btn-secondary" onclick="wizardGoStep(1)">Zurück</button>'
     +'<button class="btn btn-primary" onclick="wizardToStep3()">Weiter</button></div>';
   return html;
 }
@@ -532,8 +538,8 @@ export function renderWizardStep3(){
     +'<div id="wizPlayerList"></div>'
     +'<div id="wizSelectedPlayers" style="margin-top:12px"></div>'
     +'<div style="margin-top:16px;display:flex;justify-content:space-between">'
-    +'<button class="btn btn-secondary" onclick="turnierWizard.step=2;renderWizardStep()">Zurück</button>'
-    +'<button class="btn btn-primary" onclick="turnierWizard.step=4;renderWizardStep()">Weiter</button></div>';
+    +'<button class="btn btn-secondary" onclick="wizardGoStep(2)">Zurück</button>'
+    +'<button class="btn btn-primary" onclick="wizardGoStep(4)">Weiter</button></div>';
   setTimeout(()=>renderWizardPlayerList(),0);
   return html;
 }
@@ -629,11 +635,11 @@ export function renderWizardStep4(){
   html+='<div style="padding:6px 0"><span style="color:var(--tx3)">Sichtbarkeit:</span> '+(c.playersVisible?'Alle Tische':'Nur eigener Tisch')+'</div>';
   html+='</div>';
   html+='<div class="toggle-row" style="margin-top:12px;padding:8px 0"><span class="toggle-label">Gesamtwertung</span>'
-    +'<button class="toggle'+(c.scoringEnabled?' on':'')+'" onclick="turnierWizard.config.scoringEnabled=!turnierWizard.config.scoringEnabled;this.classList.toggle(\'on\');renderWizardStep()"></button></div>';
+    +'<button class="toggle'+(c.scoringEnabled?' on':'')+'" onclick="wizardToggleConfig(\'scoringEnabled\')"></button></div>';
   html+='<div class="toggle-row" style="padding:8px 0"><span class="toggle-label">Spieler sehen andere Tische</span>'
-    +'<button class="toggle'+(c.playersVisible?' on':'')+'" onclick="turnierWizard.config.playersVisible=!turnierWizard.config.playersVisible;this.classList.toggle(\'on\');renderWizardStep()"></button></div>';
+    +'<button class="toggle'+(c.playersVisible?' on':'')+'" onclick="wizardToggleConfig(\'playersVisible\')"></button></div>';
   html+='<div style="margin-top:16px;display:flex;justify-content:space-between">'
-    +'<button class="btn btn-secondary" onclick="turnierWizard.step='+(c.playerMode===3?2:3)+';renderWizardStep()">Zurück</button>'
+    +'<button class="btn btn-secondary" onclick="wizardGoStep('+(c.playerMode===3?2:3)+')">Zurück</button>'
     +'<button class="btn btn-primary" onclick="submitCreateTurnier()">Turnier erstellen</button></div>';
   return html;
 }
@@ -1206,6 +1212,10 @@ export function closeTurnierDashboard(){
 }
 document.getElementById('turnierModal').addEventListener('click',function(e){if(e.target===this)closeTurnierDashboard()});
 
+// Setter fuer onclick (Variablen sind modul-lokal, nicht global)
+export function dashboardSetTab(tab){dashboardTab=tab;renderTurnierDashboard(lastTischeSnapshot)}
+export function zuweisungSetTisch(id){zuweisungActiveTisch=id;renderZuweisung()}
+
 export function renderTurnierDashboard(tische){
   const el=document.getElementById('turnierModalContent');
   if(!state.turnier)return;
@@ -1233,10 +1243,10 @@ export function renderTurnierDashboard(tische){
 
   // Tab-Navigation
   html+='<div class="turnier-tabs">'
-    +'<button class="turnier-tab'+(dashboardTab==='tische'?' active':'')+'" onclick="dashboardTab=\'tische\';renderTurnierDashboard(lastTischeSnapshot)">Tische</button>'
-    +'<button class="turnier-tab'+(dashboardTab==='gesamt'?' active':'')+'" onclick="dashboardTab=\'gesamt\';renderTurnierDashboard(lastTischeSnapshot)">Gesamtwertung</button>';
+    +'<button class="turnier-tab'+(dashboardTab==='tische'?' active':'')+'" onclick="dashboardSetTab(\'tische\')">Tische</button>'
+    +'<button class="turnier-tab'+(dashboardTab==='gesamt'?' active':'')+'" onclick="dashboardSetTab(\'gesamt\')">Gesamtwertung</button>';
   if(isRotation){
-    html+='<button class="turnier-tab'+(dashboardTab==='historie'?' active':'')+'" onclick="dashboardTab=\'historie\';renderTurnierDashboard(lastTischeSnapshot)">Historie</button>';
+    html+='<button class="turnier-tab'+(dashboardTab==='historie'?' active':'')+'" onclick="dashboardSetTab(\'historie\')">Historie</button>';
   }
   html+='</div>';
 
@@ -1491,7 +1501,7 @@ export function renderZuweisung(){
   tischArr.forEach(t=>{
     const assigned=allSpieler.filter(id=>zuweisungData.spielerZuweisung[id]===t.id);
     const isActive=zuweisungActiveTisch===t.id;
-    html+='<div class="zuweisung-tisch'+(assigned.length?' has-players':'')+'" style="'+(isActive?'border-color:var(--acc);background:color-mix(in srgb,var(--acc) 5%,transparent)':'')+'" onclick="zuweisungActiveTisch=\''+t.id+'\';renderZuweisung()">'
+    html+='<div class="zuweisung-tisch'+(assigned.length?' has-players':'')+'" style="'+(isActive?'border-color:var(--acc);background:color-mix(in srgb,var(--acc) 5%,transparent)':'')+'" onclick="zuweisungSetTisch(\''+t.id+'\')">'
       +'<div style="font-weight:600;font-size:14px;margin-bottom:6px">'+(t.name||'Tisch '+t.nummer)+' ('+assigned.length+'/4)</div>';
     assigned.forEach(id=>{
       html+='<span class="zuweisung-chip assigned" onclick="event.stopPropagation();unassignSpieler(\''+id+'\')">'+nameOf(id)+' &times;</span>';

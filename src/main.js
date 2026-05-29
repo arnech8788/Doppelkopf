@@ -169,6 +169,17 @@ export function openSettings(){
   html+='<div class="card"><div class="card-title">Darstellung</div>';
   const isLight=document.documentElement.getAttribute('data-theme')==='light';
   html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Dark Mode</span><button class="toggle'+(!isLight?' on':'')+'" onclick="this.classList.toggle(\'on\');toggleTheme()"></button></div>';
+  // Akzentfarbe frei wählbar
+  const presets=['#2563eb','#7c3aed','#db2777','#dc2626','#ea580c','#16a34a','#0891b2','#ca8a04'];
+  const curAcc=(localStorage.getItem('doko-accent')||'').toLowerCase();
+  html+='<div style="margin-top:12px"><span class="toggle-label">Akzentfarbe</span>';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px">';
+  html+='<button onclick="setAccent(\'\')" title="Standard" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:linear-gradient(135deg,#1a9e8f,#2ec4b6);border:3px solid '+(curAcc?'var(--bdr)':'var(--tx)')+'"></button>';
+  presets.forEach(col=>{
+    html+='<button onclick="setAccent(\''+col+'\')" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:'+col+';border:3px solid '+(curAcc===col?'var(--tx)':'var(--bdr)')+'"></button>';
+  });
+  html+='<label title="Eigene Farbe" style="width:30px;height:30px;border-radius:50%;cursor:pointer;border:1px dashed var(--bdr);display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:14px">🎨<input type="color" value="'+(curAcc||'#1a9e8f')+'" onchange="setAccent(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%"></label>';
+  html+='</div></div>';
   html+='</div>';
 
   // Debug
@@ -333,7 +344,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.2 · 29.05.2026</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.3 · 29.05.2026</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -421,6 +432,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.3',d:'29.05.2026',t:'Akzentfarbe frei wählbar (Einstellungen → Darstellung). Emojis erscheinen jetzt auch in der Statistik hinter den Spielern. Bugfix: Im Turnier-Wizard lassen sich die Modi wieder anklicken (auch Dashboard-Tabs und Tisch-Zuweisung).'},
     {v:'5.2',d:'29.05.2026',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
     {v:'5.1',d:'29.05.2026 16:26',t:'Navigation umgebaut: Bottom-Nav statt Pill-Bar oben. Setup-Screen aufgelöst in Eingabe-Leerzustand, Mehr-Screen und Einstellungen-Modal. Spieler-Leiste mit Kebab-Menü im Eingabe-Screen.'},
     {v:'5.0',d:'29.05.2026 15:14',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
@@ -627,10 +639,41 @@ export function updateThemeIcon(){
   const isLight=document.documentElement.getAttribute('data-theme')==='light';
   el.innerHTML=isLight?'<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>':'<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
 }
+// ── Akzentfarbe (frei wählbar, überschreibt die Theme-Standardfarbe) ──
+function hexToRgb(hex){
+  const m=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex||'');
+  return m?{r:parseInt(m[1],16),g:parseInt(m[2],16),b:parseInt(m[3],16)}:null;
+}
+function lightenHex(hex,pct){
+  const c=hexToRgb(hex);if(!c)return hex;
+  const f=v=>Math.round(v+(255-v)*(pct/100)).toString(16).padStart(2,'0');
+  return '#'+f(c.r)+f(c.g)+f(c.b);
+}
+// Setzt --acc/--acc2/--acc-bg als Inline-Override (leerer Wert = Theme-Standard)
+export function applyAccent(hex){
+  const root=document.documentElement;
+  if(hex){
+    const c=hexToRgb(hex);
+    root.style.setProperty('--acc',hex);
+    root.style.setProperty('--acc2',lightenHex(hex,18));
+    if(c)root.style.setProperty('--acc-bg','rgba('+c.r+','+c.g+','+c.b+',.12)');
+  }else{
+    root.style.removeProperty('--acc');
+    root.style.removeProperty('--acc2');
+    root.style.removeProperty('--acc-bg');
+  }
+}
+export function setAccent(hex){
+  if(hex)localStorage.setItem('doko-accent',hex);else localStorage.removeItem('doko-accent');
+  applyAccent(hex);
+  openSettings(); // Modal neu rendern, damit die aktive Farbe markiert wird
+}
+
 (function(){
   const saved=localStorage.getItem('doko-theme');
   if(saved)document.documentElement.setAttribute('data-theme',saved);
   else document.documentElement.setAttribute('data-theme','light');
+  applyAccent(localStorage.getItem('doko-accent')||'');
   updateThemeIcon();
 })();
 
@@ -658,6 +701,7 @@ Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
     showScreen, shareCurrentScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
+    applyAccent, setAccent,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll
