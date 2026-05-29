@@ -8,40 +8,16 @@ export function renderEingabe(){
   const spielerLeiste=document.getElementById('spielerLeiste');
 
   if(getAllPlayers().length<4){
-    // Leerzustand
+    // Leerzustand – Spielerverwaltung lebt jetzt im Spieler-Tab
     spielerLeiste.innerHTML='';
-    let html='<div class="empty-start">';
-    html+='<div id="quickStartCard" style="width:100%"></div>';
-    html+='<div class="inline-setup"><div class="card"><div class="card-title">Spieler</div>';
-    html+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Mindestens 4 Spieler eintragen. Der erste gibt zuerst.</div>';
-    html+='<div id="playerManageList"></div>';
-    html+='<div class="input-wrap" style="margin-top:8px"><input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off"><div class="suggestions" id="suggestions"></div></div>';
-    html+='<button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>';
-    html+='</div></div>';
-    html+='</div>';
-    document.getElementById('eingabeContent').innerHTML=html;
     document.getElementById('bockIndicator').innerHTML='';
-    renderPlayerTags();
-    renderQuickStart();
-    initAddPlayerInput();
+    document.getElementById('eingabeContent').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Trage zuerst mindestens 4 Spieler ein.<button class="btn btn-primary" style="margin-top:14px;width:auto;padding:10px 20px" onclick="showScreen(\'spieler\')">Zu „Spieler"</button></div>';
     return;
   }
 
-  // Spieler-Leiste mit Kebab
-  const all_leiste=getAllPlayers();
-  const dealerIdx_leiste=state.rounds.length%all_leiste.length;
-  let leiste='<div class="spieler-leiste"><div class="chips">';
-  all_leiste.forEach((p,i)=>{
-    leiste+='<span class="spieler-chip-sm'+(i===dealerIdx_leiste?' geber':'')+'">'+p+(i===dealerIdx_leiste?' (G)':'')+'</span>';
-  });
-  leiste+='</div><div class="kebab-wrap"><button class="kebab-btn" onclick="toggleKebab()">&#8942;</button>';
-  leiste+='<div class="kebab-dropdown" id="kebabMenu" style="display:none">';
-  leiste+='<div class="kebab-item" onclick="closeKebab();openPlayerManageModal()">&#9998; Spieler bearbeiten</div>';
-  leiste+='<div class="kebab-item" onclick="closeKebab();openAddPlayerInline()">&#10010; Spieler hinzufügen</div>';
-  leiste+='<div class="kebab-item" onclick="closeKebab();startNewGame()">&#9654; Neues Spiel starten</div>';
-  leiste+='<div class="kebab-item danger" onclick="closeKebab();endGame()">&#9632; Spiel beenden</div>';
-  leiste+='</div></div></div>';
-  spielerLeiste.innerHTML=leiste;
+  // Spieler-Leiste entfernt (spart Platz) – Spielerverwaltung lebt im Spieler-Tab,
+  // der aktuelle Geber steht im Karten-Titel weiter unten.
+  spielerLeiste.innerHTML='';
 
   const bi=document.getElementById('bockIndicator');
   let biHtml='';

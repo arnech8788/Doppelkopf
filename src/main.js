@@ -123,7 +123,7 @@ export function load(){
   try{const s=localStorage.getItem('doko-v4');if(s){const d=JSON.parse(s);Object.assign(state,d)}}catch(e){}
   renderTurnierIndicator();
   if(getAllPlayers().length>=4)showScreen('eingabe');
-  else showScreen('eingabe');
+  else showScreen('spieler');
   checkFirstStart();
   checkTurnierUrlParam();
   restoreTischPlayers();
@@ -195,12 +195,12 @@ document.getElementById('settingsModal').addEventListener('click',function(e){if
 
 // ── Screen-Navigation ──
 export function showScreen(id){
-  if(viewingArchive&&(id==='mehr'||id==='eingabe'))viewingArchive=null;
+  if(viewingArchive&&(id==='mehr'||id==='eingabe'||id==='spieler'))viewingArchive=null;
   document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active')});
   document.getElementById('screen-'+id).classList.add('active');
-  document.querySelectorAll('.bottom-nav button').forEach((b,i)=>{b.classList.toggle('active',['eingabe','tabelle','stats','mehr'][i]===id)});
+  document.querySelectorAll('.bottom-nav button').forEach((b,i)=>{b.classList.toggle('active',['spieler','eingabe','tabelle','stats','mehr'][i]===id)});
   // Kopfzeile: zeigt den Namen des aktiven Screens (eine einzige Titelzeile)
-  const TITLES={eingabe:'Eingabe',tabelle:'Spielverlauf',stats:'Statistiken',mehr:'Mehr'};
+  const TITLES={spieler:'Spieler',eingabe:'Eingabe',tabelle:'Spielverlauf',stats:'Statistiken',mehr:'Mehr'};
   const titleEl=document.getElementById('appTitle');
   if(titleEl)titleEl.textContent=TITLES[id]||'Eingabe';
   const shareBtn=document.getElementById('headerShareBtn');
@@ -216,6 +216,7 @@ export function showScreen(id){
   if(id==='tabelle')renderTabelle(true);
   if(id==='stats'){renderStats();schedulePrerenderShareImages();}
   if(id==='mehr')renderMehrScreen();
+  if(id==='spieler')renderSpielerScreen();
 }
 
 // Teilen-Aktion der Kopfzeile – leitet je nach aktivem Screen weiter
@@ -344,7 +345,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.3 · 29.05.2026</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.4 · 29.05.2026</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -432,6 +433,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.4',d:'29.05.2026',t:'Eigener "Spieler"-Reiter unten: Spieler eintragen/umbenennen/sortieren, Quickstart und Spielsteuerung an einem Ort. Dafür die Spielernamen-Leiste oben im Eingabe-Screen entfernt (mehr Platz fürs Numpad).'},
     {v:'5.3',d:'29.05.2026',t:'Akzentfarbe frei wählbar (Einstellungen → Darstellung). Emojis erscheinen jetzt auch in der Statistik hinter den Spielern. Bugfix: Im Turnier-Wizard lassen sich die Modi wieder anklicken (auch Dashboard-Tabs und Tisch-Zuweisung).'},
     {v:'5.2',d:'29.05.2026',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
     {v:'5.1',d:'29.05.2026 16:26',t:'Navigation umgebaut: Bottom-Nav statt Pill-Bar oben. Setup-Screen aufgelöst in Eingabe-Leerzustand, Mehr-Screen und Einstellungen-Modal. Spieler-Leiste mit Kebab-Menü im Eingabe-Screen.'},

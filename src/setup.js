@@ -153,6 +153,31 @@ export function initAddPlayerInput(){
 initAddPlayerInput();
 export function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 
+// Eigener Spieler-Screen (Bottom-Nav-Reiter "Spieler"): Spieler eintragen/anpassen,
+// Quickstart und Spielsteuerung – wiederverwendet die vorhandenen Render-Helfer.
+export function renderSpielerScreen(){
+  const el=document.getElementById('spielerContent');
+  if(!el)return;
+  let html='<div id="quickStartCard"></div>';
+  html+='<div class="card"><div class="card-title">Spieler</div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Reihenfolge bestimmt den Geber – der erste Spieler gibt zuerst. Antippen zum Umbenennen, Pfeile zum Sortieren.</div>';
+  html+='<div id="playerManageList"></div>';
+  html+='<div class="input-wrap" style="margin-top:8px"><input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off"><div class="suggestions" id="suggestions"></div></div>';
+  html+='<button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>';
+  html+='</div>';
+  if(state.rounds.length>0){
+    html+='<div class="card"><div class="card-title">Aktuelles Spiel</div>';
+    html+='<div style="display:flex;gap:8px">';
+    html+='<button class="btn btn-secondary" style="margin:0" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel</button>';
+    html+='<button class="btn btn-secondary" style="margin:0" onclick="endGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><rect x="5" y="5" width="14" height="14" rx="2"/></svg> Spiel beenden</button>';
+    html+='</div></div>';
+  }
+  el.innerHTML=html;
+  renderPlayerTags();
+  renderQuickStart();
+  initAddPlayerInput();
+}
+
 export async function startNewGame(){
   if(state.rounds.length===0){
     showToast('Es sind noch keine Spiele eingetragen.','info');
