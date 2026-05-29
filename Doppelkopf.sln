@@ -5,18 +5,83 @@ VisualStudioVersion = 17.14.36310.24
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Projektmappenelemente", "Projektmappenelemente", "{84D27F74-D2BA-6C25-2661-968F101900D9}"
 	ProjectSection(SolutionItems) = preProject
+		CLAUDE.md = CLAUDE.md
 		CNAME = CNAME
-		icon-192.png = icon-192.png
-		icon-512.png = icon-512.png
-		icon.svg = icon.svg
 		index.html = index.html
-		manifest.json = manifest.json
-		styles.css = styles.css
-		sw.js = sw.js
+		package-lock.json = package-lock.json
+		src\stats.js = src\stats.js
+		vite.config.js = vite.config.js
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		src\archiv.js = src\archiv.js
+		src\eingabe.js = src\eingabe.js
+		src\main.js = src\main.js
+		src\setup.js = src\setup.js
+		src\stats.js = src\stats.js
+		src\tabelle.js = src\tabelle.js
+		src\turnier.js = src\turnier.js
+		src\ui.js = src\ui.js
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "public", "public", "{94B79532-0F0B-4E79-835E-8AEC8276729E}"
+	ProjectSection(SolutionItems) = preProject
+		public\icon-192.png = public\icon-192.png
+		public\icon-512.png = public\icon-512.png
+		public\icon.svg = public\icon.svg
+		public\manifest.json = public\manifest.json
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{0DA4969E-9B96-4C59-86CA-8B7E03318C5C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "superpowers", "superpowers", "{B960CD1D-E200-4951-A353-6A26E9B9C0A3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "plans", "plans", "{1D965F04-902F-4256-A012-8571D9C54E27}"
+	ProjectSection(SolutionItems) = preProject
+		docs\superpowers\plans\2026-05-25-eingabe-responsive-layout.md = docs\superpowers\plans\2026-05-25-eingabe-responsive-layout.md
+		docs\superpowers\plans\2026-05-26-custom-dialogs.md = docs\superpowers\plans\2026-05-26-custom-dialogs.md
+		docs\superpowers\plans\2026-05-26-spielarchiv.md = docs\superpowers\plans\2026-05-26-spielarchiv.md
+		docs\superpowers\plans\2026-05-27-achievements.md = docs\superpowers\plans\2026-05-27-achievements.md
+		docs\superpowers\plans\2026-05-27-debug-mode.md = docs\superpowers\plans\2026-05-27-debug-mode.md
+		docs\superpowers\plans\2026-05-27-saison-stats.md = docs\superpowers\plans\2026-05-27-saison-stats.md
+		docs\superpowers\plans\2026-05-27-schnellstart.md = docs\superpowers\plans\2026-05-27-schnellstart.md
+		docs\superpowers\plans\2026-05-27-spielabend-highlights.md = docs\superpowers\plans\2026-05-27-spielabend-highlights.md
+		docs\superpowers\plans\2026-05-28-turnier-modus.md = docs\superpowers\plans\2026-05-28-turnier-modus.md
+		docs\superpowers\plans\2026-05-28-turnier-phase2.md = docs\superpowers\plans\2026-05-28-turnier-phase2.md
+		docs\superpowers\plans\2026-05-28-turnier-phase3.md = docs\superpowers\plans\2026-05-28-turnier-phase3.md
+		docs\superpowers\plans\2026-05-29-code-auslagerung.md = docs\superpowers\plans\2026-05-29-code-auslagerung.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "secs", "secs", "{14E2049B-9EAF-4C96-819A-5129A1665BC1}"
+	ProjectSection(SolutionItems) = preProject
+		docs\superpowers\specs\2026-05-25-eingabe-responsive-layout-design.md = docs\superpowers\specs\2026-05-25-eingabe-responsive-layout-design.md
+		docs\superpowers\specs\2026-05-26-custom-dialogs-design.md = docs\superpowers\specs\2026-05-26-custom-dialogs-design.md
+		docs\superpowers\specs\2026-05-26-eingabe-kompakt-design.md = docs\superpowers\specs\2026-05-26-eingabe-kompakt-design.md
+		docs\superpowers\specs\2026-05-26-spielarchiv-design.md = docs\superpowers\specs\2026-05-26-spielarchiv-design.md
+		docs\superpowers\specs\2026-05-27-achievements-design.md = docs\superpowers\specs\2026-05-27-achievements-design.md
+		docs\superpowers\specs\2026-05-27-debug-mode-design.md = docs\superpowers\specs\2026-05-27-debug-mode-design.md
+		docs\superpowers\specs\2026-05-27-saison-stats-design.md = docs\superpowers\specs\2026-05-27-saison-stats-design.md
+		docs\superpowers\specs\2026-05-27-schnellstart-design.md = docs\superpowers\specs\2026-05-27-schnellstart-design.md
+		docs\superpowers\specs\2026-05-27-spielabend-highlights-design.md = docs\superpowers\specs\2026-05-27-spielabend-highlights-design.md
+		docs\superpowers\specs\2026-05-27-turnier-modus-design.md = docs\superpowers\specs\2026-05-27-turnier-modus-design.md
+		docs\superpowers\specs\2026-05-28-turnier-modus-v2-design.md = docs\superpowers\specs\2026-05-28-turnier-modus-v2-design.md
+		docs\superpowers\specs\2026-05-29-code-auslagerung-design.md = docs\superpowers\specs\2026-05-29-code-auslagerung-design.md
 	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {84D27F74-D2BA-6C25-2661-968F101900D9}
+		{94B79532-0F0B-4E79-835E-8AEC8276729E} = {84D27F74-D2BA-6C25-2661-968F101900D9}
+		{0DA4969E-9B96-4C59-86CA-8B7E03318C5C} = {84D27F74-D2BA-6C25-2661-968F101900D9}
+		{B960CD1D-E200-4951-A353-6A26E9B9C0A3} = {0DA4969E-9B96-4C59-86CA-8B7E03318C5C}
+		{1D965F04-902F-4256-A012-8571D9C54E27} = {B960CD1D-E200-4951-A353-6A26E9B9C0A3}
+		{14E2049B-9EAF-4C96-819A-5129A1665BC1} = {B960CD1D-E200-4951-A353-6A26E9B9C0A3}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C060C9D0-23EF-4AD7-B344-39D5CB10D032}
 	EndGlobalSection
 EndGlobal
