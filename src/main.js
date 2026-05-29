@@ -345,7 +345,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.6 · 29.05.2026</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.6 · 29.05.2026 22:05</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -433,11 +433,11 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
-    {v:'5.6',d:'29.05.2026',t:'Turnier nutzt jetzt ein laufendes Spiel: beim Erstellen (Freie Eingabe) kann das aktuelle Spiel direkt als eigener Tisch uebernommen werden; beim Beitritt zu einem bestehenden Tisch wird dessen Spiel geladen bzw. ein leerer Tisch kann das laufende Spiel uebernehmen.'},
-    {v:'5.5',d:'29.05.2026',t:'Modals (Einstellungen, Info, Bearbeiten u. a.) lassen sich jetzt per Zurück-Geste schließen: Hardware-/Browser-Zurück sowie Wischen nach rechts auf dem Modal.'},
-    {v:'5.4',d:'29.05.2026',t:'Eigener "Spieler"-Reiter unten: Spieler eintragen/umbenennen/sortieren, Quickstart und Spielsteuerung an einem Ort. Dafür die Spielernamen-Leiste oben im Eingabe-Screen entfernt (mehr Platz fürs Numpad).'},
-    {v:'5.3',d:'29.05.2026',t:'Akzentfarbe frei wählbar (Einstellungen → Darstellung). Emojis erscheinen jetzt auch in der Statistik hinter den Spielern. Bugfix: Im Turnier-Wizard lassen sich die Modi wieder anklicken (auch Dashboard-Tabs und Tisch-Zuweisung).'},
-    {v:'5.2',d:'29.05.2026',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
+    {v:'5.6',d:'29.05.2026 22:05',t:'Turnier nutzt jetzt ein laufendes Spiel: beim Erstellen (Freie Eingabe) kann das aktuelle Spiel direkt als eigener Tisch uebernommen werden; beim Beitritt zu einem bestehenden Tisch wird dessen Spiel geladen bzw. ein leerer Tisch kann das laufende Spiel uebernehmen.'},
+    {v:'5.5',d:'29.05.2026 21:37',t:'Modals (Einstellungen, Info, Bearbeiten u. a.) lassen sich jetzt per Zurück-Geste schließen: Hardware-/Browser-Zurück sowie Wischen nach rechts auf dem Modal.'},
+    {v:'5.4',d:'29.05.2026 21:14',t:'Eigener "Spieler"-Reiter unten: Spieler eintragen/umbenennen/sortieren, Quickstart und Spielsteuerung an einem Ort. Dafür die Spielernamen-Leiste oben im Eingabe-Screen entfernt (mehr Platz fürs Numpad).'},
+    {v:'5.3',d:'29.05.2026 20:31',t:'Akzentfarbe frei wählbar (Einstellungen → Darstellung). Emojis erscheinen jetzt auch in der Statistik hinter den Spielern. Bugfix: Im Turnier-Wizard lassen sich die Modi wieder anklicken (auch Dashboard-Tabs und Tisch-Zuweisung).'},
+    {v:'5.2',d:'29.05.2026 19:04',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
     {v:'5.1',d:'29.05.2026 16:26',t:'Navigation umgebaut: Bottom-Nav statt Pill-Bar oben. Setup-Screen aufgelöst in Eingabe-Leerzustand, Mehr-Screen und Einstellungen-Modal. Spieler-Leiste mit Kebab-Menü im Eingabe-Screen.'},
     {v:'5.0',d:'29.05.2026 15:14',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
     {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
