@@ -1,3 +1,6 @@
 .vs/
 .superpowers/
 docs/superpowers/
+node_modules/
+dist/
+.refactor/
