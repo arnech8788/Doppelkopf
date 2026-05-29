@@ -140,8 +140,47 @@ export function save(){
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
 }
 
-// ── Einstellungen (Stub – wird in Task 3 implementiert) ──
-export function openSettings(){}
+// ── Einstellungen-Modal ──
+export function openSettings(){
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Einstellungen</h3><button onclick="closeSettings()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
+
+  // Solo-Arten
+  html+='<div class="card"><div class="card-title">Solo-Arten erfassen</div>';
+  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle'+(state.soloTypesEnabled?' on':'')+'" id="soloTypesToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin-top:4px">Bei einem Solo wird nach der Art gefragt</div>';
+  html+='<div id="soloTypesList"></div>';
+  html+='<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="customSoloInput" placeholder="Eigenes Solo..." style="font-size:13px;padding:8px 10px"><button class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="addCustomSolo()">+</button></div>';
+  html+='</div>';
+
+  // Bockrunden
+  html+='<div class="card"><div class="card-title">Bockrunden</div>';
+  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Bockrunden aktiviert</span><button class="toggle'+(state.bockEnabled?' on':'')+'" id="bockEnabledToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  html+='<div class="settings-row"><span>Spiele pro Bockrunde</span><input type="number" id="bockCount" value="'+(state.bockCount||4)+'" min="1" max="20" onchange="save()"></div>';
+  html+='<div style="font-size:11px;color:var(--tx3);padding:4px 0 8px">Standard: Anzahl der Mitspieler</div>';
+  html+='<div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle'+(state.bockSolo?' on':'')+'" id="bockSoloToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  html+='</div>';
+
+  // Archiv
+  html+='<div class="card"><div class="card-title">Archiv</div>';
+  html+='<div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="'+(state.archiveMax||10)+'" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>';
+  html+='</div>';
+
+  // Darstellung
+  html+='<div class="card"><div class="card-title">Darstellung</div>';
+  const isLight=document.documentElement.getAttribute('data-theme')==='light';
+  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Dark Mode</span><button class="toggle'+(!isLight?' on':'')+'" onclick="this.classList.toggle(\'on\');toggleTheme()"></button></div>';
+  html+='</div>';
+
+  // Debug
+  html+='<div class="card" style="cursor:pointer" onclick="closeSettings();openDebugModal()"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">&#128295;</span><div><div style="font-weight:500">Debug-Modus</div><div style="font-size:11px;color:var(--tx3)">Geräteinfos, State, Logs</div></div></div></div>';
+
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeSettings()">Schließen</button>';
+  document.getElementById('settingsModalContent').innerHTML=html;
+  document.getElementById('settingsModal').classList.add('show');
+  setup.renderSoloTypes();
+}
+export function closeSettings(){document.getElementById('settingsModal').classList.remove('show')}
+document.getElementById('settingsModal').addEventListener('click',function(e){if(e.target===this)closeSettings()});
 
 // ── Screen-Navigation ──
 export function showScreen(id){
@@ -600,7 +639,7 @@ const updateSW = registerSW({
 Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
-    showScreen, toggleTheme, getChartColors, openSettings, renderMehrScreen,
+    showScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
   },
