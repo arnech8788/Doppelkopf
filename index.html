@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.47 · 28.05.2026 17:47</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.48 · 29.05.2026 13:10</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -349,6 +349,9 @@ let chartInstances=[];
 let pendingRound=null;
 let lastUndo=null;
 let viewingArchive=null;
+let prerenderedTabelle=null;
+let prerenderedStats=null;
+let prerenderTimer=null;
 let timerInterval=null;
 let toastTimer=null;
 function showToast(text,type){
@@ -531,7 +534,7 @@ function showScreen(id){
   }
   if(id==='eingabe')renderTurnierIndicator();
   if(id==='tabelle')renderTabelle(true);
-  if(id==='stats')renderStats();
+  if(id==='stats'){renderStats();schedulePrerenderShareImages();}
 }
 
 function renderSoloTypes(){
@@ -2520,11 +2523,15 @@ function openArchivedGame(id){
   const game=archive.find(g=>g.id===id);
   if(!game)return;
   viewingArchive=game;
+  prerenderedTabelle=null;prerenderedStats=null;
   showScreen('tabelle');
+  schedulePrerenderShareImages();
 }
 function closeArchiveView(){
   viewingArchive=null;
+  prerenderedTabelle=null;prerenderedStats=null;
   showScreen('tabelle');
+  schedulePrerenderShareImages();
 }
 function closeAllTimeModal(){document.getElementById('allTimeModal').classList.remove('show')}
 document.getElementById('allTimeModal').addEventListener('click',function(e){if(e.target===this)closeAllTimeModal()});
@@ -3086,6 +3093,7 @@ function finalizeRound(round){
   }
   checkRoundAchievements(round);
   showScreen('tabelle');renderTabelle(true);
+  schedulePrerenderShareImages();
 }
 
 function openEditModal(i){
@@ -3167,6 +3175,7 @@ function saveEditRound(){
   const oldSoloType=state.rounds[editingRound].soloType;
   state.rounds[editingRound]={points:pts,playing,winners,solo,bock:bockApplies,scores,soloType:solo?oldSoloType:null};
   save();syncToFirebase();invalidateEingabeCache();closeEditModal();renderTabelle(false);
+  schedulePrerenderShareImages();
 }
 async function deleteRound(i){
   if(!await showConfirm('Spiel '+(i+1)+' löschen?','Löschen',true))return;
@@ -3174,11 +3183,13 @@ async function deleteRound(i){
   if(deletedRound.bock){state.bockQueue++}
   state.rounds.splice(i,1);
   save();syncToFirebase();invalidateEingabeCache();renderTabelle(false);
+  schedulePrerenderShareImages();
 }
 function moveRound(i,dir){
   const j=i+dir;if(j<0||j>=state.rounds.length)return;
   const tmp=state.rounds[i];state.rounds[i]=state.rounds[j];state.rounds[j]=tmp;
   save();invalidateEingabeCache();renderTabelle(false);
+  schedulePrerenderShareImages();
 }
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal()});
 
@@ -3646,36 +3657,48 @@ function launchMiniConfetti(){
   setTimeout(()=>container.remove(),2500);
 }
 
-async function captureAndShare(element,filename){
+async function captureToBlob(element){
+  const canvas=await html2canvas(element,{backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),scale:2,useCORS:true});
+  return new Promise(resolve=>{canvas.toBlob(blob=>resolve(blob),'image/png')});
+}
+async function shareBlob(blob,filename){
   try{
-    const canvas=await html2canvas(element,{backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),scale:1,useCORS:true});
-    await new Promise((resolve,reject)=>{
-      canvas.toBlob(async function(blob){
-        try{
-          const file=new File([blob],filename,{type:'image/png'});
-          if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Doppelkopf Ergebnis'})}
-          else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url)}
-          resolve();
-        }catch(e){reject(e)}
-      },'image/png');
-    });
+    const file=new File([blob],filename,{type:'image/png'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Doppelkopf Ergebnis'})}
+    else{const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url)}
   }catch(e){console.error('Share failed:',e)}
 }
-function shareStats(){const el=document.getElementById('shareableStats');if(el)captureAndShare(el,'doppelkopf-statistik.png')}
-function shareTabelle(){
+async function captureAndShare(element,filename){
+  try{const blob=await captureToBlob(element);await shareBlob(blob,filename)}catch(e){console.error('Share failed:',e)}
+}
+function schedulePrerenderShareImages(){
+  if(prerenderTimer)clearTimeout(prerenderTimer);
+  prerenderTimer=setTimeout(prerenderShareImages,500);
+}
+async function prerenderShareImages(){
+  prerenderTimer=null;
+  try{
+    const tableEl=buildShareTableElement();
+    if(tableEl){document.body.appendChild(tableEl);prerenderedTabelle=await captureToBlob(tableEl);tableEl.remove()}
+    const statsEl=document.getElementById('shareableStats');
+    if(statsEl&&statsEl.innerHTML)prerenderedStats=await captureToBlob(statsEl);
+  }catch(e){console.error('Prerender failed:',e)}
+}
+function shareStats(){
+  if(prerenderedStats){shareBlob(prerenderedStats,'doppelkopf-statistik.png');return}
+  const el=document.getElementById('shareableStats');if(el)captureAndShare(el,'doppelkopf-statistik.png');
+}
+function buildShareTableElement(){
   const table=document.querySelector('#tableWrap table');
-  if(!table)return;
+  if(!table)return null;
   const maxRows=8;
   const clone=table.cloneNode(true);
-  // Volle Spielernamen im Header statt Kürzel
-  const src=viewingArchive||state;
   const all=viewingArchive?[...viewingArchive.players]:getHistoricalPlayers();
   const headerThs=clone.querySelectorAll('thead th');
   all.forEach((p,i)=>{
-    const th=headerThs[i+1];// +1 wegen # Spalte
+    const th=headerThs[i+1];
     if(th)th.innerHTML=p;
   });
-  // Expand-Rows entfernen
   clone.querySelectorAll('.expand-row').forEach(r=>r.remove());
   const rows=clone.querySelectorAll('tbody tr');
   const total=rows.length;
@@ -3689,14 +3712,18 @@ function shareTabelle(){
     sep.appendChild(td);
     clone.querySelector('tbody').insertBefore(sep,clone.querySelector('tbody tr'));
   }
-  // Letzte Menü-Spalte (⋮) aus allen Zeilen entfernen
   clone.querySelectorAll('tr').forEach(r=>{const last=r.lastElementChild;if(last&&(last.querySelector('.row-menu-wrap')||last.textContent.trim()===''))last.remove()});
   const ths=clone.querySelectorAll('thead th');
   if(ths.length&&ths[ths.length-1].textContent.trim()==='')ths[ths.length-1].remove();
-  // Temporäres Container-Element
   const wrap=document.createElement('div');
   wrap.style.cssText='position:fixed;left:-9999px;top:0;background:var(--bg2);padding:16px;border-radius:8px;font-family:inherit';
   wrap.appendChild(clone);
+  return wrap;
+}
+function shareTabelle(){
+  if(prerenderedTabelle){shareBlob(prerenderedTabelle,'doppelkopf-tabelle.png');return}
+  const wrap=buildShareTableElement();
+  if(!wrap)return;
   document.body.appendChild(wrap);
   captureAndShare(wrap,'doppelkopf-tabelle.png').then(()=>wrap.remove()).catch(()=>wrap.remove());
 }
@@ -3782,6 +3809,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.48',d:'29.05.2026 13:10',t:'Teilen-Bilder werden jetzt im Hintergrund vorgerendert \u2013 sofortiges Teilen ohne Wartezeit, höhere Bildqualität (scale 2).'},
     {v:'4.47',d:'28.05.2026 17:47',t:'Turnier: Spielleiter kann jetzt Tische erstellen und beitreten \u2013 Co-Host-Erkennung blockiert nicht mehr den eigenen Host.'},
     {v:'4.46',d:'28.05.2026 17:36',t:'Turnier: 8 Bugfixes \u2013 Spieler ohne Tisch bekommt Beitreten-Button, Tischwechsel entfernt vom alten Tisch, Host-Tisch-Verlassen bereinigt Firebase, Self-Rotation auch f\u00fcr mitspielenden Host, Tisch-Auswahl visuelles Feedback gefixt, QR-Codes basieren auf Tischanzahl, Spieler-App Registrierung direkt im Beitreten-Dialog, var(--primary) komplett durch var(--acc) ersetzt.'},
     {v:'4.45',d:'28.05.2026 17:02',t:'Turnier: Textkorrekturen (Firebase-Referenzen entfernt, Wizard-Beschreibungen), Konfigurationsübersicht im Setup für Spielleiter mit Änderungsmöglichkeit (Sichtbarkeit, Gesamtwertung), Spieler-App Beitritt für bereits registrierte Spieler verbessert.'},
