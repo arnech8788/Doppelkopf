@@ -189,9 +189,9 @@ export function showScreen(id){
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.bottom-nav button').forEach((b,i)=>{b.classList.toggle('active',['eingabe','tabelle','stats','mehr'][i]===id)});
   // Kopfzeile: zeigt den Namen des aktiven Screens (eine einzige Titelzeile)
-  const TITLES={eingabe:'Doppelkopf',tabelle:'Spielverlauf',stats:'Statistiken',mehr:'Mehr'};
+  const TITLES={eingabe:'Eingabe',tabelle:'Spielverlauf',stats:'Statistiken',mehr:'Mehr'};
   const titleEl=document.getElementById('appTitle');
-  if(titleEl)titleEl.textContent=TITLES[id]||'Doppelkopf';
+  if(titleEl)titleEl.textContent=TITLES[id]||'Eingabe';
   const shareBtn=document.getElementById('headerShareBtn');
   if(shareBtn)shareBtn.style.display=(id==='tabelle'||id==='stats')?'':'none';
   if(id==='eingabe'){
