@@ -58,8 +58,9 @@ export function formatArchiveDate(g,short){
   return dateStr+' '+startTime+endTime;
 }
 export function renderArchiveList(){
-  const archive=loadArchive();
   const el=document.getElementById('archiveList');
+  if(!el)return;
+  const archive=loadArchive();
   if(!archive.length){el.innerHTML='';return}
   let html='<div class="section-label" style="margin-top:20px">Vergangene Spiele ('+archive.length+')</div>';
   archive.forEach(g=>{

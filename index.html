@@ -23,52 +23,7 @@
   <div id="turnierIndicator"></div>
 
   <div class="screen active" id="screen-mehr">
-    <h2>Einstellungen</h2>
-    <div id="quickStartCard"></div>
-    <div class="card">
-      <div class="card-title">Spieler</div>
-      <div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Der erste Spieler gibt zuerst die Karten. Nach jedem Spiel rotiert der Geber automatisch in der Reihenfolge der Liste.</div>
-      <div id="playerManageList"></div>
-      <div class="input-wrap" style="margin-top:8px">
-        <input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off">
-        <div class="suggestions" id="suggestions"></div>
-      </div>
-      <button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Solo-Arten erfassen</div>
-      <div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle" id="soloTypesToggle" onclick="this.classList.toggle('on');save()"></button></div>
-      <div style="font-size:12px;color:var(--tx3);margin-top:4px">Bei einem Solo wird nach der Art gefragt</div>
-      <div class="settings-link" onclick="document.getElementById('soloSettings').classList.toggle('show')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Verfügbare Soli bearbeiten</div>
-      <div class="settings-panel" id="soloSettings">
-        <div id="soloTypesList"></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input type="text" id="customSoloInput" placeholder="Eigenes Solo..." style="font-size:13px;padding:8px 10px">
-          <button class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="addCustomSolo()">+</button>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Bockrunden</div>
-      <div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Bockrunden aktiviert</span><button class="toggle" id="bockEnabledToggle" onclick="this.classList.toggle('on');save()"></button></div>
-      <div class="settings-link" onclick="document.getElementById('settingsPanel').classList.toggle('show')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> Erweiterte Einstellungen</div>
-      <div class="settings-panel" id="settingsPanel">
-        <div class="settings-row"><span>Spiele pro Bockrunde</span><input type="number" id="bockCount" value="4" min="1" max="20" onchange="save()"></div>
-        <div style="font-size:11px;color:var(--tx3);padding:4px 0 8px">Standard: Anzahl der Mitspieler</div>
-        <div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle" id="bockSoloToggle" onclick="this.classList.toggle('on');save()"></button></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Spielarchiv</div>
-      <div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="10" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>
-    </div>
-    <div class="card" id="turnierCard">
-      <div class="card-title">Turnier</div>
-      <div id="turnierSetupContent"></div>
-    </div>
-    <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
-    <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.0 · 29.05.2026 15:14</div>
+    <div id="mehrContent"></div>
   </div>
 
   <div class="screen" id="screen-eingabe">

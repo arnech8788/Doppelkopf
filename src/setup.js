@@ -3,6 +3,7 @@ import { showToast, showConfirm, ICO } from './ui.js';
 
 export function renderSoloTypes(){
   const c=document.getElementById('soloTypesList');
+  if(!c)return;
   c.innerHTML=state.soloTypes.map((s,i)=>
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bdr)"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" '+(s.enabled?'checked':'')+' onchange="toggleSoloType('+i+')"> '+s.name+' <span style="color:var(--tx3);font-size:11px">('+s.short+')</span></label><button class="icon-btn" onclick="removeSoloType('+i+')">'+ICO.x+'</button></div>'
   ).join('');
@@ -19,6 +20,7 @@ export function addCustomSolo(){
 
 export function renderQuickStart(){
   const el=document.getElementById('quickStartCard');
+  if(!el)return;
   // Nur anzeigen wenn <4 Spieler UND Archiv vorhanden
   const archive=loadArchive();
   if(getAllPlayers().length>=4||!archive.length||!archive[0].players||!archive[0].players.length){
@@ -44,6 +46,7 @@ export function quickStart(){
 }
 export function renderPlayerTags(){
   const c=document.getElementById('playerManageList');
+  if(!c)return;
   if(!state.players.length){c.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Noch keine Mitspieler</div>';return}
   c.innerHTML=state.players.map((p,i)=>
     '<div class="player-manage"><span class="pm-name">'+p+'</span><div class="pm-actions">'
@@ -99,6 +102,7 @@ document.getElementById('renameModal').addEventListener('click',function(e){if(e
 
 export async function addPlayer(){
   const inp=document.getElementById('addPlayerInput');
+  if(!inp)return;
   const name=inp.value.trim();
   if(!name||state.players.includes(name))return;
   // Hinweis falls der Name historisch existiert (gelöschter Spieler kehrt zurück)
@@ -111,7 +115,8 @@ export async function addPlayer(){
   inp.value='';renderPlayerTags();renderQuickStart();
   checkAutoStart();save();
   invalidateEingabeCache();
-  document.getElementById('suggestions').classList.remove('show');
+  const sug=document.getElementById('suggestions');
+  if(sug)sug.classList.remove('show');
   setTimeout(()=>{inp.focus()},50);
 }
 export async function removePlayer(i){
@@ -125,11 +130,13 @@ export async function removePlayer(i){
 }
 export function checkAutoStart(){
   if(getAllPlayers().length>=4){
-    state.bockCount=parseInt(document.getElementById('bockCount').value)||getAllPlayers().length;
+    const bockCountEl=document.getElementById('bockCount');
+    state.bockCount=bockCountEl?parseInt(bockCountEl.value)||getAllPlayers().length:state.bockCount||getAllPlayers().length;
   }
 }
 
 const addInp=document.getElementById('addPlayerInput');
+if(addInp){
 addInp.addEventListener('input',function(){
   const v=this.value.trim().toLowerCase();
   const sug=document.getElementById('suggestions');
@@ -141,6 +148,7 @@ addInp.addEventListener('input',function(){
   sug.classList.add('show');
 });
 addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
+}
 export function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 
 export async function startNewGame(){

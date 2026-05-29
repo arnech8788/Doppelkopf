@@ -121,22 +121,22 @@ export async function getDeviceInfo(){
 // ── Persistenz ──
 export function load(){
   try{const s=localStorage.getItem('doko-v4');if(s){const d=JSON.parse(s);Object.assign(state,d)}}catch(e){}
-  document.getElementById('bockEnabledToggle').classList.toggle('on',state.bockEnabled!==false);
-  document.getElementById('bockCount').value=state.bockCount||4;
-  document.getElementById('bockSoloToggle').classList.toggle('on',!!state.bockSolo);
-  document.getElementById('soloTypesToggle').classList.toggle('on',!!state.soloTypesEnabled);
-  document.getElementById('archiveMax').value=state.archiveMax||10;
-  renderPlayerTags();renderQuickStart();renderSoloTypes();renderArchiveList();renderTurnierSetup();renderTurnierIndicator();
+  renderTurnierIndicator();
   if(getAllPlayers().length>=4)showScreen('eingabe');
+  else showScreen('eingabe');
   checkFirstStart();
   checkTurnierUrlParam();
   restoreTischPlayers();
 }
 export function save(){
-  state.bockEnabled=document.getElementById('bockEnabledToggle').classList.contains('on');
-  state.bockCount=parseInt(document.getElementById('bockCount').value)||4;
-  state.bockSolo=document.getElementById('bockSoloToggle').classList.contains('on');
-  state.soloTypesEnabled=document.getElementById('soloTypesToggle').classList.contains('on');
+  const bockToggle=document.getElementById('bockEnabledToggle');
+  if(bockToggle)state.bockEnabled=bockToggle.classList.contains('on');
+  const bockCountEl=document.getElementById('bockCount');
+  if(bockCountEl)state.bockCount=parseInt(bockCountEl.value)||4;
+  const bockSoloToggle=document.getElementById('bockSoloToggle');
+  if(bockSoloToggle)state.bockSolo=bockSoloToggle.classList.contains('on');
+  const soloToggle=document.getElementById('soloTypesToggle');
+  if(soloToggle)state.soloTypesEnabled=soloToggle.classList.contains('on');
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
 }
 
@@ -159,6 +159,7 @@ export function showScreen(id){
   if(id==='eingabe')renderTurnierIndicator();
   if(id==='tabelle')renderTabelle(true);
   if(id==='stats'){renderStats();schedulePrerenderShareImages();}
+  if(id==='mehr')renderMehrScreen();
 }
 
 
@@ -272,6 +273,20 @@ export function invalidateEingabeCache(){
 // ── Bockrunde ──
 export function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
 
+
+// ── Mehr-Screen ──
+export function renderMehrScreen(){
+  const el=document.getElementById('mehrContent');
+  if(!el)return;
+  let html='<h2>Mehr</h2>';
+  html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
+  html+='<div id="archiveList"></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.0 · 29.05.2026 15:14</div>';
+  el.innerHTML=html;
+  renderArchiveList();
+  renderTurnierSetup();
+}
 
 // ── Info-/Debug-Modal, Version-Tap ──
 export async function openInfoModal(){
@@ -585,7 +600,7 @@ const updateSW = registerSW({
 Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
-    showScreen, toggleTheme, getChartColors, openSettings,
+    showScreen, toggleTheme, getChartColors, openSettings, renderMehrScreen,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
   },
