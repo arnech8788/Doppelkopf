@@ -34,7 +34,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 /* Header */
 .app-header{display:flex;align-items:center;justify-content:space-between;padding:8px 4px;margin-bottom:12px}
-.app-title{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--tx)}
+.app-title{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--tx)}
+.header-actions{display:flex;align-items:center;gap:4px}
 .header-icon{background:none;border:none;color:var(--tx3);cursor:pointer;padding:6px;border-radius:var(--r-sm);transition:.2s}
 .header-icon:active{background:var(--bg3)}
 

@@ -188,6 +188,12 @@ export function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active')});
   document.getElementById('screen-'+id).classList.add('active');
   document.querySelectorAll('.bottom-nav button').forEach((b,i)=>{b.classList.toggle('active',['eingabe','tabelle','stats','mehr'][i]===id)});
+  // Kopfzeile: zeigt den Namen des aktiven Screens (eine einzige Titelzeile)
+  const TITLES={eingabe:'Doppelkopf',tabelle:'Spielverlauf',stats:'Statistiken',mehr:'Mehr'};
+  const titleEl=document.getElementById('appTitle');
+  if(titleEl)titleEl.textContent=TITLES[id]||'Doppelkopf';
+  const shareBtn=document.getElementById('headerShareBtn');
+  if(shareBtn)shareBtn.style.display=(id==='tabelle'||id==='stats')?'':'none';
   if(id==='eingabe'){
     const el=document.getElementById('eingabeContent');
     if(!el.dataset.roundCount||parseInt(el.dataset.roundCount)!==state.rounds.length){
@@ -199,6 +205,12 @@ export function showScreen(id){
   if(id==='tabelle')renderTabelle(true);
   if(id==='stats'){renderStats();schedulePrerenderShareImages();}
   if(id==='mehr')renderMehrScreen();
+}
+
+// Teilen-Aktion der Kopfzeile – leitet je nach aktivem Screen weiter
+export function shareCurrentScreen(){
+  if(document.getElementById('screen-stats').classList.contains('active'))shareStats();
+  else shareTabelle();
 }
 
 
@@ -317,11 +329,11 @@ export function isBockRound(){return state.bockEnabled&&state.bockQueue>0}
 export function renderMehrScreen(){
   const el=document.getElementById('mehrContent');
   if(!el)return;
-  let html='<h2>Mehr</h2>';
+  let html='';
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.1 · 29.05.2026 16:26</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.2 · 29.05.2026</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -409,6 +421,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.2',d:'29.05.2026',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
     {v:'5.1',d:'29.05.2026 16:26',t:'Navigation umgebaut: Bottom-Nav statt Pill-Bar oben. Setup-Screen aufgelöst in Eingabe-Leerzustand, Mehr-Screen und Einstellungen-Modal. Spieler-Leiste mit Kebab-Menü im Eingabe-Screen.'},
     {v:'5.0',d:'29.05.2026 15:14',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
     {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
@@ -644,7 +657,7 @@ const updateSW = registerSW({
 Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
-    showScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
+    showScreen, shareCurrentScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll
