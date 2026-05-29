@@ -70,7 +70,7 @@
     </div>
     <button class="btn btn-primary" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel starten</button>
     <div id="archiveList"></div>
-    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.48 · 29.05.2026 13:10</div>
+    <div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v4.49 · 29.05.2026 13:20</div>
   </div>
 
   <div class="screen" id="screen-eingabe">
@@ -3339,7 +3339,9 @@ function renderStats(){
     });
   });
   const soloCount=rounds.filter(r=>r.solo).length;
-  const soloKing=soloCount>0?all.reduce((a,b)=>soloWins[a]>=soloWins[b]?a:b):'–';
+  const maxSoloWins=soloCount>0?Math.max(...all.map(p=>soloWins[p])):0;
+  const _soloCandidates=maxSoloWins>0?all.filter(p=>soloWins[p]===maxSoloWins):[];
+  const soloKing=_soloCandidates.length===1?_soloCandidates[0]:'–';
   const maxTotal=all.length?Math.max(...all.map(p=>totals[p])):0;
   const _bestCandidates=all.filter(p=>totals[p]===maxTotal);
   const bestPlayer=_bestCandidates.length===1?_bestCandidates[0]:'–';
@@ -3809,6 +3811,7 @@ async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
     {v:'4.48',d:'29.05.2026 13:10',t:'Teilen-Bilder werden jetzt im Hintergrund vorgerendert \u2013 sofortiges Teilen ohne Wartezeit, höhere Bildqualität (scale 2).'},
     {v:'4.47',d:'28.05.2026 17:47',t:'Turnier: Spielleiter kann jetzt Tische erstellen und beitreten \u2013 Co-Host-Erkennung blockiert nicht mehr den eigenen Host.'},
     {v:'4.46',d:'28.05.2026 17:36',t:'Turnier: 8 Bugfixes \u2013 Spieler ohne Tisch bekommt Beitreten-Button, Tischwechsel entfernt vom alten Tisch, Host-Tisch-Verlassen bereinigt Firebase, Self-Rotation auch f\u00fcr mitspielenden Host, Tisch-Auswahl visuelles Feedback gefixt, QR-Codes basieren auf Tischanzahl, Spieler-App Registrierung direkt im Beitreten-Dialog, var(--primary) komplett durch var(--acc) ersetzt.'},
