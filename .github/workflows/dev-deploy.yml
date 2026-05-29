@@ -14,13 +14,27 @@ jobs:
     steps:
       - name: Checkout dev branch
         uses: actions/checkout@v4
+        with:
+          ref: dev
 
-      - name: Deploy to dev folder
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # /dev wird unter <domain>/dev/ ausgeliefert -> base muss /dev/ sein.
+      - name: Build (base /dev/)
+        run: npm run build -- --base=/dev/
+
+      - name: Stage build output
         run: |
-          mkdir public
-          cp -r * public/
-          mkdir -p public/dev
-          cp -r * public/dev/ || true
+          rm -rf /tmp/dev-build
+          mkdir -p /tmp/dev-build
+          cp -r dist/* /tmp/dev-build/
 
       - name: Push to main
         run: |
@@ -30,8 +44,9 @@ jobs:
           git fetch origin main
           git checkout main
 
+          rm -rf dev
           mkdir -p dev
-          cp -r public/dev/* dev/
+          cp -r /tmp/dev-build/* dev/
 
           git add dev/
           git commit -m "Update dev version" || echo "No changes"
