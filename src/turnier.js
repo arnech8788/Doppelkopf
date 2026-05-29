@@ -1,7 +1,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import qrcode from 'qrcode-generator';
-import { state, save, getAllPlayers } from './main.js';
+import { state, save, getAllPlayers, invalidateEingabeCache } from './main.js';
 import { showToast, showConfirm, showPrompt } from './ui.js';
 
 const FIREBASE_CONFIG={
@@ -677,7 +677,21 @@ export async function submitCreateTurnier(){
       await dbRef.child('currentRotation').set(0);
       await dbRef.child('rotationen/0').set({status:'active',startedAt:firebase.database.ServerValue.TIMESTAMP});
     }
-    state.turnier={code:code,tischId:null,tischName:null,tischNummer:null,isHost:true,isPlayer:false,turnierName:turnierName||null};
+    // Laufendes Spiel direkt als eigenen Tisch übernehmen (Freie Eingabe)
+    let hostTisch=null;
+    if(c.playerMode===3 && state.rounds.length>0){
+      const carry=await showConfirm('Du hast ein laufendes Spiel ('+state.rounds.length+' Runde'+(state.rounds.length>1?'n':'')+'). Direkt als deinen Tisch (Tisch 1) ins Turnier übernehmen?','Übernehmen');
+      if(carry){
+        const spielerIds=getAllPlayers();
+        const schreiberId=ownSpieler?ownSpieler.id:(spielerIds[0]||'');
+        const tischRef=dbRef.child('tische').push();
+        await tischRef.set({name:'Tisch 1',nummer:1,spielerIds:spielerIds,schreiberId:schreiberId,rounds:state.rounds,lastSync:firebase.database.ServerValue.TIMESTAMP});
+        hostTisch={id:tischRef.key,name:'Tisch 1',nummer:1,schreiberId:schreiberId};
+      }
+    }
+    state.turnier=hostTisch
+      ? {code:code,tischId:hostTisch.id,tischName:hostTisch.name,tischNummer:hostTisch.nummer,isHost:true,isPlayer:false,turnierName:turnierName||null,schreiberId:hostTisch.schreiberId}
+      : {code:code,tischId:null,tischName:null,tischNummer:null,isHost:true,isPlayer:false,turnierName:turnierName||null};
     save();
     closeCreateTurnier();
     renderTurnierSetup();renderTurnierIndicator();
@@ -1089,8 +1103,29 @@ export async function joinTurnier(){
     const tisch=tischObj[joinSelectedTischId];
     if(!tisch){showToast('Tisch nicht mehr vorhanden.','error');return}
     const wasHost=state.turnier&&state.turnier.isHost;
-    state.turnier={code:code,tischId:joinSelectedTischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:!!wasHost,isPlayer:false,turnierName:joinTurnierData&&joinTurnierData.name||null,schreiberId:tisch.schreiberId||null};
+    const tischRounds=Array.isArray(tisch.rounds)?tisch.rounds:[];
+    const deviceId=getDeviceId();
+    const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
+    let schreiberId=tisch.schreiberId||null;
+    if(tischRounds.length>0){
+      // Tisch hat bereits ein Spiel -> laden, damit du das Tisch-Spiel siehst
+      let load=true;
+      if(state.rounds.length>0){
+        load=await showConfirm('Dieser Tisch hat bereits ein Spiel ('+tischRounds.length+' Runde'+(tischRounds.length>1?'n':'')+'). Laden? Dein aktuelles lokales Spiel wird dabei ersetzt.','Tisch-Spiel laden',true);
+      }
+      if(load){state.rounds=JSON.parse(JSON.stringify(tischRounds));invalidateEingabeCache();}
+    }else if(state.rounds.length>0){
+      // Leerer Tisch + laufendes Spiel -> anbieten zu übernehmen (du wirst Schreiber)
+      const carry=await showConfirm('Dieser Tisch hat noch kein Spiel. Dein laufendes Spiel ('+state.rounds.length+' Runde'+(state.rounds.length>1?'n':'')+') hierher übernehmen?','Übernehmen');
+      if(carry){
+        schreiberId=ownSpieler?ownSpieler.id:schreiberId;
+        try{await firebase.database().ref('turniere/DK'+code+'/tische/'+joinSelectedTischId).update({rounds:state.rounds,schreiberId:schreiberId,lastSync:firebase.database.ServerValue.TIMESTAMP});}
+        catch(e){console.warn('carry to tisch:',e)}
+      }
+    }
+    state.turnier={code:code,tischId:joinSelectedTischId,tischName:tisch.name||('Tisch '+tisch.nummer),tischNummer:tisch.nummer,isHost:!!wasHost,isPlayer:false,turnierName:joinTurnierData&&joinTurnierData.name||null,schreiberId:schreiberId};
     syncTischPlayersToSetup(tisch.spielerIds||[]);
+    save();
     closeJoinTurnier();
     renderTurnierSetup();renderTurnierIndicator();
     showToast('Turnier DK-'+code+' beigetreten ('+state.turnier.tischName+')!','info');
