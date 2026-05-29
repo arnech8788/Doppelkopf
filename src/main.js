@@ -345,7 +345,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.4 · 29.05.2026</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.5 · 29.05.2026</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -433,6 +433,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.5',d:'29.05.2026',t:'Modals (Einstellungen, Info, Bearbeiten u. a.) lassen sich jetzt per Zurück-Geste schließen: Hardware-/Browser-Zurück sowie Wischen nach rechts auf dem Modal.'},
     {v:'5.4',d:'29.05.2026',t:'Eigener "Spieler"-Reiter unten: Spieler eintragen/umbenennen/sortieren, Quickstart und Spielsteuerung an einem Ort. Dafür die Spielernamen-Leiste oben im Eingabe-Screen entfernt (mehr Platz fürs Numpad).'},
     {v:'5.3',d:'29.05.2026',t:'Akzentfarbe frei wählbar (Einstellungen → Darstellung). Emojis erscheinen jetzt auch in der Statistik hinter den Spielern. Bugfix: Im Turnier-Wizard lassen sich die Modi wieder anklicken (auch Dashboard-Tabs und Tisch-Zuweisung).'},
     {v:'5.2',d:'29.05.2026',t:'Kopfzeile zusammengeführt: nur noch eine Titelzeile oben, die den aktuellen Screen-Namen zeigt (Teilen-Aktion rechts im Header). Die separate Überschriftenzeile entfällt – mehr Platz.'},
@@ -683,6 +684,57 @@ export function getChartColors(){
   const s=getComputedStyle(document.documentElement);
   return{grid:s.getPropertyValue('--chart-grid').trim(),tick:s.getPropertyValue('--chart-tick').trim(),lbl:s.getPropertyValue('--chart-lbl').trim()};
 }
+
+// ═══════════════════════════════════════════════════════════
+// Modals per Zurück-Geste schließen:
+//  - Hardware-/Browser-Zurück (popstate) – Android-Back, Safari-Kantenwisch
+//  - Touch-Swipe nach rechts auf dem Modal – iOS-Standalone hat keine System-Geste
+// Zentral für alle Overlays; nameModal ausgenommen (erzwungene Eingabe).
+// ═══════════════════════════════════════════════════════════
+function dokoOpenOverlays(){
+  return [...document.querySelectorAll('.modal-overlay.show:not(#nameModal), .confirm-overlay.show')];
+}
+function dokoTopOverlay(){
+  const open=dokoOpenOverlays();
+  if(!open.length)return null;
+  return open.sort((a,b)=>(parseInt(getComputedStyle(a).zIndex)||0)-(parseInt(getComputedStyle(b).zIndex)||0)).pop();
+}
+function dokoCloseOverlay(ov){
+  if(!ov)return;
+  // Bevorzugt die eigene Schließ-Logik des Overlays auslösen (Klick aufs Overlay)
+  ov.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));
+  if(ov.classList.contains('show'))ov.classList.remove('show'); // Fallback
+}
+// History-Synchronisierung über MutationObserver (kein Eingriff in die vielen open*-Funktionen nötig).
+// Beim Öffnen genau EINEN History-Eintrag anlegen; programmatisches history.back() vermeiden wir
+// bewusst – die Zurück-Geste/-Taste (popstate) schließt das oberste Overlay.
+function dokoSyncHistory(){
+  if(dokoOpenOverlays().length>0 && !(history.state&&history.state.dokoModal)){
+    history.pushState({dokoModal:1},'');
+  }
+}
+const dokoMO=new MutationObserver(dokoSyncHistory);
+document.querySelectorAll('.modal-overlay, .confirm-overlay').forEach(el=>dokoMO.observe(el,{attributes:true,attributeFilter:['class']}));
+window.addEventListener('popstate',()=>{
+  if(dokoOpenOverlays().length)dokoCloseOverlay(dokoTopOverlay());
+});
+// Touch-Swipe nach rechts
+let dokoSwX=0,dokoSwY=0,dokoSwOv=null;
+document.addEventListener('touchstart',e=>{
+  dokoSwOv=dokoTopOverlay();
+  if(!dokoSwOv)return;
+  const t=e.changedTouches[0];dokoSwX=t.clientX;dokoSwY=t.clientY;
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!dokoSwOv)return;
+  const t=e.changedTouches[0];
+  const dx=t.clientX-dokoSwX, dy=t.clientY-dokoSwY;
+  const fromEdge=dokoSwX<=36;
+  if(dx>80 && Math.abs(dy)<60 && dx>Math.abs(dy)*1.5 && (fromEdge||dx>120)){
+    if(dokoTopOverlay()===dokoSwOv)dokoCloseOverlay(dokoSwOv);
+  }
+  dokoSwOv=null;
+},{passive:true});
 
 // ═══════════════════════════════════════════════════════════
 // PWA / Service Worker (vite-plugin-pwa) – ersetzt das alte sw.js
