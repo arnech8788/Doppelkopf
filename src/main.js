@@ -70,7 +70,7 @@ export function setTimerInterval(v){timerInterval=v}
 export async function getDeviceInfo(){
   const info={appVersion:'',browser:'',os:'',model:'',screen:'',viewport:'',dpr:'',theme:'',online:'',sw:''};
   // App-Version aus Fußzeile
-  const verEl=document.querySelector('#screen-mehr div[style*="font-size:10px"]');
+  const verEl=document.getElementById('versionLabel');
   info.appVersion=verEl?verEl.textContent.trim():'unbekannt';
   // User-Agent Client Hints (Chromium only)
   try{
@@ -590,6 +590,10 @@ export async function importState(){
   renderAll();
   showToast('State importiert','success');
 }
+export function renderAll(){
+  invalidateEingabeCache();
+  showScreen('eingabe');
+}
 export function closeDebugModal(){document.getElementById('debugModal').classList.remove('show')}
 document.getElementById('debugModal').addEventListener('click',function(e){if(e.target===this)closeDebugModal()});
 export function closeInfoModal(){document.getElementById('infoModal').classList.remove('show')}
@@ -641,7 +645,8 @@ Object.assign(window,
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
     showScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
-    openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
+    openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
+    renderAll
   },
   setup, eingabe, tabelle, stats, archiv, turnier
 );

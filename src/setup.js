@@ -173,10 +173,5 @@ export async function startNewGame(){
   if(timerInterval){clearInterval(timerInterval);setTimerInterval(null)}
   invalidateEingabeCache();
   save();
-  renderArchiveList();renderQuickStart();
-  if(getAllPlayers().length>=4){
-    showScreen('eingabe');
-  }else{
-    showToast('Neues Spiel gestartet. Füge mindestens 4 Spieler hinzu.','info');
-  }
+  showScreen('eingabe');
 }
