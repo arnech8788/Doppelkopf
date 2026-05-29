@@ -53,7 +53,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "plans", "plans", "{1D965F04
 		docs\superpowers\plans\2026-05-29-code-auslagerung.md = docs\superpowers\plans\2026-05-29-code-auslagerung.md
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "secs", "secs", "{14E2049B-9EAF-4C96-819A-5129A1665BC1}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "specs", "specs", "{14E2049B-9EAF-4C96-819A-5129A1665BC1}"
 	ProjectSection(SolutionItems) = preProject
 		docs\superpowers\specs\2026-05-25-eingabe-responsive-layout-design.md = docs\superpowers\specs\2026-05-25-eingabe-responsive-layout-design.md
 		docs\superpowers\specs\2026-05-26-custom-dialogs-design.md = docs\superpowers\specs\2026-05-26-custom-dialogs-design.md
