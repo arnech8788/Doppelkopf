@@ -321,7 +321,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.0 · 29.05.2026 15:14</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.1 · 29.05.2026 16:26</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -409,6 +409,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.1',d:'29.05.2026 16:26',t:'Navigation umgebaut: Bottom-Nav statt Pill-Bar oben. Setup-Screen aufgelöst in Eingabe-Leerzustand, Mehr-Screen und Einstellungen-Modal. Spieler-Leiste mit Kebab-Menü im Eingabe-Screen.'},
     {v:'5.0',d:'29.05.2026 15:14',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
     {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
     {v:'4.48',d:'29.05.2026 13:10',t:'Teilen-Bilder werden jetzt im Hintergrund vorgerendert \u2013 sofortiges Teilen ohne Wartezeit, höhere Bildqualität (scale 2).'},
