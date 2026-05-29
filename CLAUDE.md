@@ -4,25 +4,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Doppelkopf Punktezettel ist eine PWA (Progressive Web App) zum Erfassen von Punktestaenden beim Doppelkopf-Spieleabend. Sie laeuft komplett im Browser, ohne Build-Prozess und ohne externe Abhaengigkeiten.
+Doppelkopf Punktezettel ist eine PWA (Progressive Web App) zum Erfassen von Punktestaenden beim Doppelkopf-Spieleabend. Sie laeuft komplett im Browser. Seit v5.0 wird der Code mit **Vite** gebuendelt und in **ES-Module** unter `src/` aufgeteilt.
 
-## No Build Process
+## Build & Entwicklung
 
-Es gibt keinen Build-Schritt, keinen Package Manager und kein Framework. Aenderungen an `index.html`, `styles.css` oder `sw.js` werden direkt im Browser wirksam - einfach die Seite neu laden. Die App kann direkt mit einem lokalen Webserver oder ueber GitHub Pages geoeffnet werden.
+- **Dependencies installieren**: `npm install`
+- **Dev-Server (Hot Reload)**: `npm run dev`
+- **Production-Build**: `npm run build` -> erzeugt `dist/`
+- **Build-Vorschau**: `npm run preview`
+
+Der Service Worker wird von `vite-plugin-pwa` (Workbox, `generateSW`) automatisch erzeugt;
+es gibt **kein manuelles `sw.js` und kein manuelles `CACHE_NAME`** mehr. Cache-Busting laeuft
+ueber Datei-Hashes; das `registerSW({ onNeedRefresh })` in `src/main.js` triggert den Update-Toast.
+
+Externe Libraries (Firebase, Chart.js, html2canvas, qrcode-generator) sind npm-Pakete und werden
+in den Modulen per `import` eingebunden (frueher CDN-`<script>`-Tags).
 
 ## Deployment
 
-- **Production**: `main`-Branch wird direkt als GitHub Pages ausgespielt (Wurzelverzeichnis).
-- **Dev/Vorschau**: Push auf `dev`-Branch loest den GitHub Actions Workflow aus, der den Inhalt in den `/dev/`-Ordner auf `main` kopiert.
-- Beim Erhoehen der Versionsnummer muss der `CACHE_NAME` in `sw.js` aktualisiert werden (z.B. `'doko-v4.18'` -> `'doko-v4.19'`). Das erzwingt beim naechsten Seitenaufruf ein Cache-Busting und zeigt den Update-Toast.
+- **Production**: Push auf `main` -> GitHub Action (`.github/workflows/pages.yml`) baut mit Vite
+  und deployt `dist/` nach GitHub Pages (base `/`).
+- **Dev/Vorschau**: Push auf `dev` -> Action (`dev-deploy.yml`) baut mit `--base=/dev/` und legt
+  das `dist/`-Ergebnis in den `/dev/`-Ordner auf `main`.
+- Versionsnummer wird in `index.html` (Footer `#versionLabel`) und im Changelog-Array in
+  `src/main.js` (`openInfoModal`) gepflegt. Kein `CACHE_NAME` mehr noetig.
 
 ## Architecture
 
-Die gesamte App lebt in drei Dateien:
+Statische Huelle + CSS, App-Logik in 8 ES-Modulen unter `src/`:
 
-- **`index.html`** - Enthaelt HTML-Struktur, den kompletten JavaScript-Code (inline `<script>`) und bindet `styles.css` ein.
+- **`index.html`** - Nur HTML-Struktur, bindet `styles.css` und `<script type="module" src="/src/main.js">` ein.
 - **`styles.css`** - Externes Stylesheet mit CSS Custom Properties fuer das Theming (Light/Dark Mode).
-- **`sw.js`** - Service Worker fuer Offline-Faehigkeit und Cache-Verwaltung.
+- **`src/main.js`** - Entry Point: globaler `state`, Setter fuer geteilten State, `save()`/`load()`,
+  Navigation (`showScreen`), Theme, Easter-Eggs, Info-/Debug-Modal, PWA-Registrierung. Importiert
+  alle Module und registriert am Ende **alle** Funktionen per `Object.assign(window, …)` fuer die
+  `onclick`-Handler.
+- **`src/ui.js`** - Toast, Confirm, Prompt, Icons (`ICO`), Konfetti.
+- **`src/setup.js`** - Spielerverwaltung, Solo-Typen, Bock-Einstellungen, Quickstart, `startNewGame`.
+- **`src/eingabe.js`** - Punkteerfassung, Numpad, Punkterechner, Achievements, `finalizeRound`.
+- **`src/tabelle.js`** - Rangliste, Spielverlauf, Edit-Modal, Sharing (html2canvas).
+- **`src/stats.js`** - Statistiken, Charts (chart.js), Highlights, Achievement-Anzeige.
+- **`src/archiv.js`** - Spielarchiv, Ewige Tabelle.
+- **`src/turnier.js`** - Kompletter Turnier-Modus (Firebase Compat, Dashboard, Rotation, QR, Sync).
+
+### Modul-Konventionen (wichtig)
+
+- **onclick-Handler**: ES-Module sind nicht global. `main.js` registriert daher alle Modul-Exporte
+  per `Object.assign(window, …)`. Jede Funktion, die in HTML- oder `innerHTML`-`onclick` referenziert
+  wird, muss `export`iert sein.
+- **Geteilter mutabler State** (`currentPts`, `pendingRound`, `lastUndo`, `viewingArchive`,
+  `prerenderedTabelle`, `prerenderedStats`, `timerInterval`) lebt in `main.js` als `export let`.
+  Lesen per Import (live binding), **Schreiben ausschliesslich ueber die Setter**
+  (`setCurrentPts(…)` etc.) – direkte Zuweisung wuerde im ESM-Strict-Mode crashen.
+- Module importieren Helfer/Konstanten/Setter aus `./main.js` und UI-Helfer aus `./ui.js`.
 
 ### State Management
 

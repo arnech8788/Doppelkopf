@@ -352,6 +352,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.0',d:'29.05.2026',t:'Großer technischer Umbau: Code in 8 ES-Module aufgeteilt, Vite als Bundler, Service Worker via vite-plugin-pwa (kein manuelles Cache-Busting mehr). Keine Funktions- oder UI-Änderung.'},
     {v:'4.49',d:'29.05.2026 13:20',t:'Solokönig zeigt jetzt "–" bei Gleichstand (nur eindeutiger Gewinner wird gekürt).'},
     {v:'4.48',d:'29.05.2026 13:10',t:'Teilen-Bilder werden jetzt im Hintergrund vorgerendert \u2013 sofortiges Teilen ohne Wartezeit, höhere Bildqualität (scale 2).'},
     {v:'4.47',d:'28.05.2026 17:47',t:'Turnier: Spielleiter kann jetzt Tische erstellen und beitreten \u2013 Co-Host-Erkennung blockiert nicht mehr den eigenen Host.'},
