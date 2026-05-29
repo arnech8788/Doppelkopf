@@ -278,3 +278,18 @@ tr.clickable:active{background:var(--bg3)}
 .turnier-tisch-card{transition:transform .1s}
 .turnier-tisch-card:active{transform:scale(.98)}
 #turnierJoinContent input,#turnierCreateContent input{width:100%;box-sizing:border-box}
+/* Spieler-Leiste */
+.spieler-leiste{display:flex;align-items:center;gap:6px;padding:8px 0;margin-bottom:8px}
+.spieler-leiste .chips{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+.spieler-chip-sm{padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500;background:var(--bg3);color:var(--tx2)}
+.spieler-chip-sm.geber{background:var(--acc);color:#fff}
+.kebab-btn{background:none;border:none;color:var(--tx3);cursor:pointer;padding:4px;font-size:20px;line-height:1}
+.kebab-wrap{position:relative}
+.kebab-dropdown{position:absolute;right:0;top:100%;background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 4px 20px rgba(0,0,0,.2);z-index:20;min-width:220px;overflow:hidden}
+.kebab-dropdown .kebab-item{padding:12px 14px;display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bdr);transition:.15s}
+.kebab-dropdown .kebab-item:last-child{border-bottom:none}
+.kebab-dropdown .kebab-item:active{background:var(--bg3)}
+.kebab-dropdown .kebab-item.danger{color:var(--red)}
+.empty-start{padding:32px 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+.inline-setup{width:100%}
+.inline-setup .card{text-align:left}

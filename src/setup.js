@@ -135,20 +135,22 @@ export function checkAutoStart(){
   }
 }
 
-const addInp=document.getElementById('addPlayerInput');
-if(addInp){
-addInp.addEventListener('input',function(){
-  const v=this.value.trim().toLowerCase();
-  const sug=document.getElementById('suggestions');
-  if(!v){sug.classList.remove('show');return}
-  const all=getAllPlayers();
-  const matches=state.knownNames.filter(n=>n.toLowerCase().includes(v)&&!all.includes(n));
-  if(!matches.length){sug.classList.remove('show');return}
-  sug.innerHTML=matches.map(m=>'<div class="sug-item" onclick="pickSuggestion(\''+m.replace(/'/g,"\\'")+'\')">' +m+'</div>').join('');
-  sug.classList.add('show');
-});
-addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
+export function initAddPlayerInput(){
+  const addInp=document.getElementById('addPlayerInput');
+  if(!addInp)return;
+  addInp.addEventListener('input',function(){
+    const v=this.value.trim().toLowerCase();
+    const sug=document.getElementById('suggestions');
+    if(!v){sug.classList.remove('show');return}
+    const all=getAllPlayers();
+    const matches=state.knownNames.filter(n=>n.toLowerCase().includes(v)&&!all.includes(n));
+    if(!matches.length){sug.classList.remove('show');return}
+    sug.innerHTML=matches.map(m=>'<div class="sug-item" onclick="pickSuggestion(\''+m.replace(/'/g,"\\'")+'\')">' +m+'</div>').join('');
+    sug.classList.add('show');
+  });
+  addInp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addPlayer()}});
 }
+initAddPlayerInput();
 export function pickSuggestion(name){document.getElementById('addPlayerInput').value=name;document.getElementById('suggestions').classList.remove('show');addPlayer()}
 
 export async function startNewGame(){

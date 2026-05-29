@@ -1,12 +1,48 @@
 import { state, save, getAllPlayers, getHistoricalPlayers, getPlayerEmoji, getVocab, invalidateEingabeCache, isBockRound, showScreen, ACHIEVEMENTS, currentPts, pendingRound, lastUndo, timerInterval, setCurrentPts, setPendingRound, setLastUndo, setTimerInterval } from './main.js';
-import { showToast, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
+import { showToast, showConfirm, showPrompt, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
+import { renderPlayerTags, renderQuickStart, initAddPlayerInput } from './setup.js';
+import { archiveCurrentGame } from './archiv.js';
 
 export function renderEingabe(){
   document.getElementById('successMsg').style.display='none';
+  const spielerLeiste=document.getElementById('spielerLeiste');
+
   if(getAllPlayers().length<4){
-    document.getElementById('eingabeContent').innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>Trage mindestens 4 Spieler im Setup ein.</div>';
-    document.getElementById('bockIndicator').innerHTML='';return;
+    // Leerzustand
+    spielerLeiste.innerHTML='';
+    let html='<div class="empty-start">';
+    html+='<div id="quickStartCard" style="width:100%"></div>';
+    html+='<div class="inline-setup"><div class="card"><div class="card-title">Spieler</div>';
+    html+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Mindestens 4 Spieler eintragen. Der erste gibt zuerst.</div>';
+    html+='<div id="playerManageList"></div>';
+    html+='<div class="input-wrap" style="margin-top:8px"><input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off"><div class="suggestions" id="suggestions"></div></div>';
+    html+='<button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>';
+    html+='</div></div>';
+    html+='</div>';
+    document.getElementById('eingabeContent').innerHTML=html;
+    document.getElementById('bockIndicator').innerHTML='';
+    renderPlayerTags();
+    renderQuickStart();
+    initAddPlayerInput();
+    return;
   }
+
+  // Spieler-Leiste mit Kebab
+  const all_leiste=getAllPlayers();
+  const dealerIdx_leiste=state.rounds.length%all_leiste.length;
+  let leiste='<div class="spieler-leiste"><div class="chips">';
+  all_leiste.forEach((p,i)=>{
+    leiste+='<span class="spieler-chip-sm'+(i===dealerIdx_leiste?' geber':'')+'">'+p+(i===dealerIdx_leiste?' (G)':'')+'</span>';
+  });
+  leiste+='</div><div class="kebab-wrap"><button class="kebab-btn" onclick="toggleKebab()">&#8942;</button>';
+  leiste+='<div class="kebab-dropdown" id="kebabMenu" style="display:none">';
+  leiste+='<div class="kebab-item" onclick="closeKebab();openPlayerManageModal()">&#9998; Spieler bearbeiten</div>';
+  leiste+='<div class="kebab-item" onclick="closeKebab();openAddPlayerInline()">&#10010; Spieler hinzufügen</div>';
+  leiste+='<div class="kebab-item" onclick="closeKebab();startNewGame()">&#9654; Neues Spiel starten</div>';
+  leiste+='<div class="kebab-item danger" onclick="closeKebab();endGame()">&#9632; Spiel beenden</div>';
+  leiste+='</div></div></div>';
+  spielerLeiste.innerHTML=leiste;
+
   const bi=document.getElementById('bockIndicator');
   let biHtml='';
   const all=getAllPlayers();
@@ -579,3 +615,80 @@ export function openCalcHelpModal(){
 }
 export function closeCalcHelpModal(){document.getElementById('calcHelpModal').classList.remove('show')}
 document.getElementById('calcHelpModal').addEventListener('click',function(e){if(e.target===this)closeCalcHelpModal()});
+
+// ── Kebab-Menü ──
+export function toggleKebab(){
+  const menu=document.getElementById('kebabMenu');
+  if(!menu)return;
+  const show=menu.style.display==='none';
+  menu.style.display=show?'block':'none';
+  if(show){
+    setTimeout(()=>document.addEventListener('click',_closeKebabOutside,{once:true}),0);
+  }
+}
+export function closeKebab(){
+  const menu=document.getElementById('kebabMenu');
+  if(menu)menu.style.display='none';
+}
+function _closeKebabOutside(e){
+  const menu=document.getElementById('kebabMenu');
+  if(menu&&!menu.contains(e.target)&&!e.target.closest('.kebab-btn')){
+    menu.style.display='none';
+  }
+}
+
+// ── Spieler bearbeiten (Modal) ──
+export function openPlayerManageModal(){
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Spieler bearbeiten</h3><button onclick="closePlayerManageModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Reihenfolge bestimmt den Geber. Erster Spieler gibt zuerst.</div>';
+  html+='<div id="playerManageList"></div>';
+  html+='<div class="input-wrap" style="margin-top:8px"><input type="text" id="addPlayerInput" placeholder="Spieler hinzufügen..." autocomplete="off"><div class="suggestions" id="suggestions"></div></div>';
+  html+='<button class="btn btn-secondary" style="margin-top:8px" onclick="addPlayer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>';
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closePlayerManageModal()">Schließen</button>';
+  document.getElementById('settingsModalContent').innerHTML=html;
+  document.getElementById('settingsModal').classList.add('show');
+  renderPlayerTags();
+  initAddPlayerInput();
+}
+export function closePlayerManageModal(){
+  document.getElementById('settingsModal').classList.remove('show');
+  invalidateEingabeCache();
+  renderEingabe();
+}
+
+// ── Spiel beenden ──
+export async function endGame(){
+  if(state.rounds.length===0){
+    showToast('Es sind noch keine Spiele eingetragen.','info');
+    return;
+  }
+  if(!await showConfirm('Aktuelles Spiel archivieren und beenden?','Beenden',true))return;
+  archiveCurrentGame();
+  checkSeasonAchievements();
+  state.rounds=[];
+  state.bockQueue=0;
+  state.gameStartTime=null;
+  state.kursleiterCupSeen=false;
+  state.dokoRundeSeen=false;
+  setLastUndo(null);
+  setPendingRound(null);
+  setCurrentPts('');
+  if(timerInterval){clearInterval(timerInterval);setTimerInterval(null)}
+  invalidateEingabeCache();
+  save();
+  renderEingabe();
+}
+
+// ── Inline Spieler hinzufügen (via Prompt) ──
+export async function openAddPlayerInline(){
+  const name=await showPrompt('Spieler hinzufügen','Name eingeben...');
+  if(!name||!name.trim())return;
+  const trimmed=name.trim();
+  if(state.players.includes(trimmed)){showToast('Spieler existiert bereits.','error');return}
+  state.players.push(trimmed);
+  if(!state.knownNames.includes(trimmed))state.knownNames.push(trimmed);
+  save();
+  invalidateEingabeCache();
+  renderEingabe();
+  showToast(trimmed+' hinzugefügt','success');
+}
