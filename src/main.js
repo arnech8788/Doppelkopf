@@ -3,6 +3,14 @@
 
 import { registerSW } from 'virtual:pwa-register';
 import { showToast, hideToast, showConfirm, showPrompt, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
+// Geschwister-Module: als Namespace importiert, damit ihr Top-Level-Code (Event-Listener,
+// Autocomplete-Init) laeuft UND alle Funktionen unten auf window registriert werden koennen.
+import * as setup from './setup.js';
+import * as eingabe from './eingabe.js';
+import * as tabelle from './tabelle.js';
+import * as stats from './stats.js';
+import * as archiv from './archiv.js';
+import * as turnier from './turnier.js';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -564,12 +572,21 @@ const updateSW = registerSW({
 });
 
 // ═══════════════════════════════════════════════════════════
-// window-Registrierung der eigenen (main + ui) onclick-Funktionen.
-// Die Geschwister-Module werden in der Finalisierung (Task 10) ergaenzt.
+// window-Registrierung ALLER onclick-Funktionen (main + ui + Geschwister-Module).
+// onclick-Handler im HTML/innerHTML referenzieren globale Funktionsnamen – durch
+// dieses Object.assign sind alle Modul-Exporte global verfuegbar.
 // ═══════════════════════════════════════════════════════════
-Object.assign(window,{
-  showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
-  showScreen, toggleTheme, getChartColors,
-  openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
-  openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
-});
+Object.assign(window,
+  {
+    showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
+    showScreen, toggleTheme, getChartColors,
+    openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
+    openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState
+  },
+  setup, eingabe, tabelle, stats, archiv, turnier
+);
+
+// ═══════════════════════════════════════════════════════════
+// App initialisieren (nachdem alle Funktionen global registriert sind).
+// ═══════════════════════════════════════════════════════════
+load();
