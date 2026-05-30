@@ -193,6 +193,67 @@ export async function claimExistingSpieler(spielerId){
   showToast('Gerät verknüpft mit '+(spieler?spieler.name:'Spieler')+'!','info');
 }
 
+// ── Eigener Spieler / Admin ──
+// Der Admin-Bereich ist ausschliesslich fuer diesen Spieler sichtbar.
+const ADMIN_NAME='arne chudobba';
+
+// Liefert den zu diesem Geraet gehoerenden Spieler-Datensatz (oder null).
+export async function getOwnSpieler(){
+  if(!initFirebase())return null;
+  return await findSpielerByDevice(getDeviceId());
+}
+
+// True, wenn der eigene Spieler der Admin ist (Name-basiert).
+export async function isAdmin(){
+  const own=await getOwnSpieler();
+  return !!own&&own.name&&own.name.trim().toLowerCase()===ADMIN_NAME;
+}
+
+// Fuellt die Profil-Karte in den Einstellungen (Name + Kuerzel editierbar, ID read-only).
+export async function fillProfileSettings(){
+  const el=document.getElementById('profileSettings');
+  if(!el)return;
+  const own=await getOwnSpieler();
+  if(!own){
+    el.innerHTML='<div style="font-size:12px;color:var(--tx3)">Noch kein Profil angelegt. Es wird beim ersten Turnier-Beitritt erstellt.</div>';
+    return;
+  }
+  const esc=s=>(s||'').replace(/"/g,'&quot;');
+  let h='';
+  h+='<div class="settings-row"><span>Benutzer-ID</span><input type="text" value="'+esc(own.id)+'" readonly style="opacity:.6;cursor:not-allowed"></div>';
+  h+='<div class="settings-row"><span>Name</span><input type="text" id="profileName" value="'+esc(own.name)+'"></div>';
+  h+='<div class="settings-row"><span>Kürzel</span><input type="text" id="profileShort" value="'+esc(own.short||'')+'" maxlength="20"></div>';
+  h+='<button class="btn btn-primary" style="margin-top:10px" onclick="saveProfile()">Profil speichern</button>';
+  el.innerHTML=h;
+}
+
+// Speichert Name + Kuerzel des eigenen Spielers in der Datenbank.
+export async function saveProfile(){
+  const own=await getOwnSpieler();
+  if(!own){showToast('Kein Profil gefunden.','error');return}
+  const name=(document.getElementById('profileName').value||'').trim();
+  const short=(document.getElementById('profileShort').value||'').trim();
+  if(name.length<2){showToast('Name muss mind. 2 Zeichen haben.','error');return}
+  if(!short){showToast('Kürzel darf nicht leer sein.','error');return}
+  // Eindeutigkeit pruefen (gegen andere Spieler)
+  const all=await loadSpielerDB();
+  if(all.some(s=>s.id!==own.id&&s.short&&s.short.toLowerCase()===short.toLowerCase())){
+    showToast('Kürzel "'+short+'" ist bereits vergeben.','error');return;
+  }
+  if(all.some(s=>s.id!==own.id&&s.name&&s.name.toLowerCase()===name.toLowerCase())){
+    showToast('Name "'+name+'" ist bereits vergeben.','error');return;
+  }
+  try{
+    await firebase.database().ref('spieler/'+own.id).update({name,short});
+    const cached=spielerCache.find(s=>s.id===own.id);
+    if(cached){cached.name=name;cached.short=short}
+    showToast('Profil gespeichert.','info');
+  }catch(e){
+    console.error('saveProfile error:',e);
+    showToast('Speichern fehlgeschlagen.','error');
+  }
+}
+
 export function renderTurnierIndicator(){
   const el=document.getElementById('turnierIndicator');
   if(!el)return;

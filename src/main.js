@@ -11,6 +11,7 @@ import * as tabelle from './tabelle.js';
 import * as stats from './stats.js';
 import * as archiv from './archiv.js';
 import * as turnier from './turnier.js';
+import * as admin from './admin.js';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -144,6 +145,9 @@ export function save(){
 export function openSettings(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Einstellungen</h3><button onclick="closeSettings()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
 
+  // Mein Profil (Name + Kürzel anpassbar, ID read-only) – async befüllt
+  html+='<div class="card"><div class="card-title">Mein Profil</div><div id="profileSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div></div>';
+
   // Solo-Arten
   html+='<div class="card"><div class="card-title">Solo-Arten erfassen</div>';
   html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle'+(state.soloTypesEnabled?' on':'')+'" id="soloTypesToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
@@ -189,6 +193,7 @@ export function openSettings(){
   document.getElementById('settingsModalContent').innerHTML=html;
   document.getElementById('settingsModal').classList.add('show');
   setup.renderSoloTypes();
+  turnier.fillProfileSettings();
 }
 export function closeSettings(){document.getElementById('settingsModal').classList.remove('show')}
 document.getElementById('settingsModal').addEventListener('click',function(e){if(e.target===this)closeSettings()});
@@ -345,10 +350,12 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.7 · 30.05.2026 07:42</div>';
+  html+='<div id="adminEntrySlot"></div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.8 · 30.05.2026 12:30</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
+  admin.fillAdminEntry();
 }
 
 // ── Info-/Debug-Modal, Version-Tap ──
@@ -433,6 +440,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.8',d:'30.05.2026 12:30',t:'Profil in den Einstellungen: jeder kann seinen Namen und sein Kuerzel selbst anpassen (Benutzer-ID bleibt schreibgeschuetzt). Neuer Admin-Bereich unter „Mehr" – nur fuer den Admin sichtbar – mit vollem Zugriff auf die Datenbank: navigieren, als JSON bearbeiten, Schluessel anlegen und Knoten loeschen.'},
     {v:'5.7',d:'30.05.2026 07:42',t:'Turniere ohne Code finden: In-App-QR-Scanner und – optional beim Erstellen aktivierbar – Anzeige von Turnieren in der Naehe per Standort. Beitritt weiterhin auch per Code/Link moeglich.'},
     {v:'5.6',d:'30.05.2026 00:05',t:'Turnier nutzt jetzt ein laufendes Spiel: beim Erstellen (Freie Eingabe) kann das aktuelle Spiel direkt als eigener Tisch uebernommen werden; beim Beitritt zu einem bestehenden Tisch wird dessen Spiel geladen bzw. ein leerer Tisch kann das laufende Spiel uebernehmen.'},
     {v:'5.5',d:'29.05.2026 23:37',t:'Modals (Einstellungen, Info, Bearbeiten u. a.) lassen sich jetzt per Zurück-Geste schließen: Hardware-/Browser-Zurück sowie Wischen nach rechts auf dem Modal.'},
@@ -762,7 +770,7 @@ Object.assign(window,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll
   },
-  setup, eingabe, tabelle, stats, archiv, turnier
+  setup, eingabe, tabelle, stats, archiv, turnier, admin
 );
 
 // ═══════════════════════════════════════════════════════════
