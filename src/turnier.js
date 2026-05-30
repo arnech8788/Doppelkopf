@@ -1,6 +1,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import qrcode from 'qrcode-generator';
+import jsQR from 'jsqr';
 import { state, save, getAllPlayers, invalidateEingabeCache } from './main.js';
 import { showToast, showConfirm, showPrompt } from './ui.js';
 
@@ -427,10 +428,10 @@ export async function toggleTurnierConfig(key){
   renderEditConfig(turnierConfigCache);
   renderTurnierSetup();
 }
-let turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false},selectedPlayers:[]};
+let turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false,discoverable:false},selectedPlayers:[]};
 
 export function openCreateTurnier(){
-  turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false},selectedPlayers:[],turnierName:''};
+  turnierWizard={step:1,config:{playerMode:3,tableMode:'fixed',rotationType:null,rotationTrigger:null,rotationAfterRounds:4,scoringEnabled:true,playersVisible:false,discoverable:false},selectedPlayers:[],turnierName:''};
   document.getElementById('turnierCreateModal').classList.add('show');
   renderWizardStep();
 }
@@ -638,10 +639,55 @@ export function renderWizardStep4(){
     +'<button class="toggle'+(c.scoringEnabled?' on':'')+'" onclick="wizardToggleConfig(\'scoringEnabled\')"></button></div>';
   html+='<div class="toggle-row" style="padding:8px 0"><span class="toggle-label">Spieler sehen andere Tische</span>'
     +'<button class="toggle'+(c.playersVisible?' on':'')+'" onclick="wizardToggleConfig(\'playersVisible\')"></button></div>';
+  html+='<div class="toggle-row" style="padding:8px 0"><span class="toggle-label">In der Nähe auffindbar</span>'
+    +'<button class="toggle'+(c.discoverable?' on':'')+'" onclick="wizardToggleConfig(\'discoverable\')"></button></div>';
+  html+='<div style="font-size:11px;color:var(--tx3);padding:0 0 4px">Teilt beim Erstellen deinen ungefähren Standort, damit andere das Turnier ohne Code in der Nähe finden.</div>';
   html+='<div style="margin-top:16px;display:flex;justify-content:space-between">'
     +'<button class="btn btn-secondary" onclick="wizardGoStep('+(c.playerMode===3?2:3)+')">Zurück</button>'
     +'<button class="btn btn-primary" onclick="submitCreateTurnier()">Turnier erstellen</button></div>';
   return html;
+}
+
+// ── Discovery („in der Nähe") + QR-Scan-Helfer ──
+function parseTurnierCode(text){
+  if(!text)return null;
+  const s=String(text);
+  let m=s.match(/(?:turnier=)?DK[-]?(\d{4})/i);
+  if(!m)m=s.match(/(?:^|[^\d])(\d{4})(?:[^\d]|$)/);
+  return m?m[1]:null;
+}
+function haversineKm(lat1,lng1,lat2,lng2){
+  const R=6371,toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function getPosition(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){resolve(null);return}
+    navigator.geolocation.getCurrentPosition(
+      p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude}),
+      ()=>resolve(null),
+      {enableHighAccuracy:false,timeout:8000,maximumAge:300000}
+    );
+  });
+}
+async function writeDiscovery(code,name,pos){
+  if(!pos||!initFirebase())return;
+  try{
+    await firebase.database().ref('discovery/DK'+code).set({
+      code:code,
+      name:name||null,
+      created:firebase.database.ServerValue.TIMESTAMP,
+      lat:Math.round(pos.lat*100)/100,
+      lng:Math.round(pos.lng*100)/100,
+      status:'active'
+    });
+  }catch(e){console.warn('writeDiscovery:',e)}
+}
+async function removeDiscovery(code){
+  if(!code||!initFirebase())return;
+  try{await firebase.database().ref('discovery/DK'+code).remove();}catch(e){console.warn('removeDiscovery:',e)}
 }
 
 export async function submitCreateTurnier(){
@@ -688,6 +734,12 @@ export async function submitCreateTurnier(){
         await tischRef.set({name:'Tisch 1',nummer:1,spielerIds:spielerIds,schreiberId:schreiberId,rounds:state.rounds,lastSync:firebase.database.ServerValue.TIMESTAMP});
         hostTisch={id:tischRef.key,name:'Tisch 1',nummer:1,schreiberId:schreiberId};
       }
+    }
+    // Opt-in: ungefähren Standort für "in der Nähe finden" hinterlegen
+    if(c.discoverable){
+      const pos=await getPosition();
+      if(pos)await writeDiscovery(code,turnierName,pos);
+      else showToast('Standort nicht verfügbar – Turnier ist nur per Code/QR beitretbar.','info');
     }
     state.turnier=hostTisch
       ? {code:code,tischId:hostTisch.id,tischName:hostTisch.name,tischNummer:hostTisch.nummer,isHost:true,isPlayer:false,turnierName:turnierName||null,schreiberId:hostTisch.schreiberId}
@@ -761,7 +813,12 @@ export function openJoinTurnier(prefillCode,prefillTisch){
     +'<div style="margin-bottom:12px"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Turnier-Code</label>'
     +'<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:var(--tx2)">DK-</span>'
     +'<input type="text" id="joinCodeInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" value="'+(prefillCode||'')+'" placeholder="4729" style="font-size:16px;padding:10px;letter-spacing:4px;text-align:center;flex:1"></div></div>'
-    +'<div id="joinTurnierInfo" style="margin-bottom:16px"></div>';
+    +'<div id="joinTurnierInfo" style="margin-bottom:12px"></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px">'
+    +'<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openQrScanner()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:-2px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg> QR scannen</button>'
+    +'<button class="btn btn-secondary" style="flex:1;margin:0" onclick="renderNearbyTurniere()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:-2px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> In der Nähe</button>'
+    +'</div>'
+    +'<div id="joinNearby"></div>';
   document.getElementById('turnierJoinModal').classList.add('show');
   if(!prefillCode)document.getElementById('joinCodeInput').focus();
   const codeInput=document.getElementById('joinCodeInput');
@@ -775,6 +832,87 @@ export function openJoinTurnier(prefillCode,prefillTisch){
 
 export function closeJoinTurnier(){document.getElementById('turnierJoinModal').classList.remove('show')}
 document.getElementById('turnierJoinModal').addEventListener('click',function(e){if(e.target===this)closeJoinTurnier()});
+
+// Turniere in der Nähe (GPS) – liest den Discovery-Index und filtert nach Entfernung/Alter
+export async function renderNearbyTurniere(){
+  const box=document.getElementById('joinNearby');
+  if(!box)return;
+  if(!initFirebase()){box.innerHTML='<div style="font-size:12px;color:var(--red)">Firebase nicht verfügbar.</div>';return}
+  box.innerHTML='<div style="font-size:12px;color:var(--tx3)">Standort wird ermittelt…</div>';
+  const pos=await getPosition();
+  if(!pos){box.innerHTML='<div style="font-size:12px;color:var(--tx3)">Standort nicht verfügbar. Nutze Code oder QR.</div>';return}
+  let entries=[];
+  try{
+    const snap=await firebase.database().ref('discovery').get();
+    if(snap.exists())entries=Object.values(snap.val()||{});
+  }catch(e){box.innerHTML='<div style="font-size:12px;color:var(--red)">Konnte Turniere nicht laden.</div>';return}
+  const now=Date.now(), maxAgeMs=12*60*60*1000, maxKm=25;
+  const list=entries
+    .filter(t=>t&&t.status==='active'&&typeof t.lat==='number'&&typeof t.lng==='number'&&t.created&&(now-t.created)<maxAgeMs)
+    .map(t=>({...t,dist:haversineKm(pos.lat,pos.lng,t.lat,t.lng)}))
+    .filter(t=>t.dist<=maxKm)
+    .sort((a,b)=>a.dist-b.dist)
+    .slice(0,15);
+  if(!list.length){box.innerHTML='<div style="font-size:12px;color:var(--tx3)">Keine Turniere in der Nähe gefunden.</div>';return}
+  let html='<div class="section-label">In der Nähe</div>';
+  list.forEach(t=>{
+    const dist=t.dist<1?Math.round(t.dist*1000)+' m':t.dist.toFixed(1)+' km';
+    const mins=Math.round((now-t.created)/60000);
+    const age=mins<60?'vor '+mins+' Min':'vor '+Math.round(mins/60)+' Std';
+    html+='<div class="card turnier-tisch-card" style="cursor:pointer;padding:10px;margin-bottom:6px;border:1px solid var(--bdr)" onclick="loadJoinTurnierInfo(\''+t.code+'\',null)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-weight:600;font-size:14px">'+(t.name?t.name:'DK-'+t.code)+'</div>'
+      +'<div style="font-size:11px;color:var(--tx3)">'+dist+'</div></div>'
+      +'<div style="font-size:11px;color:var(--tx3);margin-top:2px">DK-'+t.code+' · '+age+'</div></div>';
+  });
+  box.innerHTML=html;
+  // Code-Feld bei Auswahl mitfüllen
+  box.querySelectorAll('[onclick^="loadJoinTurnierInfo"]').forEach(el=>{
+    el.addEventListener('click',()=>{const ci=document.getElementById('joinCodeInput');if(ci){const m=el.getAttribute('onclick').match(/'(\d{4})'/);if(m)ci.value=m[1];}});
+  });
+}
+
+// ── In-App QR-Scanner ──
+let qrStream=null, qrRaf=null;
+export async function openQrScanner(){
+  const modal=document.getElementById('qrScanModal');
+  const video=document.getElementById('qrVideo');
+  if(!modal||!video)return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showToast('Kamera nicht verfügbar.','error');return}
+  modal.classList.add('show');
+  try{
+    qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  }catch(e){showToast('Kamerazugriff verweigert.','error');closeQrScanner();return}
+  video.srcObject=qrStream;
+  video.setAttribute('playsinline','');
+  await video.play().catch(()=>{});
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const tick=()=>{
+    if(!qrStream){return}
+    if(video.readyState===video.HAVE_ENOUGH_DATA){
+      canvas.width=video.videoWidth;canvas.height=video.videoHeight;
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      try{
+        const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const res=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+        if(res&&res.data){
+          const code=parseTurnierCode(res.data);
+          if(code){closeQrScanner();openJoinTurnier(code,null);return;}
+        }
+      }catch(e){}
+    }
+    qrRaf=requestAnimationFrame(tick);
+  };
+  qrRaf=requestAnimationFrame(tick);
+}
+export function closeQrScanner(){
+  if(qrRaf){cancelAnimationFrame(qrRaf);qrRaf=null}
+  if(qrStream){qrStream.getTracks().forEach(t=>t.stop());qrStream=null}
+  const video=document.getElementById('qrVideo');if(video)video.srcObject=null;
+  const modal=document.getElementById('qrScanModal');if(modal)modal.classList.remove('show');
+}
+document.getElementById('qrScanModal')&&document.getElementById('qrScanModal').addEventListener('click',function(e){if(e.target===this)closeQrScanner()});
 
 export async function loadJoinTurnierInfo(code,prefillTisch){
   const el=document.getElementById('joinTurnierInfo');
@@ -1751,6 +1889,7 @@ export async function endTurnier(){
   try{
     archiveTurnier(state.turnier.code);
     await firebase.database().ref('turniere/DK'+state.turnier.code+'/status').set('ended');
+    removeDiscovery(state.turnier.code);
     if(turnierListener){
       firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
       turnierListener=null;

@@ -345,7 +345,7 @@ export function renderMehrScreen(){
   html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.6 · 30.05.2026 00:05</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.7 · 30.05.2026 07:42</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -433,6 +433,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.7',d:'30.05.2026 07:42',t:'Turniere ohne Code finden: In-App-QR-Scanner und – optional beim Erstellen aktivierbar – Anzeige von Turnieren in der Naehe per Standort. Beitritt weiterhin auch per Code/Link moeglich.'},
     {v:'5.6',d:'30.05.2026 00:05',t:'Turnier nutzt jetzt ein laufendes Spiel: beim Erstellen (Freie Eingabe) kann das aktuelle Spiel direkt als eigener Tisch uebernommen werden; beim Beitritt zu einem bestehenden Tisch wird dessen Spiel geladen bzw. ein leerer Tisch kann das laufende Spiel uebernehmen.'},
     {v:'5.5',d:'29.05.2026 23:37',t:'Modals (Einstellungen, Info, Bearbeiten u. a.) lassen sich jetzt per Zurück-Geste schließen: Hardware-/Browser-Zurück sowie Wischen nach rechts auf dem Modal.'},
     {v:'5.4',d:'29.05.2026 23:14',t:'Eigener "Spieler"-Reiter unten: Spieler eintragen/umbenennen/sortieren, Quickstart und Spielsteuerung an einem Ort. Dafür die Spielernamen-Leiste oben im Eingabe-Screen entfernt (mehr Platz fürs Numpad).'},
