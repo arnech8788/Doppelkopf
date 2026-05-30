@@ -219,11 +219,17 @@ export async function fillProfileSettings(){
     return;
   }
   const esc=s=>(s||'').replace(/"/g,'&quot;');
+  const inp='width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg);color:var(--tx)';
+  const row='display:flex;align-items:center;gap:14px;padding:7px 0;font-size:13px;color:var(--tx2)';
+  const lbl='flex:0 0 84px';
   let h='';
-  h+='<div class="settings-row"><span>Benutzer-ID</span><input type="text" value="'+esc(own.id)+'" readonly style="opacity:.6;cursor:not-allowed"></div>';
-  h+='<div class="settings-row"><span>Name</span><input type="text" id="profileName" value="'+esc(own.name)+'"></div>';
-  h+='<div class="settings-row"><span>Kürzel</span><input type="text" id="profileShort" value="'+esc(own.short||'')+'" maxlength="20"></div>';
-  h+='<button class="btn btn-primary" style="margin-top:10px" onclick="saveProfile()">Profil speichern</button>';
+  h+='<div style="'+row+'"><span style="'+lbl+'">Benutzer-ID</span><input type="text" value="'+esc(own.id)+'" readonly style="'+inp+';flex:1;min-width:0;opacity:.6;cursor:not-allowed"></div>';
+  h+='<div style="'+row+'"><span style="'+lbl+'">Name</span><input type="text" id="profileName" value="'+esc(own.name)+'" style="'+inp+';flex:1;min-width:0"></div>';
+  h+='<div style="'+row+'"><span style="'+lbl+'">Kürzel</span><input type="text" id="profileShort" value="'+esc(own.short||'')+'" maxlength="20" style="'+inp+';flex:1;min-width:0"></div>';
+  h+='<div style="display:flex;gap:8px;margin-top:12px">';
+  h+='<button class="btn btn-primary" style="flex:1" onclick="saveProfile()">Profil speichern</button>';
+  h+='<button class="btn btn-secondary" style="flex:0 0 auto;padding:0 16px;color:var(--red);border-color:var(--red)" onclick="deleteProfile()">Löschen</button>';
+  h+='</div>';
   el.innerHTML=h;
 }
 
@@ -251,6 +257,23 @@ export async function saveProfile(){
   }catch(e){
     console.error('saveProfile error:',e);
     showToast('Speichern fehlgeschlagen.','error');
+  }
+}
+
+// Loescht den eigenen Spieler-Datensatz aus der Datenbank.
+export async function deleteProfile(){
+  const own=await getOwnSpieler();
+  if(!own){showToast('Kein Profil gefunden.','error');return}
+  const ok=await showConfirm('Dein Profil „'+own.name+'" wirklich löschen? Du wirst aus der Spieler-Datenbank entfernt.','Löschen',true);
+  if(!ok)return;
+  try{
+    await firebase.database().ref('spieler/'+own.id).remove();
+    spielerCache=spielerCache.filter(s=>s.id!==own.id);
+    showToast('Profil gelöscht.','info');
+    fillProfileSettings();
+  }catch(e){
+    console.error('deleteProfile error:',e);
+    showToast('Löschen fehlgeschlagen.','error');
   }
 }
 
