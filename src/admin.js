@@ -5,14 +5,20 @@
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
-import { initFirebase, isAdmin } from './turnier.js';
+import { initFirebase, isAdmin, loadSpielerDB, spielerIsAdmin, BOOTSTRAP_ADMINS } from './turnier.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
+
+// Bekannte Top-Level-Knoten – dienen als Einstieg, falls der Root per
+// Firebase-Regeln nicht lesbar ist (permission_denied at /).
+const ROOT_KEYS=['spieler','turniere','discovery'];
 
 // Aktueller Pfad als Array von Schluesseln (leer = Wurzel).
 let adminPath=[];
 // Kindschluessel des aktuellen Knotens (per Index in onclick referenziert -> kein Escaping noetig).
 let adminKeys=[];
 let adminCurrentVal=null;
+let adminRootFallback=false;
+let adminAdminList=[];
 
 function pathStr(){return adminPath.join('/')}
 function refAt(path){
@@ -62,12 +68,29 @@ export function closeAdminModal(){document.getElementById('adminModal').classLis
 async function adminLoad(){
   const el=document.getElementById('adminModalContent');
   el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  if(adminPath.length===0){
+    // Root ist oft per Regeln gesperrt -> bekannte Top-Level-Knoten anbieten.
+    adminRootFallback=false;
+    try{
+      const snap=await refAt('').once('value');
+      const val=snap.val();
+      adminCurrentVal=(val&&typeof val==='object')?val:{};
+    }catch(e){
+      adminCurrentVal={};
+      adminRootFallback=true;
+    }
+    ROOT_KEYS.forEach(k=>{if(!(k in adminCurrentVal))adminCurrentVal[k]=null});
+    renderAdmin();
+    return;
+  }
+  adminRootFallback=false;
   try{
     const snap=await refAt(pathStr()).once('value');
     adminCurrentVal=snap.val();
   }catch(e){
     console.error('admin load error:',e);
-    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">Fehler: '+escHtml(e.message||e)+'</div>';
+    el.innerHTML='<div style="padding:40px;text-align:center;color:var(--red)">Fehler: '+escHtml(e.message||e)
+      +'</div><button class="btn btn-secondary" style="margin-top:12px" onclick="adminUp('+(adminPath.length-1)+')">Zurück</button>';
     return;
   }
   renderAdmin();
@@ -93,15 +116,23 @@ function renderAdmin(){
   });
   h+='</div>';
 
+  const atRoot=adminPath.length===0;
+
   // Toolbar
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
   h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminRefresh()">↻ Aktualisieren</button>';
-  if(v!==null&&typeof v==='object')
+  if(atRoot)
+    h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminManageAdmins()">👥 Admins</button>';
+  if(!atRoot&&v!==null&&typeof v==='object')
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminAddKey()">+ Schlüssel</button>';
-  h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminEditRaw()">'+ICO.edit+' JSON</button>';
-  if(adminPath.length>0)
+  if(!atRoot)
+    h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminEditRaw()">'+ICO.edit+' JSON</button>';
+  if(!atRoot)
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px;color:var(--red);border-color:var(--red)" onclick="adminDeleteCurrent()">'+ICO.trash+' Knoten löschen</button>';
   h+='</div>';
+
+  if(atRoot&&adminRootFallback)
+    h+='<div style="font-size:11px;color:var(--tx3);margin:-4px 0 10px">Root ist per DB-Regeln gesperrt – bekannte Bereiche werden angezeigt.</div>';
 
   // Inhalt
   if(v===null||v===undefined){
@@ -114,14 +145,16 @@ function renderAdmin(){
     adminKeys.forEach((k,i)=>{
       const child=v[k];
       const isObj=child!==null&&typeof child==='object';
+      const navigable=isObj||atRoot; // Root-Knoten immer betretbar (Wert ggf. erst dort lesbar)
       h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
-      if(isObj)
-        h+='<a href="#" onclick="adminOpen('+i+');return false" style="flex:1;min-width:0;color:var(--tx);text-decoration:none;display:flex;justify-content:space-between;gap:8px;align-items:center"><span style="font-weight:500;word-break:break-all">'+escHtml(k)+'</span>'+preview(child)+'<span style="color:var(--tx3)">›</span></a>';
+      if(navigable)
+        h+='<a href="#" onclick="adminOpen('+i+');return false" style="flex:1;min-width:0;color:var(--tx);text-decoration:none;display:flex;justify-content:space-between;gap:8px;align-items:center"><span style="font-weight:500;word-break:break-all">'+escHtml(k)+'</span>'+(atRoot&&adminRootFallback?'':preview(child))+'<span style="color:var(--tx3)">›</span></a>';
       else{
         h+='<div style="flex:1;min-width:0;display:flex;justify-content:space-between;gap:8px;align-items:center"><span style="font-weight:500;word-break:break-all">'+escHtml(k)+'</span>'+preview(child)+'</div>';
         h+='<button onclick="adminEditKey('+i+')" title="Bearbeiten" style="background:none;border:none;color:var(--tx2);cursor:pointer;width:30px;height:30px;flex-shrink:0">'+ICO.edit+'</button>';
       }
-      h+='<button onclick="adminDeleteKey('+i+')" title="Löschen" style="background:none;border:none;color:var(--red);cursor:pointer;width:30px;height:30px;flex-shrink:0">'+ICO.trash+'</button>';
+      if(!atRoot)
+        h+='<button onclick="adminDeleteKey('+i+')" title="Löschen" style="background:none;border:none;color:var(--red);cursor:pointer;width:30px;height:30px;flex-shrink:0">'+ICO.trash+'</button>';
       h+='</div>';
     });
     h+='</div>';
@@ -240,4 +273,49 @@ export async function adminSaveRaw(){
     showToast('Gespeichert.','info');
     adminLoad();
   }catch(e){console.error(e);showToast('Fehler beim Speichern.','error')}
+}
+
+// ── Admins verwalten ──
+// Listet alle Spieler und erlaubt das Vergeben/Entziehen von Admin-Rechten
+// (Flag spieler/<id>/isAdmin). Bootstrap-Admins sind gesperrt.
+export async function adminManageAdmins(){
+  const el=document.getElementById('adminModalContent');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  adminAdminList=await loadSpielerDB();
+  adminAdminList=adminAdminList.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">👥 Admins verwalten</h3>'
+    +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Tippe auf den Schalter, um Admin-Rechte zu vergeben oder zu entziehen.</div>';
+  h+='<div class="card" style="padding:4px 0">';
+  if(!adminAdminList.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Keine Spieler.</div>';
+  adminAdminList.forEach((s,i)=>{
+    const boot=BOOTSTRAP_ADMINS.includes(s.id);
+    const on=spielerIsAdmin(s);
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
+    h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(s.name||'(ohne Name)')+(s.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(s.short)+'</span>':'')+'</div>';
+    h+='<div style="font-size:11px;color:var(--tx3)">'+escHtml(s.id)+(boot?' · fest':'')+'</div></div>';
+    if(boot)
+      h+='<span style="font-size:11px;color:var(--acc);border:1px solid var(--acc);border-radius:999px;padding:2px 8px">Admin</span>';
+    else
+      h+='<button class="toggle'+(on?' on':'')+'" onclick="adminToggleAdmin('+i+')"></button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  el.innerHTML=h;
+}
+
+export async function adminToggleAdmin(i){
+  const s=adminAdminList[i];
+  if(!s)return;
+  if(BOOTSTRAP_ADMINS.includes(s.id)){showToast('Fest hinterlegter Admin – nicht änderbar.','info');return}
+  const makeAdmin=!(s.isAdmin===true);
+  try{
+    const ref=firebase.database().ref('spieler/'+s.id+'/isAdmin');
+    if(makeAdmin)await ref.set(true);else await ref.remove();
+    s.isAdmin=makeAdmin?true:undefined;
+    showToast(makeAdmin?(s.name||'Spieler')+' ist jetzt Admin.':'Admin-Rechte entzogen.','info');
+    adminManageAdmins();
+  }catch(e){console.error('adminToggleAdmin error:',e);showToast('Fehler beim Ändern.','error')}
 }

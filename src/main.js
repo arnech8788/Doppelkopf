@@ -351,7 +351,7 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.8 · 30.05.2026 12:30</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.9 · 30.05.2026 14:05</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -440,6 +440,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'5.9',d:'30.05.2026 14:05',t:'Profil: Benutzer-ID kopierbar, aufgeraeumtes Layout, Loeschen-Button. Admin: faengt gesperrten Datenbank-Root ab und zeigt die bekannten Bereiche, neue Admin-Verwaltung (Rechte vergeben/entziehen). Admin-Erkennung jetzt per Benutzer-ID bzw. isAdmin-Flag.'},
     {v:'5.8',d:'30.05.2026 12:30',t:'Profil in den Einstellungen: jeder kann seinen Namen und sein Kuerzel selbst anpassen (Benutzer-ID bleibt schreibgeschuetzt). Neuer Admin-Bereich unter „Mehr" – nur fuer den Admin sichtbar – mit vollem Zugriff auf die Datenbank: navigieren, als JSON bearbeiten, Schluessel anlegen und Knoten loeschen.'},
     {v:'5.7',d:'30.05.2026 07:42',t:'Turniere ohne Code finden: In-App-QR-Scanner und – optional beim Erstellen aktivierbar – Anzeige von Turnieren in der Naehe per Standort. Beitritt weiterhin auch per Code/Link moeglich.'},
     {v:'5.6',d:'30.05.2026 00:05',t:'Turnier nutzt jetzt ein laufendes Spiel: beim Erstellen (Freie Eingabe) kann das aktuelle Spiel direkt als eigener Tisch uebernommen werden; beim Beitritt zu einem bestehenden Tisch wird dessen Spiel geladen bzw. ein leerer Tisch kann das laufende Spiel uebernehmen.'},

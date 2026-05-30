@@ -194,8 +194,11 @@ export async function claimExistingSpieler(spielerId){
 }
 
 // ── Eigener Spieler / Admin ──
-// Der Admin-Bereich ist ausschliesslich fuer diesen Spieler sichtbar.
+// Der Admin-Bereich ist nur fuer Admins sichtbar.
+// Bootstrap-Admins sind fest verdrahtet (koennen nicht entzogen werden);
+// weitere Admins werden ueber das Flag spieler/<id>/isAdmin in der DB verwaltet.
 const ADMIN_NAME='arne chudobba';
+export const BOOTSTRAP_ADMINS=['efd37c07'];
 
 // Liefert den zu diesem Geraet gehoerenden Spieler-Datensatz (oder null).
 export async function getOwnSpieler(){
@@ -203,10 +206,18 @@ export async function getOwnSpieler(){
   return await findSpielerByDevice(getDeviceId());
 }
 
-// True, wenn der eigene Spieler der Admin ist (Name-basiert).
+// True, wenn der gegebene Spieler-Datensatz Admin-Rechte hat.
+export function spielerIsAdmin(s){
+  if(!s)return false;
+  if(BOOTSTRAP_ADMINS.includes(s.id))return true;
+  if(s.isAdmin===true)return true;
+  if(s.name&&s.name.trim().toLowerCase()===ADMIN_NAME)return true;
+  return false;
+}
+
+// True, wenn der eigene Spieler Admin ist.
 export async function isAdmin(){
-  const own=await getOwnSpieler();
-  return !!own&&own.name&&own.name.trim().toLowerCase()===ADMIN_NAME;
+  return spielerIsAdmin(await getOwnSpieler());
 }
 
 // Fuellt die Profil-Karte in den Einstellungen (Name + Kuerzel editierbar, ID read-only).
@@ -223,14 +234,27 @@ export async function fillProfileSettings(){
   const row='display:flex;align-items:center;gap:14px;padding:7px 0;font-size:13px;color:var(--tx2)';
   const lbl='flex:0 0 84px';
   let h='';
-  h+='<div style="'+row+'"><span style="'+lbl+'">Benutzer-ID</span><input type="text" value="'+esc(own.id)+'" readonly style="'+inp+';flex:1;min-width:0;opacity:.6;cursor:not-allowed"></div>';
+  h+='<div style="'+row+'"><span style="'+lbl+'">Benutzer-ID</span>'
+    +'<input type="text" id="profileId" value="'+esc(own.id)+'" readonly style="'+inp+';flex:1;min-width:0;opacity:.7" onclick="this.select()">'
+    +'<button onclick="copyProfileId()" title="ID kopieren" style="flex:0 0 auto;background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:36px;height:36px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button></div>';
   h+='<div style="'+row+'"><span style="'+lbl+'">Name</span><input type="text" id="profileName" value="'+esc(own.name)+'" style="'+inp+';flex:1;min-width:0"></div>';
   h+='<div style="'+row+'"><span style="'+lbl+'">Kürzel</span><input type="text" id="profileShort" value="'+esc(own.short||'')+'" maxlength="20" style="'+inp+';flex:1;min-width:0"></div>';
   h+='<div style="display:flex;gap:8px;margin-top:12px">';
   h+='<button class="btn btn-primary" style="flex:1" onclick="saveProfile()">Profil speichern</button>';
-  h+='<button class="btn btn-secondary" style="flex:0 0 auto;padding:0 16px;color:var(--red);border-color:var(--red)" onclick="deleteProfile()">Löschen</button>';
+  h+='<button class="btn btn-secondary" style="flex:1;color:var(--red);border-color:var(--red)" onclick="deleteProfile()">Löschen</button>';
   h+='</div>';
   el.innerHTML=h;
+}
+
+// Kopiert die eigene Benutzer-ID in die Zwischenablage.
+export function copyProfileId(){
+  const el=document.getElementById('profileId');
+  if(!el)return;
+  const id=el.value;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(id).then(()=>showToast('Benutzer-ID kopiert.','info')).catch(()=>{el.select();showToast('Bitte manuell kopieren.','info')});
+  }else{el.select();document.execCommand&&document.execCommand('copy');showToast('Benutzer-ID kopiert.','info')}
 }
 
 // Speichert Name + Kuerzel des eigenen Spielers in der Datenbank.
