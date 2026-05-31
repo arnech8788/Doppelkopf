@@ -60,7 +60,7 @@ export let prerenderedStats=null;
 export let timerInterval=null;
 
 // ── Setter fuer geteilten mutablen State (ESM-Exports sind nur lesbar) ──
-export function setCurrentPts(v){currentPts=v}
+export function setCurrentPts(v){currentPts=v;if(v==='')maybeApplyUpdate();}
 export function setPendingRound(v){pendingRound=v}
 export function setLastUndo(v){lastUndo=v}
 export function setViewingArchive(v){viewingArchive=v}
@@ -228,6 +228,7 @@ export function showScreen(id){
   if(id==='stats'){renderStats();schedulePrerenderShareImages();}
   if(id==='mehr')renderMehrScreen();
   if(id==='spieler')renderSpielerScreen();
+  if(id!=='eingabe')maybeApplyUpdate(); // Screen verlassen = sicherer Moment
 }
 
 // Teilen-Aktion der Kopfzeile – leitet je nach aktivem Screen weiter
@@ -357,7 +358,7 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.0 · 30.05.2026 15:30</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.1 · 30.05.2026 16:40</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -446,6 +447,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.1',d:'30.05.2026 16:40',t:'Zuverlaessigere Updates: Die App prueft jetzt regelmaessig (und beim Zurueckkehren) auf neue Versionen und laedt erst dann neu, wenn der neue Stand wirklich bereit ist. Kein Neuladen mitten in der Punkteingabe – dann erscheint ein Hinweis mit Button „Jetzt aktualisieren", sonst wird nach dem Speichern automatisch aktualisiert.'},
     {v:'6.0',d:'30.05.2026 15:30',t:'Cloud-Backup (Einstellungen): jeder mit Profil kann seine Spiele und sein Archiv automatisch in der Cloud sichern. Wiederherstellung per Knopfdruck – beim Gerätewechsel wird das Backup direkt zum Laden angeboten. Reines Backup, kein Zusammenführen mehrerer Geräte.'},
     {v:'5.9',d:'30.05.2026 14:05',t:'Profil: Benutzer-ID kopierbar, aufgeraeumtes Layout, Loeschen-Button. Admin: faengt gesperrten Datenbank-Root ab und zeigt die bekannten Bereiche, neue Admin-Verwaltung (Rechte vergeben/entziehen). Admin-Erkennung jetzt per Benutzer-ID bzw. isAdmin-Flag.'},
     {v:'5.8',d:'30.05.2026 12:30',t:'Profil in den Einstellungen: jeder kann seinen Namen und sein Kuerzel selbst anpassen (Benutzer-ID bleibt schreibgeschuetzt). Neuer Admin-Bereich unter „Mehr" – nur fuer den Admin sichtbar – mit vollem Zugriff auf die Datenbank: navigieren, als JSON bearbeiten, Schluessel anlegen und Knoten loeschen.'},
@@ -757,12 +759,76 @@ document.addEventListener('touchend',e=>{
 // ═══════════════════════════════════════════════════════════
 // PWA / Service Worker (vite-plugin-pwa) – ersetzt das alte sw.js
 // ═══════════════════════════════════════════════════════════
-const updateSW = registerSW({
-  onNeedRefresh(){
-    const toast=document.getElementById('updateToast');
-    if(toast){toast.classList.add('show');setTimeout(()=>location.reload(),3000);}
+// Zuverlaessiges Update: periodisch + bei Sichtbarkeit/Fokus pruefen, neuer SW bleibt
+// "waiting" (registerType:'prompt'), Reload erst an einem sicheren Punkt (nicht waehrend Eingabe).
+let swUpdate=null;        // updateSW-Funktion (skipWaiting + Reload bei controllerchange)
+let swReady=false;        // ein Update steht bereit
+let refreshing=false;     // Reload-Guard gegen Doppel-Reload
+const UPDATE_INTERVAL=60000;
+
+// Eingabe laeuft gerade? Dann nicht neu laden.
+export function isBusyEntering(){
+  if(currentPts!=='')return true;
+  if(pendingRound)return true;
+  return ['editModal','soloModal','calcModal'].some(id=>{
+    const el=document.getElementById(id);
+    return el&&el.classList.contains('show');
+  });
+}
+
+// Update anwenden: skipWaiting ausloesen, Reload erfolgt bei controllerchange.
+export function applyUpdate(){
+  if(refreshing)return;
+  refreshing=true;
+  const text=document.getElementById('updateToastText');
+  const btn=document.getElementById('updateToastBtn');
+  const bar=document.getElementById('updateReloadBar');
+  const toast=document.getElementById('updateToast');
+  if(text)text.textContent='Neue Version – wird geladen…';
+  if(btn)btn.hidden=true;
+  if(bar)bar.style.display='';
+  if(toast)toast.classList.add('show');
+  if(swUpdate)swUpdate(true);else location.reload();
+}
+
+// Entscheidet, ob jetzt automatisch geladen wird oder ein Button angeboten wird.
+export function maybeApplyUpdate(){
+  if(!swReady||refreshing)return;
+  const toast=document.getElementById('updateToast');
+  const text=document.getElementById('updateToastText');
+  const btn=document.getElementById('updateToastBtn');
+  const bar=document.getElementById('updateReloadBar');
+  if(!toast)return;
+  if(isBusyEntering()){
+    // Hinweis mit Button, kein ueberraschender Reload mitten in der Eingabe.
+    if(text)text.textContent='Neue Version verfügbar.';
+    if(btn)btn.hidden=false;
+    if(bar)bar.style.display='none';
+    toast.classList.add('show');
+    return;
   }
+  // Sicherer Moment -> kurzer Hinweis, dann automatisch laden.
+  if(text)text.textContent='Neue Version – wird automatisch geladen…';
+  if(btn)btn.hidden=true;
+  if(bar)bar.style.display='';
+  toast.classList.add('show');
+  setTimeout(applyUpdate,1000);
+}
+
+const updateSW = registerSW({
+  onRegisteredSW(swUrl,r){
+    if(!r)return;
+    try{r.update()}catch(e){}
+    setInterval(()=>{try{r.update()}catch(e){}},UPDATE_INTERVAL);
+    const recheck=()=>{if(document.visibilityState==='visible'){try{r.update()}catch(e){}}};
+    document.addEventListener('visibilitychange',recheck);
+    window.addEventListener('focus',recheck);
+    window.addEventListener('online',recheck);
+  },
+  onNeedRefresh(){swReady=true;maybeApplyUpdate();},
+  onRegisterError(e){console.error('SW register error:',e);}
 });
+swUpdate=updateSW;
 
 // ═══════════════════════════════════════════════════════════
 // window-Registrierung ALLER onclick-Funktionen (main + ui + Geschwister-Module).
@@ -776,7 +842,7 @@ Object.assign(window,
     applyAccent, setAccent,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
-    renderAll
+    renderAll, applyUpdate, maybeApplyUpdate
   },
   setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
 );

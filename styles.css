@@ -221,6 +221,8 @@ tr.clickable:active{background:var(--bg3)}
 }
 .update-toast.show{transform:translateX(-50%) translateY(0)}
 .update-toast svg{width:18px;height:18px;flex-shrink:0}
+.update-toast #updateToastBtn{background:#fff;color:var(--acc);border:none;border-radius:var(--r-sm);padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
+.update-toast #updateToastBtn[hidden]{display:none}
 .update-toast .reload-bar{
   position:absolute;left:0;bottom:0;height:3px;background:rgba(255,255,255,.6);
   border-radius:0 0 var(--r-sm) var(--r-sm);width:100%;transform-origin:left;

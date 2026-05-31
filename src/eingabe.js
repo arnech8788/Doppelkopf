@@ -1,4 +1,4 @@
-import { state, save, getAllPlayers, getHistoricalPlayers, getPlayerEmoji, getVocab, invalidateEingabeCache, isBockRound, showScreen, ACHIEVEMENTS, currentPts, pendingRound, lastUndo, timerInterval, setCurrentPts, setPendingRound, setLastUndo, setTimerInterval } from './main.js';
+import { state, save, getAllPlayers, getHistoricalPlayers, getPlayerEmoji, getVocab, invalidateEingabeCache, isBockRound, showScreen, ACHIEVEMENTS, currentPts, pendingRound, lastUndo, timerInterval, setCurrentPts, setPendingRound, setLastUndo, setTimerInterval, maybeApplyUpdate } from './main.js';
 import { showToast, showConfirm, showPrompt, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
 import { renderPlayerTags, renderQuickStart, initAddPlayerInput } from './setup.js';
 import { archiveCurrentGame } from './archiv.js';
@@ -449,6 +449,7 @@ export function finalizeRound(round){
   checkRoundAchievements(round);
   showScreen('tabelle');renderTabelle(true);
   schedulePrerenderShareImages();
+  maybeApplyUpdate(); // gespeichert = sicherer Moment fuer ein ausstehendes Update
 }
 
 
