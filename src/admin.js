@@ -5,7 +5,7 @@
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
-import { initFirebase, isAdmin, loadSpielerDB, spielerIsAdmin, BOOTSTRAP_ADMINS } from './turnier.js';
+import { initFirebase, isAdmin, loadSpielerDB, spielerIsAdmin, BOOTSTRAP_ADMINS, loadAllTurniere, renderTurnierList, getOwnSpieler, startPresenceWatch, stopPresenceWatch } from './turnier.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
 
 // Bekannte Top-Level-Knoten – dienen als Einstieg, falls der Root per
@@ -62,10 +62,11 @@ export async function openAdminModal(){
   await adminLoad();
 }
 
-export function closeAdminModal(){document.getElementById('adminModal').classList.remove('show')}
+export function closeAdminModal(){stopPresenceWatch();document.getElementById('adminModal').classList.remove('show')}
 
 // Laedt den aktuellen Knoten und rendert die Ansicht neu.
 async function adminLoad(){
+  stopPresenceWatch(); // evtl. laufenden Online-Listener beenden, wenn wir zum Browser zurueckkehren
   const el=document.getElementById('adminModalContent');
   el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
   if(adminPath.length===0){
@@ -121,8 +122,11 @@ function renderAdmin(){
   // Toolbar
   h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">';
   h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminRefresh()">↻ Aktualisieren</button>';
-  if(atRoot)
+  if(atRoot){
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminManageAdmins()">👥 Admins</button>';
+    h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminManageTurniere()">🏆 Turniere</button>';
+    h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminPresence()">🟢 Online</button>';
+  }
   if(!atRoot&&v!==null&&typeof v==='object')
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminAddKey()">+ Schlüssel</button>';
   if(!atRoot)
@@ -318,4 +322,52 @@ export async function adminToggleAdmin(i){
     showToast(makeAdmin?(s.name||'Spieler')+' ist jetzt Admin.':'Admin-Rechte entzogen.','info');
     adminManageAdmins();
   }catch(e){console.error('adminToggleAdmin error:',e);showToast('Fehler beim Ändern.','error')}
+}
+
+// Admin: alle Turniere sehen und verwalten (aktuell setzen, ausblenden, wiederherstellen, hart loeschen).
+export async function adminManageTurniere(){
+  stopPresenceWatch();
+  const el=document.getElementById('adminModalContent');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  const list=await loadAllTurniere();
+  const own=await getOwnSpieler();
+  let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">🏆 Turniere verwalten</h3>'
+    +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Ausgeblendete Turniere können wiederhergestellt oder endgültig gelöscht werden.</div>';
+  h+='<div id="turnierListBody"></div>';
+  el.innerHTML=h;
+  renderTurnierList(list,{role:'admin',ownSpielerId:own?own.id:null,containerId:'turnierListBody'});
+}
+
+// Admin: wer ist gerade online (Firebase Presence). Live-Aktualisierung.
+export async function adminPresence(){
+  const el=document.getElementById('adminModalContent');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  await loadSpielerDB();
+  function render(map){
+    const now=Date.now();
+    const list=Object.entries(map||{})
+      .map(([id,p])=>({id,...p}))
+      .filter(p=>p.lastSeen&&(now-p.lastSeen)<120000) // Stale-Schutz, falls onDisconnect ausblieb
+      .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
+      +'<h3 style="margin:0">🟢 Gerade online ('+list.length+')</h3>'
+      +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+    h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Nutzer mit Profil, deren App aktuell geöffnet ist. Aktualisiert sich live.</div>';
+    h+='<div class="card" style="padding:4px 0">';
+    if(!list.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Niemand online.</div>';
+    list.forEach(p=>{
+      const secs=Math.max(0,Math.round((now-p.lastSeen)/1000));
+      const ago=secs<60?'vor '+secs+' s':'vor '+Math.round(secs/60)+' min';
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
+      h+='<span style="width:8px;height:8px;border-radius:50%;background:var(--grn);flex-shrink:0"></span>';
+      h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(p.name||'(ohne Name)')+(p.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(p.short)+'</span>':'')+'</div>';
+      h+='<div style="font-size:11px;color:var(--tx3)">zuletzt aktiv '+ago+'</div></div></div>';
+    });
+    h+='</div>';
+    const cont=document.getElementById('adminModalContent');
+    if(cont)cont.innerHTML=h;
+  }
+  startPresenceWatch(render);
 }

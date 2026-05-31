@@ -50,7 +50,7 @@ export const ACHIEVEMENTS={
 };
 
 // ── Geteilter State ──
-export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,cloudBackup:false};
+export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,cloudBackup:false,uiCollapsed:{}};
 export let currentPts='';
 export let pendingRound=null;
 export let lastUndo=null;
@@ -143,53 +143,83 @@ export function save(){
   cloud.scheduleBackup();
 }
 
+// ── Einklappbare Kategorien (Mehr & Einstellungen) ──
+// Default: eingeklappt. Zustand pro scope:id in state.uiCollapsed (localStorage).
+export function collapseKey(scope,id){return scope+':'+id}
+export function isCollapsed(scope,id){
+  const v=state.uiCollapsed&&state.uiCollapsed[collapseKey(scope,id)];
+  return v===undefined?true:v; // fehlend = eingeklappt
+}
+// Baut eine .card mit klickbarem Titel-Header (Chevron) und einklappbarem Body.
+// bodyHtml-IDs bleiben erhalten -> async-Filler/save() finden ihre Elemente weiter.
+export function renderCollapsibleCard(scope,id,title,bodyHtml){
+  const open=!isCollapsed(scope,id);
+  return '<div class="card collapse-card">'
+    +'<div class="card-title collapse-head" onclick="toggleCollapse(\''+scope+'\',\''+id+'\')">'
+    +'<span>'+title+'</span>'
+    +'<svg class="chev'+(open?' open':'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="9 18 15 12 9 6"/></svg>'
+    +'</div>'
+    +'<div class="collapse-body'+(open?' show':'')+'" id="cb-'+scope+'-'+id+'">'+bodyHtml+'</div>'
+    +'</div>';
+}
+// Togglet nur DOM-Klassen (kein Re-Render) -> async geladene Inhalte/Eingaben bleiben erhalten.
+export function toggleCollapse(scope,id){
+  if(!state.uiCollapsed)state.uiCollapsed={};
+  const open=!isCollapsed(scope,id);          // aktueller offen-Zustand
+  state.uiCollapsed[collapseKey(scope,id)]=open; // neuer collapsed-Zustand = vorher offen
+  const body=document.getElementById('cb-'+scope+'-'+id);
+  if(body){
+    body.classList.toggle('show');
+    const head=body.previousElementSibling;
+    const chev=head&&head.querySelector('.chev');
+    if(chev)chev.classList.toggle('open');
+  }
+  save();
+}
+
 // ── Einstellungen-Modal ──
 export function openSettings(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Einstellungen</h3><button onclick="closeSettings()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
 
   // Mein Profil (Name + Kürzel anpassbar, ID read-only) – async befüllt
-  html+='<div class="card"><div class="card-title">Mein Profil</div><div id="profileSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div></div>';
+  html+=renderCollapsibleCard('settings','profile','Mein Profil','<div id="profileSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div>');
 
   // Cloud-Backup (opt-in, Profil vorausgesetzt) – async befüllt
-  html+='<div class="card"><div class="card-title">Cloud-Backup</div><div id="cloudSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div></div>';
+  html+=renderCollapsibleCard('settings','cloud','Cloud-Backup','<div id="cloudSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div>');
 
   // Solo-Arten
-  html+='<div class="card"><div class="card-title">Solo-Arten erfassen</div>';
-  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle'+(state.soloTypesEnabled?' on':'')+'" id="soloTypesToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
-  html+='<div style="font-size:12px;color:var(--tx3);margin-top:4px">Bei einem Solo wird nach der Art gefragt</div>';
-  html+='<div id="soloTypesList"></div>';
-  html+='<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="customSoloInput" placeholder="Eigenes Solo..." style="font-size:13px;padding:8px 10px"><button class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="addCustomSolo()">+</button></div>';
-  html+='</div>';
+  let soloBody='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Solo-Art abfragen</span><button class="toggle'+(state.soloTypesEnabled?' on':'')+'" id="soloTypesToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  soloBody+='<div style="font-size:12px;color:var(--tx3);margin-top:4px">Bei einem Solo wird nach der Art gefragt</div>';
+  soloBody+='<div id="soloTypesList"></div>';
+  soloBody+='<div style="display:flex;gap:6px;margin-top:8px"><input type="text" id="customSoloInput" placeholder="Eigenes Solo..." style="font-size:13px;padding:8px 10px"><button class="btn btn-secondary" style="width:auto;padding:8px 14px;font-size:13px" onclick="addCustomSolo()">+</button></div>';
+  html+=renderCollapsibleCard('settings','solo','Solo-Arten erfassen',soloBody);
 
   // Bockrunden
-  html+='<div class="card"><div class="card-title">Bockrunden</div>';
-  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Bockrunden aktiviert</span><button class="toggle'+(state.bockEnabled?' on':'')+'" id="bockEnabledToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
-  html+='<div class="settings-row"><span>Spiele pro Bockrunde</span><input type="number" id="bockCount" value="'+(state.bockCount||4)+'" min="1" max="20" onchange="save()"></div>';
-  html+='<div style="font-size:11px;color:var(--tx3);padding:4px 0 8px">Standard: Anzahl der Mitspieler</div>';
-  html+='<div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle'+(state.bockSolo?' on':'')+'" id="bockSoloToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
-  html+='</div>';
+  let bockBody='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Bockrunden aktiviert</span><button class="toggle'+(state.bockEnabled?' on':'')+'" id="bockEnabledToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  bockBody+='<div class="settings-row"><span>Spiele pro Bockrunde</span><input type="number" id="bockCount" value="'+(state.bockCount||4)+'" min="1" max="20" onchange="save()"></div>';
+  bockBody+='<div style="font-size:11px;color:var(--tx3);padding:4px 0 8px">Standard: Anzahl der Mitspieler</div>';
+  bockBody+='<div class="settings-row"><span>Bock gilt auch bei Solo</span><button class="toggle'+(state.bockSolo?' on':'')+'" id="bockSoloToggle" onclick="this.classList.toggle(\'on\');save()"></button></div>';
+  html+=renderCollapsibleCard('settings','bock','Bockrunden',bockBody);
 
   // Archiv
-  html+='<div class="card"><div class="card-title">Archiv</div>';
-  html+='<div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="'+(state.archiveMax||10)+'" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>';
-  html+='</div>';
+  let archivBody='<div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="'+(state.archiveMax||10)+'" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>';
+  html+=renderCollapsibleCard('settings','archive','Archiv',archivBody);
 
   // Darstellung
-  html+='<div class="card"><div class="card-title">Darstellung</div>';
   const isLight=document.documentElement.getAttribute('data-theme')==='light';
-  html+='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Dark Mode</span><button class="toggle'+(!isLight?' on':'')+'" onclick="this.classList.toggle(\'on\');toggleTheme()"></button></div>';
+  let darstBody='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Dark Mode</span><button class="toggle'+(!isLight?' on':'')+'" onclick="this.classList.toggle(\'on\');toggleTheme()"></button></div>';
   // Akzentfarbe frei wählbar
   const presets=['#2563eb','#7c3aed','#db2777','#dc2626','#ea580c','#16a34a','#0891b2','#ca8a04'];
   const curAcc=(localStorage.getItem('doko-accent')||'').toLowerCase();
-  html+='<div style="margin-top:12px"><span class="toggle-label">Akzentfarbe</span>';
-  html+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px">';
-  html+='<button onclick="setAccent(\'\')" title="Standard" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:linear-gradient(135deg,#1a9e8f,#2ec4b6);border:3px solid '+(curAcc?'var(--bdr)':'var(--tx)')+'"></button>';
+  darstBody+='<div style="margin-top:12px"><span class="toggle-label">Akzentfarbe</span>';
+  darstBody+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px">';
+  darstBody+='<button onclick="setAccent(\'\')" title="Standard" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:linear-gradient(135deg,#1a9e8f,#2ec4b6);border:3px solid '+(curAcc?'var(--bdr)':'var(--tx)')+'"></button>';
   presets.forEach(col=>{
-    html+='<button onclick="setAccent(\''+col+'\')" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:'+col+';border:3px solid '+(curAcc===col?'var(--tx)':'var(--bdr)')+'"></button>';
+    darstBody+='<button onclick="setAccent(\''+col+'\')" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:'+col+';border:3px solid '+(curAcc===col?'var(--tx)':'var(--bdr)')+'"></button>';
   });
-  html+='<label title="Eigene Farbe" style="width:30px;height:30px;border-radius:50%;cursor:pointer;border:1px dashed var(--bdr);display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:14px">🎨<input type="color" value="'+(curAcc||'#1a9e8f')+'" onchange="setAccent(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%"></label>';
-  html+='</div></div>';
-  html+='</div>';
+  darstBody+='<label title="Eigene Farbe" style="width:30px;height:30px;border-radius:50%;cursor:pointer;border:1px dashed var(--bdr);display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:14px">🎨<input type="color" value="'+(curAcc||'#1a9e8f')+'" onchange="setAccent(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%"></label>';
+  darstBody+='</div></div>';
+  html+=renderCollapsibleCard('settings','darstellung','Darstellung',darstBody);
 
   // Debug
   html+='<div class="card" style="cursor:pointer" onclick="closeSettings();openDebugModal()"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">&#128295;</span><div><div style="font-weight:500">Debug-Modus</div><div style="font-size:11px;color:var(--tx3)">Geräteinfos, State, Logs</div></div></div></div>';
@@ -353,12 +383,12 @@ export function renderMehrScreen(){
   const el=document.getElementById('mehrContent');
   if(!el)return;
   let html='';
-  html+='<div class="card" id="turnierCard"><div class="card-title">Turnier</div><div id="turnierSetupContent"></div></div>';
+  html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.3 · 31.05.2026 22:30</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.4 · 31.05.2026 23:15</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -447,6 +477,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.4',d:'31.05.2026 23:15',t:'Turnier-Verwaltung & Online-Anzeige: Über „Mehr → Turnier → Meine Turniere" lassen sich eigene Turniere als aktuell setzen oder ausblenden – mit Anzeige, wer sie erstellt hat. Admins sehen unter „Mehr → Admin" alle Turniere (aktiv/beendet/ausgeblendet), können sie wiederherstellen oder endgültig löschen, und sehen über „🟢 Online", wer die App gerade nutzt. Außerdem sind die Kategorien in „Mehr" und „Einstellungen" jetzt einklappbar (Zustand wird gemerkt).'},
     {v:'6.3',d:'31.05.2026 22:30',t:'Update-Mechanismus repariert: Neue Versionen werden jetzt zuverlässig automatisch aktiviert und geladen (vorher konnte die App auf einer alten, zwischengespeicherten Version hängenbleiben). Der Button „Nach Updates suchen" unter „Mehr" prüft weiterhin jederzeit manuell.'},
     {v:'6.2',d:'31.05.2026 22:22',t:'Neuer Button „Nach Updates suchen" unter „Mehr" (über der Versionsnummer): prüft sofort auf eine neue Version und lädt direkt neu, wenn eine bereitsteht – sonst Rückmeldung, dass bereits die neueste Version läuft.'},
     {v:'6.1',d:'31.05.2026 22:06',t:'Zuverlaessigere Updates: Die App prueft jetzt regelmaessig (und beim Zurueckkehren) auf neue Versionen und laedt erst dann neu, wenn der neue Stand wirklich bereit ist. Kein Neuladen mitten in der Punkteingabe – dann erscheint ein Hinweis mit Button „Jetzt aktualisieren", sonst wird nach dem Speichern automatisch aktualisiert.'},
@@ -830,7 +861,7 @@ Object.assign(window,
     applyAccent, setAccent,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
-    renderAll, applyUpdate, checkForUpdate
+    renderAll, applyUpdate, checkForUpdate, toggleCollapse
   },
   setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
 );

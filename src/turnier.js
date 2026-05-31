@@ -18,6 +18,13 @@ let firebaseApp=null;
 let firebaseDb=null;
 let turnierListener=null;
 let spielerCache=[];
+// Presence (Online-Anzeige): eigener Eintrag + Heartbeat, sowie Listener fuer die Admin-Ansicht.
+let presenceRef=null;        // ref('presence/<spielerId>') des eigenen Geraets
+let presenceConnRef=null;    // ref('.info/connected')
+let presenceHeartbeat=null;  // Intervall fuer lastSeen-Refresh
+let presenceOwnId=null;      // aktuell gemeldete Spieler-ID (Idempotenz-Guard)
+let presenceListRef=null;    // ref('presence') fuer Admin-Live-Ansicht
+let presenceListCb=null;
 
 export function initFirebase(){
   if(firebaseApp)return true;
@@ -117,6 +124,7 @@ export async function checkFirstStart(){
   const deviceId=getDeviceId();
   const existing=await findSpielerByDevice(deviceId);
   if(existing){
+    startPresence(existing);
     const short=existing.short||existing.name.split(' ')[0];
     if(!state.players.includes(short)){
       state.players.push(short);
@@ -167,6 +175,7 @@ export async function submitName(){
   const spieler=await createSpieler(name);
   document.getElementById('nameModal').classList.remove('show');
   if(spieler){
+    startPresence(spieler);
     const short=spieler.short||name.split(' ')[0];
     if(!state.players.includes(short)){
       state.players.push(short);
@@ -183,6 +192,7 @@ export async function claimExistingSpieler(spielerId){
   document.getElementById('nameModal').classList.remove('show');
   const spieler=spielerCache.find(s=>s.id===spielerId);
   if(spieler){
+    startPresence(spieler);
     const short=spieler.short||spieler.name.split(' ')[0];
     if(!state.players.includes(short)){
       state.players.push(short);
@@ -220,6 +230,64 @@ export function spielerIsAdmin(s){
 // True, wenn der eigene Spieler Admin ist.
 export async function isAdmin(){
   return spielerIsAdmin(await getOwnSpieler());
+}
+
+// ── Presence / Online-Anzeige ──
+// Hinweis: Schreibt presence/<spielerId> und entfernt den Knoten automatisch beim
+// Verbindungsverlust (onDisconnect). Nur Nutzer MIT Profil melden sich; ohne Profil/
+// offline passiert nichts. Die Liste sieht ausschliesslich der Admin.
+// (Firebase-Regeln muessen serverseitig Schreiben auf 'presence' erlauben – wie bei
+//  'spieler'/'turniere' bereits offen; kuenftiges Regel-Tightening muss 'presence' whitelisten.)
+function writePresence(own){
+  if(!presenceRef)return;
+  presenceRef.set({
+    name:own.name,
+    short:own.short||null,
+    deviceId:getDeviceId(),
+    lastSeen:firebase.database.ServerValue.TIMESTAMP
+  });
+}
+
+export function startPresence(own){
+  if(!own||!initFirebase())return;
+  if(presenceOwnId===own.id)return; // bereits aktiv fuer diesen Spieler
+  stopPresence();                   // evtl. alten Eintrag/Heartbeat sauber loesen
+  presenceOwnId=own.id;
+  presenceRef=firebase.database().ref('presence/'+own.id);
+  presenceConnRef=firebase.database().ref('.info/connected');
+  presenceConnRef.on('value',snap=>{
+    if(snap.val()===true){
+      // onDisconnect bei jeder (Wieder-)Verbindung neu scharf schalten.
+      presenceRef.onDisconnect().remove();
+      writePresence(own);
+    }
+  });
+  presenceHeartbeat=setInterval(()=>{
+    if(presenceRef)presenceRef.child('lastSeen').set(firebase.database.ServerValue.TIMESTAMP);
+  },60000);
+}
+
+export function stopPresence(){
+  if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;}
+  if(presenceConnRef){try{presenceConnRef.off('value')}catch(e){}presenceConnRef=null;}
+  if(presenceRef){
+    try{presenceRef.onDisconnect().cancel()}catch(e){}
+    try{presenceRef.remove()}catch(e){}
+    presenceRef=null;
+  }
+  presenceOwnId=null;
+}
+
+// Admin-Live-Ansicht: ruft cb(map) bei jeder Aenderung auf.
+export function startPresenceWatch(cb){
+  if(!initFirebase())return;
+  stopPresenceWatch();
+  presenceListRef=firebase.database().ref('presence');
+  presenceListCb=presenceListRef.on('value',s=>cb(s.val()||{}));
+}
+export function stopPresenceWatch(){
+  if(presenceListRef&&presenceListCb){try{presenceListRef.off('value',presenceListCb)}catch(e){}}
+  presenceListRef=null;presenceListCb=null;
 }
 
 // Fuellt die Profil-Karte in den Einstellungen (Name + Kuerzel editierbar, ID read-only).
@@ -295,6 +363,7 @@ export async function deleteProfile(){
   try{
     await firebase.database().ref('spieler/'+own.id).remove();
     spielerCache=spielerCache.filter(s=>s.id!==own.id);
+    stopPresence(); // nicht mehr als online melden
     showToast('Profil gelöscht.','info');
     fillProfileSettings();
   }catch(e){
@@ -432,6 +501,7 @@ export function renderTurnierSetup(){
       +'<button class="btn btn-primary" style="flex:1" onclick="openCreateTurnier()">Erstellen</button>'
       +'<button class="btn btn-secondary" style="flex:1" onclick="openJoinTurnier()">Beitreten</button>'
       +'</div>';
+    html+='<div style="margin-top:8px"><button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="openMyTurniere()">Meine Turniere verwalten</button></div>';
     if(archiv.length){
       html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene'+(archiv.length===1?'s':'')+' Turnier'+(archiv.length>1?'e':'')+'</button></div>';
     }
@@ -474,6 +544,7 @@ export function renderTurnierSetup(){
   }else{
     html+='<button class="btn btn-secondary" style="flex:1" onclick="leaveTurnier()">Verlassen</button>';
   }
+  html+='<button class="btn btn-secondary" style="flex:1" onclick="openMyTurniere()">Meine Turniere</button>';
   html+='</div>';
   // Konfigurationsübersicht für Spielleiter
   if(t.isHost&&turnierConfigCache){
@@ -812,6 +883,9 @@ export async function submitCreateTurnier(){
     const snap=await dbRef.get();
     if(snap.exists()){showToast('Code-Kollision. Bitte erneut versuchen.','error');return}
     const turnierName=(turnierWizard.turnierName||'').trim();
+    // Ersteller VOR dem Schreiben ermitteln, damit createdBy mitgespeichert wird.
+    const deviceId=getDeviceId();
+    const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
     const turnierData={
       created:firebase.database.ServerValue.TIMESTAMP,
       lastActivity:firebase.database.ServerValue.TIMESTAMP,
@@ -819,10 +893,9 @@ export async function submitCreateTurnier(){
       config:c
     };
     if(turnierName)turnierData.name=turnierName;
+    if(ownSpieler)turnierData.createdBy=ownSpieler.id;
     await dbRef.set(turnierData);
     // Host in hosts-Liste speichern
-    const deviceId=getDeviceId();
-    const ownSpieler=spielerCache.find(s=>s.deviceIds&&s.deviceIds.includes(deviceId));
     if(ownSpieler)await dbRef.child('hosts/'+ownSpieler.id).set(true);
     if(c.playerMode!==3){
       const teilnehmer={};
@@ -2013,6 +2086,170 @@ export async function endTurnier(){
     console.error('endTurnier error:',e);
     showToast('Fehler: '+e.message,'error');
   }
+}
+
+// ── Turnier-Verwaltung: globale Liste, Ersteller, aktuelles setzen, Soft/Hard-Delete ──
+function escTurnier(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+export async function loadAllTurniere(){
+  if(!initFirebase())return[];
+  await loadSpielerDB();
+  try{
+    const snap=await firebase.database().ref('turniere').get();
+    const data=snap.val()||{};
+    return Object.entries(data).map(([key,t])=>({code:key.replace(/^DK/,''),key,...t}));
+  }catch(e){console.error('loadAllTurniere:',e);return[]}
+}
+
+export function turnierCreatorName(t){
+  const id=t.createdBy||(t.hosts?Object.keys(t.hosts)[0]:null);
+  if(!id)return 'unbekannt';
+  const s=spielerCache.find(x=>x.id===id);
+  return s?s.name:id;
+}
+
+let turnierListOpts=null;
+function turnierRow(t,opts){
+  const tableCount=t.tische?Object.keys(t.tische).length:0;
+  const created=t.created?new Date(t.created).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+  const creator=turnierCreatorName(t);
+  const isCurrent=state.turnier&&state.turnier.code===t.code;
+  let h='<div class="card" style="margin-bottom:8px'+(isCurrent?';border-color:var(--acc)':'')+'">';
+  h+='<div style="min-width:0"><div style="font-weight:600;font-size:15px">'+escTurnier(t.name||'DK-'+t.code)+(isCurrent?' <span style="font-size:10px;color:var(--acc)">• aktuell</span>':'')+'</div>';
+  h+='<div style="font-size:11px;color:var(--tx3);margin-top:1px">DK-'+t.code+' · '+tableCount+' Tisch'+(tableCount!==1?'e':'')+(created?' · '+created:'')+'</div>';
+  h+='<div style="font-size:11px;color:var(--tx3)">erstellt von '+escTurnier(creator)+'</div></div>';
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
+  if(t.status!=='deleted'&&!isCurrent)
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="setCurrentTurnier(\''+t.code+'\')">Als aktuell setzen</button>';
+  if(t.status!=='deleted')
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:100px" onclick="turnierSoftDelete(\''+t.code+'\')">Ausblenden</button>';
+  if(opts.role==='admin'&&t.status==='deleted'){
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="turnierRestore(\''+t.code+'\')">Wiederherstellen</button>';
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px;color:var(--red);border-color:var(--red)" onclick="turnierHardDelete(\''+t.code+'\')">Endgültig löschen</button>';
+  }
+  h+='</div></div>';
+  return h;
+}
+
+// Gemeinsamer Builder fuer Host (eigene) und Admin (alle, gruppiert). Schreibt in opts.containerId.
+export function renderTurnierList(turniere,opts){
+  opts=opts||{};
+  turnierListOpts=opts;
+  const el=document.getElementById(opts.containerId||'turnierListBody');
+  if(!el)return;
+  let list=turniere.slice();
+  if(opts.role!=='admin'){
+    list=list.filter(t=>t.status!=='deleted'&&opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])));
+  }
+  if(!list.length){el.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Keine Turniere.</div>';return}
+  if(opts.role==='admin'){
+    const groups=[['active','Aktiv'],['ended','Beendet'],['deleted','Ausgeblendet / gelöscht']];
+    let h='';
+    groups.forEach(([st,label])=>{
+      const g=list.filter(t=>(t.status||'active')===st);
+      if(!g.length)return;
+      g.sort((a,b)=>(b.created||0)-(a.created||0));
+      h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);margin:14px 0 6px">'+label+' ('+g.length+')</div>';
+      g.forEach(t=>{h+=turnierRow(t,opts)});
+    });
+    el.innerHTML=h;
+  }else{
+    list.sort((a,b)=>(b.created||0)-(a.created||0));
+    el.innerHTML=list.map(t=>turnierRow(t,opts)).join('');
+  }
+}
+
+async function refreshTurnierList(){
+  if(!turnierListOpts)return;
+  const list=await loadAllTurniere();
+  renderTurnierList(list,turnierListOpts);
+}
+
+// In ein (anderes) Turnier als Spielleiter wechseln.
+export async function setCurrentTurnier(code){
+  if(!initFirebase())return;
+  const own=await getOwnSpieler();
+  const snap=await firebase.database().ref('turniere/DK'+code).get();
+  if(!snap.exists()){showToast('Turnier nicht gefunden.','error');return}
+  const data=snap.val();
+  const admin=spielerIsAdmin(own);
+  const canHost=admin||(own&&(data.createdBy===own.id||(data.hosts&&data.hosts[own.id])));
+  if(!canHost){showToast('Keine Berechtigung für dieses Turnier.','error');return}
+  // Admin, der noch nicht Host ist -> als Host eintragen.
+  if(admin&&own&&!(data.hosts&&data.hosts[own.id])){
+    try{await firebase.database().ref('turniere/DK'+code+'/hosts/'+own.id).set(true)}catch(e){}
+  }
+  // Dashboard-Listener des bisherigen Turniers loesen.
+  if(turnierListener&&state.turnier){
+    firebase.database().ref('turniere/DK'+state.turnier.code+'/tische').off('value',turnierListener);
+    turnierListener=null;
+  }
+  // Caches des vorherigen Turniers zuruecksetzen, sonst zeigt das Dashboard alte Config.
+  turnierConfigCache=null;lastTischeSnapshot={};rotationenCache=null;
+  state.turnier={code:code,tischId:null,tischName:null,tischNummer:null,isHost:true,isPlayer:false,turnierName:data.name||null};
+  save();
+  renderTurnierSetup();renderTurnierIndicator();
+  refreshTurnierList();
+  showToast('Aktuelles Turnier: '+(data.name||'DK-'+code),'info');
+}
+
+// Host-Aktion: ausblenden (Soft-Delete) – Daten bleiben erhalten.
+export async function turnierSoftDelete(code){
+  if(!initFirebase())return;
+  if(!await showConfirm('Turnier DK-'+code+' ausblenden? Es verschwindet aus deinen Listen, die Daten bleiben aber erhalten.','Ausblenden',true))return;
+  try{
+    await firebase.database().ref('turniere/DK'+code+'/status').set('deleted');
+    removeDiscovery(code);
+    if(state.turnier&&state.turnier.code===code){
+      if(turnierListener){firebase.database().ref('turniere/DK'+code+'/tische').off('value',turnierListener);turnierListener=null;}
+      state.turnier=null;save();renderTurnierSetup();renderTurnierIndicator();
+    }
+    showToast('Turnier ausgeblendet.','info');
+    refreshTurnierList();
+  }catch(e){showToast('Fehler: '+e.message,'error')}
+}
+
+// Admin-Aktion: ausgeblendetes Turnier wieder aktivieren.
+export async function turnierRestore(code){
+  if(!initFirebase())return;
+  if(!spielerIsAdmin(await getOwnSpieler())){showToast('Kein Zugriff.','error');return}
+  try{
+    await firebase.database().ref('turniere/DK'+code+'/status').set('active');
+    showToast('Turnier wiederhergestellt.','info');
+    refreshTurnierList();
+  }catch(e){showToast('Fehler: '+e.message,'error')}
+}
+
+// Admin-Aktion: endgueltig aus der Datenbank entfernen.
+export async function turnierHardDelete(code){
+  if(!initFirebase())return;
+  if(!spielerIsAdmin(await getOwnSpieler())){showToast('Kein Zugriff.','error');return}
+  if(!await showConfirm('Turnier DK-'+code+' UNWIDERRUFLICH löschen? Alle Tische und Wertungen gehen verloren.','Endgültig löschen',true))return;
+  try{
+    await firebase.database().ref('turniere/DK'+code).remove();
+    removeDiscovery(code);
+    if(state.turnier&&state.turnier.code===code){state.turnier=null;save();renderTurnierSetup();renderTurnierIndicator();}
+    showToast('Turnier gelöscht.','info');
+    refreshTurnierList();
+  }catch(e){showToast('Fehler: '+e.message,'error')}
+}
+
+// Host-Einstieg: eigene Turniere verwalten.
+export async function openMyTurniere(){
+  if(!initFirebase()){showToast('Firebase nicht verfügbar.','error');return}
+  document.getElementById('turnierModal').classList.add('show');
+  const el=document.getElementById('turnierModalContent');
+  el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade...</div>';
+  const own=await getOwnSpieler();
+  const list=await loadAllTurniere();
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">Meine Turniere</h3>'
+    +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">„Als aktuell setzen" wechselt in das Turnier. „Ausblenden" entfernt es aus dieser Liste – die Daten bleiben erhalten.</div>';
+  html+='<div id="turnierListBody"></div>';
+  el.innerHTML=html;
+  renderTurnierList(list,{role:'host',ownSpielerId:own?own.id:null,containerId:'turnierListBody'});
 }
 
 let coHostSelected=[];
