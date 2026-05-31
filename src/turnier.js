@@ -191,6 +191,8 @@ export async function claimExistingSpieler(spielerId){
     }
   }
   showToast('Gerät verknüpft mit '+(spieler?spieler.name:'Spieler')+'!','info');
+  // Auf neuem Gerät: vorhandenes Cloud-Backup zur Wiederherstellung anbieten.
+  if(typeof window!=='undefined'&&window.maybeOfferRestore)window.maybeOfferRestore();
 }
 
 // ── Eigener Spieler / Admin ──

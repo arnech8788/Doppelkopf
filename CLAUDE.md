@@ -31,7 +31,7 @@ in den Modulen per `import` eingebunden (frueher CDN-`<script>`-Tags).
 
 ## Architecture
 
-Statische Huelle + CSS, App-Logik in 8 ES-Modulen unter `src/`:
+Statische Huelle + CSS, App-Logik in ES-Modulen unter `src/`:
 
 - **`index.html`** - Nur HTML-Struktur, bindet `styles.css` und `<script type="module" src="/src/main.js">` ein.
 - **`styles.css`** - Externes Stylesheet mit CSS Custom Properties fuer das Theming (Light/Dark Mode).
@@ -45,7 +45,10 @@ Statische Huelle + CSS, App-Logik in 8 ES-Modulen unter `src/`:
 - **`src/tabelle.js`** - Rangliste, Spielverlauf, Edit-Modal, Sharing (html2canvas).
 - **`src/stats.js`** - Statistiken, Charts (chart.js), Highlights, Achievement-Anzeige.
 - **`src/archiv.js`** - Spielarchiv, Ewige Tabelle.
-- **`src/turnier.js`** - Kompletter Turnier-Modus (Firebase Compat, Dashboard, Rotation, QR, Sync).
+- **`src/turnier.js`** - Kompletter Turnier-Modus (Firebase Compat, Dashboard, Rotation, QR, Sync),
+  Spieler-DB/Profil (`spieler/<id>`), Admin-Erkennung (`isAdmin`).
+- **`src/admin.js`** - Admin-Bereich: Firebase-Datenbank-Browser (CRUD) + Admin-Verwaltung; nur fuer Admins.
+- **`src/cloud.js`** - Persoenliches Cloud-Backup der eigenen Spiele (opt-in, `spieler/<id>/backup`).
 
 ### Modul-Konventionen (wichtig)
 

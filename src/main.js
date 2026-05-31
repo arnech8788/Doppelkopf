@@ -12,6 +12,7 @@ import * as stats from './stats.js';
 import * as archiv from './archiv.js';
 import * as turnier from './turnier.js';
 import * as admin from './admin.js';
+import * as cloud from './cloud.js';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -49,7 +50,7 @@ export const ACHIEVEMENTS={
 };
 
 // ── Geteilter State ──
-export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null};
+export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,cloudBackup:false};
 export let currentPts='';
 export let pendingRound=null;
 export let lastUndo=null;
@@ -139,6 +140,7 @@ export function save(){
   const soloToggle=document.getElementById('soloTypesToggle');
   if(soloToggle)state.soloTypesEnabled=soloToggle.classList.contains('on');
   try{localStorage.setItem('doko-v4',JSON.stringify(state))}catch(e){}
+  cloud.scheduleBackup();
 }
 
 // ── Einstellungen-Modal ──
@@ -147,6 +149,9 @@ export function openSettings(){
 
   // Mein Profil (Name + Kürzel anpassbar, ID read-only) – async befüllt
   html+='<div class="card"><div class="card-title">Mein Profil</div><div id="profileSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div></div>';
+
+  // Cloud-Backup (opt-in, Profil vorausgesetzt) – async befüllt
+  html+='<div class="card"><div class="card-title">Cloud-Backup</div><div id="cloudSettings"><div style="font-size:12px;color:var(--tx3)">Lädt…</div></div></div>';
 
   // Solo-Arten
   html+='<div class="card"><div class="card-title">Solo-Arten erfassen</div>';
@@ -194,6 +199,7 @@ export function openSettings(){
   document.getElementById('settingsModal').classList.add('show');
   setup.renderSoloTypes();
   turnier.fillProfileSettings();
+  cloud.fillCloudSettings();
 }
 export function closeSettings(){document.getElementById('settingsModal').classList.remove('show')}
 document.getElementById('settingsModal').addEventListener('click',function(e){if(e.target===this)closeSettings()});
@@ -351,7 +357,7 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v5.9 · 30.05.2026 14:05</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.0 · 30.05.2026 15:30</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -440,6 +446,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.0',d:'30.05.2026 15:30',t:'Cloud-Backup (Einstellungen): jeder mit Profil kann seine Spiele und sein Archiv automatisch in der Cloud sichern. Wiederherstellung per Knopfdruck – beim Gerätewechsel wird das Backup direkt zum Laden angeboten. Reines Backup, kein Zusammenführen mehrerer Geräte.'},
     {v:'5.9',d:'30.05.2026 14:05',t:'Profil: Benutzer-ID kopierbar, aufgeraeumtes Layout, Loeschen-Button. Admin: faengt gesperrten Datenbank-Root ab und zeigt die bekannten Bereiche, neue Admin-Verwaltung (Rechte vergeben/entziehen). Admin-Erkennung jetzt per Benutzer-ID bzw. isAdmin-Flag.'},
     {v:'5.8',d:'30.05.2026 12:30',t:'Profil in den Einstellungen: jeder kann seinen Namen und sein Kuerzel selbst anpassen (Benutzer-ID bleibt schreibgeschuetzt). Neuer Admin-Bereich unter „Mehr" – nur fuer den Admin sichtbar – mit vollem Zugriff auf die Datenbank: navigieren, als JSON bearbeiten, Schluessel anlegen und Knoten loeschen.'},
     {v:'5.7',d:'30.05.2026 07:42',t:'Turniere ohne Code finden: In-App-QR-Scanner und – optional beim Erstellen aktivierbar – Anzeige von Turnieren in der Naehe per Standort. Beitritt weiterhin auch per Code/Link moeglich.'},
@@ -771,7 +778,7 @@ Object.assign(window,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll
   },
-  setup, eingabe, tabelle, stats, archiv, turnier, admin
+  setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
 );
 
 // ═══════════════════════════════════════════════════════════
