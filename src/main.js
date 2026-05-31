@@ -358,7 +358,8 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.1 · 30.05.2026 16:40</div>';
+  html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.2 · 31.05.2026</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -404,7 +405,7 @@ export async function openInfoModal(){
   html+='<div style="margin-bottom:4px">iPhone: In Safari öffnen → Teilen → "Zum Home-Bildschirm"</div>';
   html+='<div style="margin-bottom:10px">Android: In Chrome öffnen → Menü → "App installieren"</div>';
   html+='<div style="font-weight:700;margin-bottom:6px;color:var(--tx)">🔄 Updates</div>';
-  html+='<div>Neue Versionen werden automatisch erkannt. Oben erscheint ein Hinweis und die App lädt sich nach 3 Sekunden selbst neu.</div>';
+  html+='<div>Neue Versionen werden im Hintergrund erkannt. Oben erscheint dann ein Hinweis; getippt wird nicht unterbrochen, sonst lädt die App selbstständig neu. Du kannst jederzeit unter „Mehr → Nach Updates suchen" manuell prüfen und sofort aktualisieren.</div>';
   html+='</div>';
 
   // Easter Egg Hinweis nur wenn aktiv
@@ -447,6 +448,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.2',d:'31.05.2026',t:'Neuer Button „Nach Updates suchen" unter „Mehr" (über der Versionsnummer): prüft sofort auf eine neue Version und lädt direkt neu, wenn eine bereitsteht – sonst Rückmeldung, dass bereits die neueste Version läuft.'},
     {v:'6.1',d:'30.05.2026 16:40',t:'Zuverlaessigere Updates: Die App prueft jetzt regelmaessig (und beim Zurueckkehren) auf neue Versionen und laedt erst dann neu, wenn der neue Stand wirklich bereit ist. Kein Neuladen mitten in der Punkteingabe – dann erscheint ein Hinweis mit Button „Jetzt aktualisieren", sonst wird nach dem Speichern automatisch aktualisiert.'},
     {v:'6.0',d:'30.05.2026 15:30',t:'Cloud-Backup (Einstellungen): jeder mit Profil kann seine Spiele und sein Archiv automatisch in der Cloud sichern. Wiederherstellung per Knopfdruck – beim Gerätewechsel wird das Backup direkt zum Laden angeboten. Reines Backup, kein Zusammenführen mehrerer Geräte.'},
     {v:'5.9',d:'30.05.2026 14:05',t:'Profil: Benutzer-ID kopierbar, aufgeraeumtes Layout, Loeschen-Button. Admin: faengt gesperrten Datenbank-Root ab und zeigt die bekannten Bereiche, neue Admin-Verwaltung (Rechte vergeben/entziehen). Admin-Erkennung jetzt per Benutzer-ID bzw. isAdmin-Flag.'},
@@ -762,6 +764,7 @@ document.addEventListener('touchend',e=>{
 // Zuverlaessiges Update: periodisch + bei Sichtbarkeit/Fokus pruefen, neuer SW bleibt
 // "waiting" (registerType:'prompt'), Reload erst an einem sicheren Punkt (nicht waehrend Eingabe).
 let swUpdate=null;        // updateSW-Funktion (skipWaiting + Reload bei controllerchange)
+let swRegistration=null;  // ServiceWorkerRegistration (fuer manuelle Pruefung)
 let swReady=false;        // ein Update steht bereit
 let refreshing=false;     // Reload-Guard gegen Doppel-Reload
 const UPDATE_INTERVAL=60000;
@@ -815,9 +818,41 @@ export function maybeApplyUpdate(){
   setTimeout(applyUpdate,1000);
 }
 
+// Manuelle Update-Pruefung (Button im "Mehr"-Screen). Fragt den SW aktiv nach
+// einem Update und laedt sofort, wenn eines bereitsteht – sonst Rueckmeldung.
+export async function checkForUpdate(){
+  if(refreshing)return;
+  // Schon ein Update erkannt? -> direkt anwenden (vom Nutzer ausdruecklich gewollt).
+  if(swReady){applyUpdate();return;}
+  showToast('Suche nach Updates…');
+  if(!('serviceWorker'in navigator)||!swRegistration){
+    // Kein SW (z.B. Dev/Browser ohne PWA) -> harter Reload als Fallback.
+    showToast('Lade neu…');
+    setTimeout(()=>location.reload(),400);
+    return;
+  }
+  try{
+    await swRegistration.update();
+  }catch(e){
+    showToast('Update-Pruefung fehlgeschlagen – bist du online?');
+    return;
+  }
+  // Kurz warten, bis ein evtl. neuer SW in den "waiting/installing"-Zustand kommt.
+  await new Promise(res=>setTimeout(res,800));
+  if(swReady||swRegistration.waiting){
+    swReady=true;
+    applyUpdate();
+  }else if(swRegistration.installing){
+    showToast('Update wird vorbereitet – gleich geht es los…');
+  }else{
+    showToast('Du hast bereits die neueste Version. ✅');
+  }
+}
+
 const updateSW = registerSW({
   onRegisteredSW(swUrl,r){
     if(!r)return;
+    swRegistration=r;
     try{r.update()}catch(e){}
     setInterval(()=>{try{r.update()}catch(e){}},UPDATE_INTERVAL);
     const recheck=()=>{if(document.visibilityState==='visible'){try{r.update()}catch(e){}}};
@@ -842,7 +877,7 @@ Object.assign(window,
     applyAccent, setAccent,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
-    renderAll, applyUpdate, maybeApplyUpdate
+    renderAll, applyUpdate, maybeApplyUpdate, checkForUpdate
   },
   setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
 );
