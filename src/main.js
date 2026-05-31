@@ -60,7 +60,7 @@ export let prerenderedStats=null;
 export let timerInterval=null;
 
 // ── Setter fuer geteilten mutablen State (ESM-Exports sind nur lesbar) ──
-export function setCurrentPts(v){currentPts=v;if(v==='')maybeApplyUpdate();}
+export function setCurrentPts(v){currentPts=v}
 export function setPendingRound(v){pendingRound=v}
 export function setLastUndo(v){lastUndo=v}
 export function setViewingArchive(v){viewingArchive=v}
@@ -228,7 +228,6 @@ export function showScreen(id){
   if(id==='stats'){renderStats();schedulePrerenderShareImages();}
   if(id==='mehr')renderMehrScreen();
   if(id==='spieler')renderSpielerScreen();
-  if(id!=='eingabe')maybeApplyUpdate(); // Screen verlassen = sicherer Moment
 }
 
 // Teilen-Aktion der Kopfzeile – leitet je nach aktivem Screen weiter
@@ -359,7 +358,7 @@ export function renderMehrScreen(){
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.2 · 31.05.2026</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.3 · 31.05.2026 22:30</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -448,9 +447,10 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
-    {v:'6.2',d:'31.05.2026',t:'Neuer Button „Nach Updates suchen" unter „Mehr" (über der Versionsnummer): prüft sofort auf eine neue Version und lädt direkt neu, wenn eine bereitsteht – sonst Rückmeldung, dass bereits die neueste Version läuft.'},
-    {v:'6.1',d:'30.05.2026 16:40',t:'Zuverlaessigere Updates: Die App prueft jetzt regelmaessig (und beim Zurueckkehren) auf neue Versionen und laedt erst dann neu, wenn der neue Stand wirklich bereit ist. Kein Neuladen mitten in der Punkteingabe – dann erscheint ein Hinweis mit Button „Jetzt aktualisieren", sonst wird nach dem Speichern automatisch aktualisiert.'},
-    {v:'6.0',d:'30.05.2026 15:30',t:'Cloud-Backup (Einstellungen): jeder mit Profil kann seine Spiele und sein Archiv automatisch in der Cloud sichern. Wiederherstellung per Knopfdruck – beim Gerätewechsel wird das Backup direkt zum Laden angeboten. Reines Backup, kein Zusammenführen mehrerer Geräte.'},
+    {v:'6.3',d:'31.05.2026 22:30',t:'Update-Mechanismus repariert: Neue Versionen werden jetzt zuverlässig automatisch aktiviert und geladen (vorher konnte die App auf einer alten, zwischengespeicherten Version hängenbleiben). Der Button „Nach Updates suchen" unter „Mehr" prüft weiterhin jederzeit manuell.'},
+    {v:'6.2',d:'31.05.2026 22:22',t:'Neuer Button „Nach Updates suchen" unter „Mehr" (über der Versionsnummer): prüft sofort auf eine neue Version und lädt direkt neu, wenn eine bereitsteht – sonst Rückmeldung, dass bereits die neueste Version läuft.'},
+    {v:'6.1',d:'31.05.2026 22:06',t:'Zuverlaessigere Updates: Die App prueft jetzt regelmaessig (und beim Zurueckkehren) auf neue Versionen und laedt erst dann neu, wenn der neue Stand wirklich bereit ist. Kein Neuladen mitten in der Punkteingabe – dann erscheint ein Hinweis mit Button „Jetzt aktualisieren", sonst wird nach dem Speichern automatisch aktualisiert.'},
+    {v:'6.0',d:'31.05.2026 21:31',t:'Cloud-Backup (Einstellungen): jeder mit Profil kann seine Spiele und sein Archiv automatisch in der Cloud sichern. Wiederherstellung per Knopfdruck – beim Gerätewechsel wird das Backup direkt zum Laden angeboten. Reines Backup, kein Zusammenführen mehrerer Geräte.'},
     {v:'5.9',d:'30.05.2026 14:05',t:'Profil: Benutzer-ID kopierbar, aufgeraeumtes Layout, Loeschen-Button. Admin: faengt gesperrten Datenbank-Root ab und zeigt die bekannten Bereiche, neue Admin-Verwaltung (Rechte vergeben/entziehen). Admin-Erkennung jetzt per Benutzer-ID bzw. isAdmin-Flag.'},
     {v:'5.8',d:'30.05.2026 12:30',t:'Profil in den Einstellungen: jeder kann seinen Namen und sein Kuerzel selbst anpassen (Benutzer-ID bleibt schreibgeschuetzt). Neuer Admin-Bereich unter „Mehr" – nur fuer den Admin sichtbar – mit vollem Zugriff auf die Datenbank: navigieren, als JSON bearbeiten, Schluessel anlegen und Knoten loeschen.'},
     {v:'5.7',d:'30.05.2026 07:42',t:'Turniere ohne Code finden: In-App-QR-Scanner und – optional beim Erstellen aktivierbar – Anzeige von Turnieren in der Naehe per Standort. Beitritt weiterhin auch per Code/Link moeglich.'},
@@ -761,69 +761,25 @@ document.addEventListener('touchend',e=>{
 // ═══════════════════════════════════════════════════════════
 // PWA / Service Worker (vite-plugin-pwa) – ersetzt das alte sw.js
 // ═══════════════════════════════════════════════════════════
-// Zuverlaessiges Update: periodisch + bei Sichtbarkeit/Fokus pruefen, neuer SW bleibt
-// "waiting" (registerType:'prompt'), Reload erst an einem sicheren Punkt (nicht waehrend Eingabe).
-let swUpdate=null;        // updateSW-Funktion (skipWaiting + Reload bei controllerchange)
+// Auto-Update (registerType:'autoUpdate'): Ein neuer Service Worker uebernimmt sofort
+// (skipWaiting + clientsClaim); vite-plugin-pwa laedt die Seite bei "controllerchange"
+// automatisch neu. Wir pruefen zusaetzlich periodisch und bei Rueckkehr in die App,
+// damit ein laufender Tab Updates zeitnah mitbekommt.
 let swRegistration=null;  // ServiceWorkerRegistration (fuer manuelle Pruefung)
-let swReady=false;        // ein Update steht bereit
 let refreshing=false;     // Reload-Guard gegen Doppel-Reload
 const UPDATE_INTERVAL=60000;
 
-// Eingabe laeuft gerade? Dann nicht neu laden.
-export function isBusyEntering(){
-  if(currentPts!=='')return true;
-  if(pendingRound)return true;
-  return ['editModal','soloModal','calcModal'].some(id=>{
-    const el=document.getElementById(id);
-    return el&&el.classList.contains('show');
-  });
-}
-
-// Update anwenden: skipWaiting ausloesen, Reload erfolgt bei controllerchange.
+// Sofort neu laden (Toast-Button "Jetzt aktualisieren").
 export function applyUpdate(){
   if(refreshing)return;
   refreshing=true;
-  const text=document.getElementById('updateToastText');
-  const btn=document.getElementById('updateToastBtn');
-  const bar=document.getElementById('updateReloadBar');
-  const toast=document.getElementById('updateToast');
-  if(text)text.textContent='Neue Version – wird geladen…';
-  if(btn)btn.hidden=true;
-  if(bar)bar.style.display='';
-  if(toast)toast.classList.add('show');
-  if(swUpdate)swUpdate(true);else location.reload();
-}
-
-// Entscheidet, ob jetzt automatisch geladen wird oder ein Button angeboten wird.
-export function maybeApplyUpdate(){
-  if(!swReady||refreshing)return;
-  const toast=document.getElementById('updateToast');
-  const text=document.getElementById('updateToastText');
-  const btn=document.getElementById('updateToastBtn');
-  const bar=document.getElementById('updateReloadBar');
-  if(!toast)return;
-  if(isBusyEntering()){
-    // Hinweis mit Button, kein ueberraschender Reload mitten in der Eingabe.
-    if(text)text.textContent='Neue Version verfügbar.';
-    if(btn)btn.hidden=false;
-    if(bar)bar.style.display='none';
-    toast.classList.add('show');
-    return;
-  }
-  // Sicherer Moment -> kurzer Hinweis, dann automatisch laden.
-  if(text)text.textContent='Neue Version – wird automatisch geladen…';
-  if(btn)btn.hidden=true;
-  if(bar)bar.style.display='';
-  toast.classList.add('show');
-  setTimeout(applyUpdate,1000);
+  location.reload();
 }
 
 // Manuelle Update-Pruefung (Button im "Mehr"-Screen). Fragt den SW aktiv nach
-// einem Update und laedt sofort, wenn eines bereitsteht – sonst Rueckmeldung.
+// einem Update; bei einem Treffer aktiviert dieser sofort und die App laedt neu.
 export async function checkForUpdate(){
   if(refreshing)return;
-  // Schon ein Update erkannt? -> direkt anwenden (vom Nutzer ausdruecklich gewollt).
-  if(swReady){applyUpdate();return;}
   showToast('Suche nach Updates…');
   if(!('serviceWorker'in navigator)||!swRegistration){
     // Kein SW (z.B. Dev/Browser ohne PWA) -> harter Reload als Fallback.
@@ -837,13 +793,12 @@ export async function checkForUpdate(){
     showToast('Update-Pruefung fehlgeschlagen – bist du online?');
     return;
   }
-  // Kurz warten, bis ein evtl. neuer SW in den "waiting/installing"-Zustand kommt.
-  await new Promise(res=>setTimeout(res,800));
-  if(swReady||swRegistration.waiting){
-    swReady=true;
-    applyUpdate();
-  }else if(swRegistration.installing){
-    showToast('Update wird vorbereitet – gleich geht es los…');
+  // Kurz warten, bis ein evtl. neuer SW erkannt wurde (installing/waiting).
+  await new Promise(res=>setTimeout(res,1000));
+  if(swRegistration.installing||swRegistration.waiting){
+    showToast('Neue Version gefunden – wird geladen…');
+    // Sicherheitshalber selbst neu laden, falls controllerchange ausbleibt.
+    setTimeout(()=>{if(!refreshing){refreshing=true;location.reload();}},3000);
   }else{
     showToast('Du hast bereits die neueste Version. ✅');
   }
@@ -860,10 +815,8 @@ const updateSW = registerSW({
     window.addEventListener('focus',recheck);
     window.addEventListener('online',recheck);
   },
-  onNeedRefresh(){swReady=true;maybeApplyUpdate();},
   onRegisterError(e){console.error('SW register error:',e);}
 });
-swUpdate=updateSW;
 
 // ═══════════════════════════════════════════════════════════
 // window-Registrierung ALLER onclick-Funktionen (main + ui + Geschwister-Module).
@@ -877,7 +830,7 @@ Object.assign(window,
     applyAccent, setAccent,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
-    renderAll, applyUpdate, maybeApplyUpdate, checkForUpdate
+    renderAll, applyUpdate, checkForUpdate
   },
   setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
 );

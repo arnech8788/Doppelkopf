@@ -6,11 +6,11 @@ export default defineConfig({
   base: '/',
   plugins: [
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       injectRegister: null, // Registrierung erfolgt manuell in main.js via virtual:pwa-register
       workbox: {
-        clientsClaim: false,        // neuer SW uebernimmt nicht sofort -> kontrolliertes Update
-        skipWaiting: false,         // bleibt "waiting", bis main.js gezielt updateSW(true) ruft
+        clientsClaim: true,         // neuer SW uebernimmt sofort die Kontrolle ueber offene Seiten
+        skipWaiting: true,          // neuer SW wartet nicht -> Update wird zuverlaessig aktiv
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,png,svg,json,ico}'],
         navigateFallback: '/index.html',
