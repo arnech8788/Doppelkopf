@@ -59,7 +59,7 @@ export function renderEingabe(){
     const icon=getStreakIcon(p,streaks,looseStreaks);
     const emoji=getPlayerEmoji(p);
     const displayName=(emoji?emoji+' ':'')+p;
-    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onclick="cycleState(this)"><span class="chip-icon"></span>'+displayName+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div>';
+    html+='<div class="player-chip" data-player="'+p+'" data-state="neutral" onpointerdown="cycleState(this)"><span class="chip-icon"></span>'+displayName+(icon?' <span style="font-size:12px">'+icon+'</span>':'')+'</div>';
   });
   html+='</div>';
   if(state.bockEnabled){

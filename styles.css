@@ -131,7 +131,7 @@ td{padding:10px 6px;border-bottom:1px solid var(--bdr);white-space:nowrap;text-a
 
 .my-player-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--acc-bg);border-radius:10px;font-size:11px;color:var(--acc2)}
 
-.player-chip{padding:clamp(8px,1.5dvh,12px) clamp(12px,2dvh,18px);background:var(--bg3);border:2px solid var(--bg4);border-radius:var(--r-sm);color:var(--tx3);font-size:clamp(13px,1.8dvh,15px);font-weight:500;cursor:pointer;transition:.15s;user-select:none;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
+.player-chip{padding:clamp(8px,1.5dvh,12px) clamp(12px,2dvh,18px);background:var(--bg3);border:2px solid var(--bg4);border-radius:var(--r-sm);color:var(--tx3);font-size:clamp(13px,1.8dvh,15px);font-weight:500;cursor:pointer;transition:.15s;user-select:none;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation}
 .player-chip:active{transform:scale(.95)}
 .player-chip[data-state="lost"]{border-color:var(--red-bdr);color:var(--red);background:var(--red-bg)}
 .player-chip[data-state="won"]{border-color:var(--grn-bdr);color:var(--grn);background:var(--grn-bg)}
