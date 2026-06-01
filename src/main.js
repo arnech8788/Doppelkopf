@@ -388,7 +388,7 @@ export function renderMehrScreen(){
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.4 · 31.05.2026 23:15</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.5 · 31.05.2026 23:55</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -477,6 +477,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.5',d:'31.05.2026 23:55',t:'Fix Online-Anzeige: Die Admin-Ansicht „🟢 Online" blieb auf „Lädt…" hängen (der Online-Status wurde an einem nicht freigegebenen Datenbank-Pfad gespeichert). Der Online-Status liegt jetzt direkt am Spieler und wird zuverlässig angezeigt; bei Verbindungsproblemen erscheint eine Meldung statt Dauerladen.'},
     {v:'6.4',d:'31.05.2026 23:15',t:'Turnier-Verwaltung & Online-Anzeige: Über „Mehr → Turnier → Meine Turniere" lassen sich eigene Turniere als aktuell setzen oder ausblenden – mit Anzeige, wer sie erstellt hat. Admins sehen unter „Mehr → Admin" alle Turniere (aktiv/beendet/ausgeblendet), können sie wiederherstellen oder endgültig löschen, und sehen über „🟢 Online", wer die App gerade nutzt. Außerdem sind die Kategorien in „Mehr" und „Einstellungen" jetzt einklappbar (Zustand wird gemerkt).'},
     {v:'6.3',d:'31.05.2026 22:30',t:'Update-Mechanismus repariert: Neue Versionen werden jetzt zuverlässig automatisch aktiviert und geladen (vorher konnte die App auf einer alten, zwischengespeicherten Version hängenbleiben). Der Button „Nach Updates suchen" unter „Mehr" prüft weiterhin jederzeit manuell.'},
     {v:'6.2',d:'31.05.2026 22:22',t:'Neuer Button „Nach Updates suchen" unter „Mehr" (über der Versionsnummer): prüft sofort auf eine neue Version und lädt direkt neu, wenn eine bereitsteht – sonst Rückmeldung, dass bereits die neueste Version läuft.'},

@@ -344,30 +344,45 @@ export async function adminManageTurniere(){
 export async function adminPresence(){
   const el=document.getElementById('adminModalContent');
   el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
-  await loadSpielerDB();
+  let firstResponse=false;
+  function header(title){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
+      +'<h3 style="margin:0">'+title+'</h3>'
+      +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+  }
+  function showMessage(title,msg){
+    const cont=document.getElementById('adminModalContent');
+    if(cont)cont.innerHTML=header(title)+'<div class="card" style="color:var(--tx3);font-size:13px">'+escHtml(msg)+'</div>';
+  }
+  // map = Spieler-Datensaetze; online sind die mit frischem online.lastSeen.
   function render(map){
+    firstResponse=true;
     const now=Date.now();
     const list=Object.entries(map||{})
-      .map(([id,p])=>({id,...p}))
-      .filter(p=>p.lastSeen&&(now-p.lastSeen)<120000) // Stale-Schutz, falls onDisconnect ausblieb
+      .map(([id,s])=>({id,...s}))
+      .filter(s=>s.online&&s.online.lastSeen&&(now-s.online.lastSeen)<150000) // Stale-Schutz
       .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
-      +'<h3 style="margin:0">🟢 Gerade online ('+list.length+')</h3>'
-      +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+    let h=header('🟢 Gerade online ('+list.length+')');
     h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Nutzer mit Profil, deren App aktuell geöffnet ist. Aktualisiert sich live.</div>';
     h+='<div class="card" style="padding:4px 0">';
     if(!list.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Niemand online.</div>';
-    list.forEach(p=>{
-      const secs=Math.max(0,Math.round((now-p.lastSeen)/1000));
+    list.forEach(s=>{
+      const secs=Math.max(0,Math.round((now-s.online.lastSeen)/1000));
       const ago=secs<60?'vor '+secs+' s':'vor '+Math.round(secs/60)+' min';
       h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
       h+='<span style="width:8px;height:8px;border-radius:50%;background:var(--grn);flex-shrink:0"></span>';
-      h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(p.name||'(ohne Name)')+(p.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(p.short)+'</span>':'')+'</div>';
+      h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(s.name||'(ohne Name)')+(s.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(s.short)+'</span>':'')+'</div>';
       h+='<div style="font-size:11px;color:var(--tx3)">zuletzt aktiv '+ago+'</div></div></div>';
     });
     h+='</div>';
     const cont=document.getElementById('adminModalContent');
     if(cont)cont.innerHTML=h;
   }
-  startPresenceWatch(render);
+  startPresenceWatch(render,err=>{
+    firstResponse=true;
+    console.warn('presence watch error:',err);
+    showMessage('🟢 Gerade online','Online-Status konnte nicht geladen werden.');
+  });
+  // Sicherheitsnetz: nie dauerhaft auf "Lädt…" haengen bleiben.
+  setTimeout(()=>{if(!firstResponse)showMessage('🟢 Gerade online','Keine Daten – niemand online oder keine Verbindung.')},6000);
 }

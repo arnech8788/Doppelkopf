@@ -238,14 +238,16 @@ export async function isAdmin(){
 // offline passiert nichts. Die Liste sieht ausschliesslich der Admin.
 // (Firebase-Regeln muessen serverseitig Schreiben auf 'presence' erlauben – wie bei
 //  'spieler'/'turniere' bereits offen; kuenftiges Regel-Tightening muss 'presence' whitelisten.)
+// Hinweis: Presence wird im bereits erlaubten 'spieler'-Pfad als Kind 'online' gespeichert
+// (spieler/<id>/online) – so braucht es KEINE Firebase-Regeländerung. Name/Kuerzel stehen
+// schon im Spieler-Datensatz. Nur Nutzer MIT Profil melden sich; ohne Profil/offline passiert
+// nichts. Die Liste sieht ausschliesslich der Admin.
 function writePresence(own){
   if(!presenceRef)return;
   presenceRef.set({
-    name:own.name,
-    short:own.short||null,
-    deviceId:getDeviceId(),
-    lastSeen:firebase.database.ServerValue.TIMESTAMP
-  });
+    lastSeen:firebase.database.ServerValue.TIMESTAMP,
+    deviceId:getDeviceId()
+  }).catch(e=>console.warn('presence write:',e));
 }
 
 export function startPresence(own){
@@ -253,7 +255,7 @@ export function startPresence(own){
   if(presenceOwnId===own.id)return; // bereits aktiv fuer diesen Spieler
   stopPresence();                   // evtl. alten Eintrag/Heartbeat sauber loesen
   presenceOwnId=own.id;
-  presenceRef=firebase.database().ref('presence/'+own.id);
+  presenceRef=firebase.database().ref('spieler/'+own.id+'/online');
   presenceConnRef=firebase.database().ref('.info/connected');
   presenceConnRef.on('value',snap=>{
     if(snap.val()===true){
@@ -272,18 +274,19 @@ export function stopPresence(){
   if(presenceConnRef){try{presenceConnRef.off('value')}catch(e){}presenceConnRef=null;}
   if(presenceRef){
     try{presenceRef.onDisconnect().cancel()}catch(e){}
-    try{presenceRef.remove()}catch(e){}
+    try{presenceRef.remove()}catch(e){} // entfernt nur das 'online'-Kind, nicht den Spieler
     presenceRef=null;
   }
   presenceOwnId=null;
 }
 
-// Admin-Live-Ansicht: ruft cb(map) bei jeder Aenderung auf.
-export function startPresenceWatch(cb){
-  if(!initFirebase())return;
+// Admin-Live-Ansicht: lauscht auf 'spieler' (erlaubt) und ruft cb(spielerMap) bei jeder
+// Aenderung auf; onError bei Lese-/Rechtefehler (verhindert stummes "Laedt").
+export function startPresenceWatch(cb,onError){
+  if(!initFirebase()){if(onError)onError(new Error('keine Verbindung'));return;}
   stopPresenceWatch();
-  presenceListRef=firebase.database().ref('presence');
-  presenceListCb=presenceListRef.on('value',s=>cb(s.val()||{}));
+  presenceListRef=firebase.database().ref('spieler');
+  presenceListCb=presenceListRef.on('value',s=>cb(s.val()||{}),err=>{if(onError)onError(err)});
 }
 export function stopPresenceWatch(){
   if(presenceListRef&&presenceListCb){try{presenceListRef.off('value',presenceListCb)}catch(e){}}
