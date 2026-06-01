@@ -219,6 +219,18 @@ export function openSettings(){
   });
   darstBody+='<label title="Eigene Farbe" style="width:30px;height:30px;border-radius:50%;cursor:pointer;border:1px dashed var(--bdr);display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:14px">🎨<input type="color" value="'+(curAcc||'#1a9e8f')+'" onchange="setAccent(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%"></label>';
   darstBody+='</div></div>';
+  // Hintergrundfarbe frei wählbar (abgestuft, Textkontrast automatisch)
+  const bgPresets=['#0f1310','#10161f','#1c1622','#241a1a','#eef2f7','#f3eefa','#fbf0ee','#eef5ee'];
+  const curBg=(localStorage.getItem('doko-bg')||'').toLowerCase();
+  darstBody+='<div style="margin-top:16px"><span class="toggle-label">Hintergrundfarbe</span>';
+  darstBody+='<div style="font-size:11px;color:var(--tx3);margin-top:2px">Textfarbe passt sich automatisch an</div>';
+  darstBody+='<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px">';
+  darstBody+='<button onclick="setBg(\'\')" title="Standard" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:linear-gradient(135deg,var(--bg),var(--bg3));border:3px solid '+(curBg?'var(--bdr)':'var(--tx)')+'"></button>';
+  bgPresets.forEach(col=>{
+    darstBody+='<button onclick="setBg(\''+col+'\')" style="width:30px;height:30px;border-radius:50%;cursor:pointer;background:'+col+';border:3px solid '+(curBg===col?'var(--tx)':'var(--bdr)')+'"></button>';
+  });
+  darstBody+='<label title="Eigene Farbe" style="width:30px;height:30px;border-radius:50%;cursor:pointer;border:1px dashed var(--bdr);display:inline-flex;align-items:center;justify-content:center;position:relative;overflow:hidden;font-size:14px">🎨<input type="color" value="'+(curBg||'#0f1310')+'" onchange="setBg(this.value)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%"></label>';
+  darstBody+='</div></div>';
   html+=renderCollapsibleCard('settings','darstellung','Darstellung',darstBody);
 
   // Debug
@@ -388,7 +400,7 @@ export function renderMehrScreen(){
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.5 · 31.05.2026 23:55</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.6 · 01.06.2026 12:00</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -477,6 +489,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.6',d:'01.06.2026 12:00',t:'Neue Hintergrundfarbe frei wählbar (Mehr → Darstellung): Wähle aus dezenten Vorlagen oder per Farbwähler eine eigene Hintergrundfarbe – die Flächen (Seite, Karten, Felder) werden stimmig abgestuft und die Textfarbe passt sich automatisch an, damit alles lesbar bleibt. Die Akzentfarbe lässt sich weiterhin unabhängig einstellen; „Standard" setzt auf das Theme zurück.'},
     {v:'6.5',d:'31.05.2026 23:55',t:'Fix Online-Anzeige: Die Admin-Ansicht „🟢 Online" blieb auf „Lädt…" hängen (der Online-Status wurde an einem nicht freigegebenen Datenbank-Pfad gespeichert). Der Online-Status liegt jetzt direkt am Spieler und wird zuverlässig angezeigt; bei Verbindungsproblemen erscheint eine Meldung statt Dauerladen.'},
     {v:'6.4',d:'31.05.2026 23:15',t:'Turnier-Verwaltung & Online-Anzeige: Über „Mehr → Turnier → Meine Turniere" lassen sich eigene Turniere als aktuell setzen oder ausblenden – mit Anzeige, wer sie erstellt hat. Admins sehen unter „Mehr → Admin" alle Turniere (aktiv/beendet/ausgeblendet), können sie wiederherstellen oder endgültig löschen, und sehen über „🟢 Online", wer die App gerade nutzt. Außerdem sind die Kategorien in „Mehr" und „Einstellungen" jetzt einklappbar (Zustand wird gemerkt).'},
     {v:'6.3',d:'31.05.2026 22:30',t:'Update-Mechanismus repariert: Neue Versionen werden jetzt zuverlässig automatisch aktiviert und geladen (vorher konnte die App auf einer alten, zwischengespeicherten Version hängenbleiben). Der Button „Nach Updates suchen" unter „Mehr" prüft weiterhin jederzeit manuell.'},
@@ -706,6 +719,16 @@ function lightenHex(hex,pct){
   const f=v=>Math.round(v+(255-v)*(pct/100)).toString(16).padStart(2,'0');
   return '#'+f(c.r)+f(c.g)+f(c.b);
 }
+function darkenHex(hex,pct){
+  const c=hexToRgb(hex);if(!c)return hex;
+  const f=v=>Math.round(v*(1-pct/100)).toString(16).padStart(2,'0');
+  return '#'+f(c.r)+f(c.g)+f(c.b);
+}
+// Relative Helligkeit 0..1 (Lesbarkeit: <0.5 ≈ dunkel)
+function luminance(hex){
+  const c=hexToRgb(hex);if(!c)return 1;
+  return (0.299*c.r+0.587*c.g+0.114*c.b)/255;
+}
 // Setzt --acc/--acc2/--acc-bg als Inline-Override (leerer Wert = Theme-Standard)
 export function applyAccent(hex){
   const root=document.documentElement;
@@ -726,11 +749,48 @@ export function setAccent(hex){
   openSettings(); // Modal neu rendern, damit die aktive Farbe markiert wird
 }
 
+// ── Hintergrundfarbe (frei wählbar) ──
+// Leitet aus einer Basisfarbe die abgestuften Flächen (--bg/--bg2/--bg3/--bg4)
+// ab und wählt automatisch lesbare Textfarben (--tx/--tx2/--tx3) + Rahmen (--bdr).
+// Leerer Wert = Theme-Standard.
+export function applyBg(hex){
+  const root=document.documentElement;
+  if(hex){
+    const dark=luminance(hex)<0.5;
+    root.style.setProperty('--bg',hex);
+    if(dark){
+      root.style.setProperty('--bg2',lightenHex(hex,6));
+      root.style.setProperty('--bg3',lightenHex(hex,12));
+      root.style.setProperty('--bg4',lightenHex(hex,20));
+      root.style.setProperty('--tx','#e8ecf4');
+      root.style.setProperty('--tx2','#9ba3b8');
+      root.style.setProperty('--tx3','#636b82');
+      root.style.setProperty('--bdr','rgba(255,255,255,.07)');
+    }else{
+      root.style.setProperty('--bg2',lightenHex(hex,4));
+      root.style.setProperty('--bg3',darkenHex(hex,5));
+      root.style.setProperty('--bg4',darkenHex(hex,11));
+      root.style.setProperty('--tx','#1a1c24');
+      root.style.setProperty('--tx2','#5a5e72');
+      root.style.setProperty('--tx3','#8b8fa6');
+      root.style.setProperty('--bdr','rgba(0,0,0,.08)');
+    }
+  }else{
+    ['--bg','--bg2','--bg3','--bg4','--tx','--tx2','--tx3','--bdr'].forEach(p=>root.style.removeProperty(p));
+  }
+}
+export function setBg(hex){
+  if(hex)localStorage.setItem('doko-bg',hex);else localStorage.removeItem('doko-bg');
+  applyBg(hex);
+  openSettings(); // Modal neu rendern, damit die aktive Farbe markiert wird
+}
+
 (function(){
   const saved=localStorage.getItem('doko-theme');
   if(saved)document.documentElement.setAttribute('data-theme',saved);
   else document.documentElement.setAttribute('data-theme','light');
   applyAccent(localStorage.getItem('doko-accent')||'');
+  applyBg(localStorage.getItem('doko-bg')||'');
   updateThemeIcon();
 })();
 
@@ -859,7 +919,7 @@ Object.assign(window,
   {
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
     showScreen, shareCurrentScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
-    applyAccent, setAccent,
+    applyAccent, setAccent, applyBg, setBg,
     openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll, applyUpdate, checkForUpdate, toggleCollapse
