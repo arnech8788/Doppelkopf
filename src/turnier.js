@@ -2123,13 +2123,13 @@ function turnierRow(t,opts){
   h+='<div style="font-size:11px;color:var(--tx3)">erstellt von '+escTurnier(creator)+'</div></div>';
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">';
   if(t.status!=='deleted'&&!isCurrent)
-    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="setCurrentTurnier(\''+t.code+'\')">Als aktuell setzen</button>';
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="setCurrentTurnier(\''+t.code+'\')">Öffnen / Bearbeiten</button>';
   if(t.status!=='deleted')
-    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:100px" onclick="turnierSoftDelete(\''+t.code+'\')">Ausblenden</button>';
-  if(opts.role==='admin'&&t.status==='deleted'){
+    h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:100px" onclick="turnierSoftDelete(\''+t.code+'\')">Archivieren</button>';
+  if(t.status==='deleted')
     h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="turnierRestore(\''+t.code+'\')">Wiederherstellen</button>';
+  if(opts.role==='admin'&&t.status==='deleted')
     h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px;color:var(--red);border-color:var(--red)" onclick="turnierHardDelete(\''+t.code+'\')">Endgültig löschen</button>';
-  }
   h+='</div></div>';
   return h;
 }
@@ -2142,24 +2142,21 @@ export function renderTurnierList(turniere,opts){
   if(!el)return;
   let list=turniere.slice();
   if(opts.role!=='admin'){
-    list=list.filter(t=>t.status!=='deleted'&&opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])));
+    // Eigene Turniere (Ersteller oder Co-Host) – inkl. archivierter, damit sie wiederhergestellt werden können.
+    list=list.filter(t=>opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])));
   }
   if(!list.length){el.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Keine Turniere.</div>';return}
-  if(opts.role==='admin'){
-    const groups=[['active','Aktiv'],['ended','Beendet'],['deleted','Ausgeblendet / gelöscht']];
-    let h='';
-    groups.forEach(([st,label])=>{
-      const g=list.filter(t=>(t.status||'active')===st);
-      if(!g.length)return;
-      g.sort((a,b)=>(b.created||0)-(a.created||0));
-      h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);margin:14px 0 6px">'+label+' ('+g.length+')</div>';
-      g.forEach(t=>{h+=turnierRow(t,opts)});
-    });
-    el.innerHTML=h;
-  }else{
-    list.sort((a,b)=>(b.created||0)-(a.created||0));
-    el.innerHTML=list.map(t=>turnierRow(t,opts)).join('');
-  }
+  // Beide Rollen gruppiert: Aktiv / Beendet / Archiviert.
+  const groups=[['active','Aktiv'],['ended','Beendet'],['deleted','Archiviert']];
+  let h='';
+  groups.forEach(([st,label])=>{
+    const g=list.filter(t=>(t.status||'active')===st);
+    if(!g.length)return;
+    g.sort((a,b)=>(b.created||0)-(a.created||0));
+    h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);margin:14px 0 6px">'+label+' ('+g.length+')</div>';
+    g.forEach(t=>{h+=turnierRow(t,opts)});
+  });
+  el.innerHTML=h;
 }
 
 async function refreshTurnierList(){
@@ -2196,10 +2193,10 @@ export async function setCurrentTurnier(code){
   showToast('Aktuelles Turnier: '+(data.name||'DK-'+code),'info');
 }
 
-// Host-Aktion: ausblenden (Soft-Delete) – Daten bleiben erhalten.
+// Archivieren (Soft-Delete) – Daten bleiben erhalten, jederzeit wiederherstellbar. Ersteller/Co-Host & Admin.
 export async function turnierSoftDelete(code){
   if(!initFirebase())return;
-  if(!await showConfirm('Turnier DK-'+code+' ausblenden? Es verschwindet aus deinen Listen, die Daten bleiben aber erhalten.','Ausblenden',true))return;
+  if(!await showConfirm('Turnier DK-'+code+' archivieren? Es verschwindet aus den aktiven Listen, die Daten bleiben erhalten und lassen sich wiederherstellen.','Archivieren',true))return;
   try{
     await firebase.database().ref('turniere/DK'+code+'/status').set('deleted');
     removeDiscovery(code);
@@ -2207,15 +2204,19 @@ export async function turnierSoftDelete(code){
       if(turnierListener){firebase.database().ref('turniere/DK'+code+'/tische').off('value',turnierListener);turnierListener=null;}
       state.turnier=null;save();renderTurnierSetup();renderTurnierIndicator();
     }
-    showToast('Turnier ausgeblendet.','info');
+    showToast('Turnier archiviert.','info');
     refreshTurnierList();
   }catch(e){showToast('Fehler: '+e.message,'error')}
 }
 
-// Admin-Aktion: ausgeblendetes Turnier wieder aktivieren.
+// Archiviertes Turnier wieder aktivieren – Admin ODER Ersteller/Co-Host.
 export async function turnierRestore(code){
   if(!initFirebase())return;
-  if(!spielerIsAdmin(await getOwnSpieler())){showToast('Kein Zugriff.','error');return}
+  const own=await getOwnSpieler();
+  const snap=await firebase.database().ref('turniere/DK'+code).get();
+  const data=snap.val()||{};
+  const allowed=spielerIsAdmin(own)||(own&&(data.createdBy===own.id||(data.hosts&&data.hosts[own.id])));
+  if(!allowed){showToast('Kein Zugriff.','error');return}
   try{
     await firebase.database().ref('turniere/DK'+code+'/status').set('active');
     showToast('Turnier wiederhergestellt.','info');
@@ -2249,7 +2250,7 @@ export async function openMyTurniere(){
     +'<h3 style="margin:0">Meine Turniere</h3>'
     +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">„Als aktuell setzen" wechselt in das Turnier. „Ausblenden" entfernt es aus dieser Liste – die Daten bleiben erhalten.</div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">„Öffnen / Bearbeiten" wechselt ins Turnier (voller Spielleiter-Zugriff). „Archivieren" nimmt es aus den aktiven Listen – die Daten bleiben erhalten und lassen sich jederzeit wiederherstellen.</div>';
   html+='<div id="turnierListBody"></div>';
   el.innerHTML=html;
   renderTurnierList(list,{role:'host',ownSpielerId:own?own.id:null,containerId:'turnierListBody'});
