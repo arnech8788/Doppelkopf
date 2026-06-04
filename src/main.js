@@ -13,6 +13,7 @@ import * as archiv from './archiv.js';
 import * as turnier from './turnier.js';
 import * as admin from './admin.js';
 import * as cloud from './cloud.js';
+import * as game from './game.js';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -50,7 +51,7 @@ export const ACHIEVEMENTS={
 };
 
 // ── Geteilter State ──
-export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,cloudBackup:false,uiCollapsed:{}};
+export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,cloudBackup:false,uiCollapsed:{},dokoGame:null,dokoTotals:null,dokoDealer:0,dokoMitNeunen:true,dokoAuto:true};
 export let currentPts='';
 export let pendingRound=null;
 export let lastUndo=null;
@@ -399,12 +400,14 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
+  html+='<div id="gameEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.8 · 04.06.2026 20:11</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.9 · 04.06.2026 20:30</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
   admin.fillAdminEntry();
+  game.fillGameEntry();
 }
 
 // ── Info-/Debug-Modal, Version-Tap ──
@@ -489,6 +492,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.9',d:'04.06.2026 20:30',t:'NEU (nur für Admins): Doppelkopf gegen den Computer! Über „Mehr → Doppelkopf spielen" startet ein echtes Kartenspiel gegen drei KI-Gegner – mit voller Trumpf-Ordnung, Bedienpflicht, Stichen, Vorbehalt/Solo/Hochzeit, Re/Kontra & Absagen sowie automatischer Wertung (Doppelkopf/Fuchs/Karlchen). Spielstand wird gespeichert und kann fortgesetzt werden. Erste Version – Feedback willkommen.'},
     {v:'6.8',d:'04.06.2026 20:11',t:'Turnier-Verwaltung verfeinert: „Ausblenden" heißt jetzt „Archivieren" und ist reversibel – Ersteller (und Admins) können ihre archivierten Turniere selbst wieder herstellen. „Meine Turniere" und die Admin-Ansicht zeigen Turniere gruppiert nach Aktiv/Beendet/Archiviert; „Öffnen / Bearbeiten" gibt vollen Spielleiter-Zugriff. Admins können weiterhin alle Turniere bearbeiten und endgültig löschen.'},
     {v:'6.7',d:'01.06.2026 13:00',t:'Eingabe: Mehrere Spieler lassen sich jetzt gleichzeitig mit mehreren Fingern markieren (Multi-Touch). Vorher reagierte beim gleichzeitigen Drücken zweier Spieler nur einer.'},
     {v:'6.6',d:'01.06.2026 12:00',t:'Neue Hintergrundfarbe frei wählbar (Mehr → Darstellung): Wähle aus dezenten Vorlagen oder per Farbwähler eine eigene Hintergrundfarbe – die Flächen (Seite, Karten, Felder) werden stimmig abgestuft und die Textfarbe passt sich automatisch an, damit alles lesbar bleibt. Die Akzentfarbe lässt sich weiterhin unabhängig einstellen; „Standard" setzt auf das Theme zurück.'},
@@ -926,7 +930,7 @@ Object.assign(window,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll, applyUpdate, checkForUpdate, toggleCollapse
   },
-  setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud
+  setup, eingabe, tabelle, stats, archiv, turnier, admin, cloud, game
 );
 
 // ═══════════════════════════════════════════════════════════
