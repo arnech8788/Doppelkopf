@@ -334,7 +334,7 @@ export async function adminManageTurniere(){
   let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
     +'<h3 style="margin:0">🏆 Turniere verwalten</h3>'
     +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
-  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Ausgeblendete Turniere können wiederhergestellt oder endgültig gelöscht werden.</div>';
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:4px">Alle Turniere: öffnen/bearbeiten, archivieren, wiederherstellen oder endgültig löschen.</div>';
   h+='<div id="turnierListBody"></div>';
   el.innerHTML=h;
   renderTurnierList(list,{role:'admin',ownSpielerId:own?own.id:null,containerId:'turnierListBody'});
