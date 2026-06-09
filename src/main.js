@@ -402,7 +402,7 @@ export function renderMehrScreen(){
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.10 · 04.06.2026 21:00</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.11 · 04.06.2026 21:20</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -492,6 +492,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.11',d:'04.06.2026 21:20',t:'Doppelkopf-Spiel (Admins): Letzten Stich auf Abruf einsehen. Während des Spiels gibt es jetzt einen „🔍 Letzter Stich"-Button, der den zuletzt abgeschlossenen Stich noch einmal zeigt (welche Karte von wem, Gewinner und Augenzahl). Schließt sich automatisch, sobald die nächste Karte gespielt wird.'},
     {v:'6.10',d:'04.06.2026 21:00',t:'Doppelkopf-Spiel (Admins): Bedienung übersichtlicher. Beim Vorbehalt/Solo bleiben deine Karten jetzt sichtbar (Popup verdeckt die Hand nicht mehr). Ein deutlicher Banner zeigt, wer dran ist bzw. wann du dran bist, samt Hervorhebung des aktiven Spielers und deiner Hand. Ansagen (Re/Kontra/Keine 90 …) laufen jetzt über einen „Ansage"-Button, der ein Popup mit den gerade erlaubten Ansagen öffnet.'},
     {v:'6.9',d:'04.06.2026 20:30',t:'NEU (nur für Admins): Doppelkopf gegen den Computer! Über „Mehr → Doppelkopf spielen" startet ein echtes Kartenspiel gegen drei KI-Gegner – mit voller Trumpf-Ordnung, Bedienpflicht, Stichen, Vorbehalt/Solo/Hochzeit, Re/Kontra & Absagen sowie automatischer Wertung (Doppelkopf/Fuchs/Karlchen). Spielstand wird gespeichert und kann fortgesetzt werden. Erste Version – Feedback willkommen.'},
     {v:'6.8',d:'04.06.2026 20:11',t:'Turnier-Verwaltung verfeinert: „Ausblenden" heißt jetzt „Archivieren" und ist reversibel – Ersteller (und Admins) können ihre archivierten Turniere selbst wieder herstellen. „Meine Turniere" und die Admin-Ansicht zeigen Turniere gruppiert nach Aktiv/Beendet/Archiviert; „Öffnen / Bearbeiten" gibt vollen Spielleiter-Zugriff. Admins können weiterhin alle Turniere bearbeiten und endgültig löschen.'},
