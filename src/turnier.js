@@ -2045,10 +2045,20 @@ export async function showTurnierArchiv(){
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px">'
       +'<div style="font-size:12px;color:var(--tx2)">'+role
       +(stale?' · <span style="color:var(--red)">nur lokal · nicht mehr auf dem Server</span>':'')+'</div>'
-      +(stale?'<button onclick="event.stopPropagation();removeArchivEntry(\''+a.code+'\')" style="flex:0 0 auto;background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;font-size:11px;padding:4px 8px;border-radius:var(--r-sm)">Entfernen</button>':'')
+      +'<button onclick="event.stopPropagation();removeArchivEntry(\''+a.code+'\')" style="flex:0 0 auto;background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;font-size:11px;padding:4px 8px;border-radius:var(--r-sm)">Entfernen</button>'
       +'</div></div>';
   });
+  if(archiv.length)
+    html+='<button class="btn btn-secondary" style="width:100%;font-size:12px;margin-top:16px;color:var(--red);border-color:var(--red)" onclick="clearTurnierArchiv()">Gesamtes Archiv leeren</button>';
   el.innerHTML=html;
+}
+
+// Komplettes lokales Archiv leeren (Serverdaten bleiben unberührt).
+export async function clearTurnierArchiv(){
+  if(!await showConfirm('Das gesamte lokale Turnier-Archiv leeren? Turnierdaten auf dem Server bleiben unberührt.','Archiv leeren'))return;
+  localStorage.removeItem('doko-v4-turnierArchiv');
+  showToast('Archiv geleert.','success');
+  closeTurnierDashboard();
 }
 
 // Einzelnen (lokalen) Archiv-Eintrag entfernen.
