@@ -18,6 +18,7 @@ let busy = false;         // KI denkt / Stich-Pause läuft
 let showingTrick = null;  // fertiger Stich, der gerade angezeigt wird
 let pendingContinue = null; // Fortsetzung bei „Auto-Weiter" aus
 let vorbExpanded = false; // Vorbehalt-Untermenü offen
+let ansageOpen = false;   // Ansage-Popup offen
 
 // ── Mount / Persistenz ──
 export function mountGame() { render(); }
@@ -139,7 +140,25 @@ function applyAnnounce(idx, level, side) {
 }
 export function dokoAnnounce(level) {
   if (busy || !G || G.phase !== 'play') return;
-  if (applyAnnounce(0, level, ownSide(0))) { persistGame(); render(); }
+  if (applyAnnounce(0, level, ownSide(0))) { ansageOpen = false; persistGame(); render(); }
+}
+export function dokoOpenAnsage() { if (!G || G.phase !== 'play' || busy || showingTrick) return; ansageOpen = true; render(); }
+export function dokoCloseAnsage() { ansageOpen = false; render(); }
+
+// Aktuell regelkonform erlaubte Ansagen des Menschen (idx0).
+const ANN_LABEL = { re: 'Re', kontra: 'Kontra', '90': 'Keine 90', '60': 'Keine 60', '30': 'Keine 30', schwarz: 'Schwarz' };
+function announceOptions() {
+  if (!G || G.phase !== 'play') return [];
+  const side = ownSide(0); const out = [];
+  for (const lvl of ['re', 'kontra']) {
+    if ((side === lvl || side === 'unknown') && !G.announcements[lvl] && E.canAnnounce(G, 0, lvl)) out.push({ level: lvl, label: ANN_LABEL[lvl] });
+  }
+  if (side === 're' || side === 'kontra') {
+    for (const lvl of ['90', '60', '30', 'schwarz']) {
+      if (E.canAnnounce(G, 0, lvl) && !G.announcements.absagen.some(x => x.party === side && x.level === lvl)) out.push({ level: lvl, label: ANN_LABEL[lvl] });
+    }
+  }
+  return out;
 }
 export function dokoNewGame() { startNewDokoGame(); }
 
@@ -192,8 +211,9 @@ function opponentBox(idx, align) {
   const p = G.players[idx];
   const active = G.phase === 'play' && E.currentPlayer(G) === idx && !showingTrick;
   const backs = Array.from({ length: Math.min(p.hand.length, 12) }, () => cardBack(true)).join('');
-  return `<div style="display:flex;flex-direction:column;align-items:${align};gap:4px;${active ? 'filter:drop-shadow(0 0 6px var(--acc));' : ''}">`
-    + `<div style="font-size:12px;font-weight:600;color:var(--tx2)">${active ? '▶ ' : ''}${p.name}${sideBadge(idx)}${annBadge(idx)}</div>`
+  const nameStyle = active ? 'background:var(--acc);color:#fff;padding:2px 9px;border-radius:11px' : 'color:var(--tx2)';
+  return `<div style="display:flex;flex-direction:column;align-items:${align};gap:4px;${active ? 'filter:drop-shadow(0 0 9px var(--acc));' : ''}">`
+    + `<div style="font-size:12px;font-weight:700;${nameStyle}">${active ? '▶ ' : ''}${p.name}${sideBadge(idx)}${annBadge(idx)}</div>`
     + `<div style="display:flex;gap:1px;flex-wrap:wrap;max-width:150px;justify-content:${align}">${backs}</div>`
     + `<div style="font-size:10px;color:var(--tx3)">${p.hand.length} Karten</div></div>`;
 }
@@ -220,17 +240,44 @@ function header() {
     + `<button onclick="closeDokoGame()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:34px;height:34px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">${ICO.x}</button></div>`;
 }
 
-function announceBar() {
-  if (G.phase !== 'play') return '';
-  const side = ownSide(0);
-  const btn = (lvl, label) => {
-    const can = E.canAnnounce(G, 0, lvl) && !busy
-      && ((lvl === 're' || lvl === 'kontra') ? !G.announcements[lvl] : (side === 're' || side === 'kontra'));
-    return `<button onclick="dokoAnnounce('${lvl}')" ${can ? '' : 'disabled'} style="font-size:11px;padding:5px 9px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg3);color:var(--tx2);cursor:${can ? 'pointer' : 'not-allowed'};opacity:${can ? 1 : .4}">${label}</button>`;
-  };
-  const reKontra = (side === 're') ? btn('re', 'Re') : (side === 'kontra') ? btn('kontra', 'Kontra') : (btn('re', 'Re') + btn('kontra', 'Kontra'));
-  return `<div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;justify-content:center;border-top:1px solid var(--bdr)">`
-    + reKontra + btn('90', 'Keine 90') + btn('60', 'Keine 60') + btn('30', 'Keine 30') + btn('schwarz', 'Schwarz') + `</div>`;
+// Banner „wer ist dran" – auffällig grün/akzent wenn der Mensch dran ist.
+function turnBanner() {
+  if (!G || G.phase === 'scoring') return '';
+  let text, bg = 'var(--bg2)', col = 'var(--tx2)';
+  if (G.phase === 'vorbehalt') {
+    const who = G.vorbehalt.order[G.vorbehalt.current];
+    if (who === 0) { text = '▶ Du bist dran – Vorbehalt?'; bg = 'var(--acc)'; col = '#fff'; }
+    else text = `${G.players[who]?.name ?? ''} überlegt …`;
+  } else { // play
+    if (showingTrick) {
+      text = `Stich geht an ${G.players[showingTrick.winner].name}`;
+    } else {
+      const cur = E.currentPlayer(G);
+      if (cur === 0 && !busy) { text = '▶ Du bist dran – wähle eine Karte'; bg = 'var(--grn)'; col = '#fff'; }
+      else text = `${G.players[cur].name} ist dran …`;
+    }
+  }
+  return `<div style="padding:7px 12px;text-align:center;font-size:13px;font-weight:600;background:${bg};color:${col};border-bottom:1px solid var(--bdr)">${text}</div>`;
+}
+
+// Einzelner „Ansage"-Button (öffnet Popup); disabled wenn aktuell keine Ansage möglich.
+function ansageButton() {
+  if (!G || G.phase !== 'play') return '';
+  const can = !busy && !showingTrick && announceOptions().length > 0;
+  return `<button onclick="dokoOpenAnsage()" ${can ? '' : 'disabled'} style="padding:6px 12px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg3);color:var(--tx2);cursor:${can ? 'pointer' : 'not-allowed'};opacity:${can ? 1 : .4}">📣 Ansage</button>`;
+}
+
+// Ansage-Popup über der Stage (Hand bleibt darunter sichtbar).
+function ansageOverlay() {
+  if (!ansageOpen || !G || G.phase !== 'play') return '';
+  const opts = announceOptions();
+  const body = opts.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">`
+      + opts.map(o => `<button class="btn btn-primary" onclick="dokoAnnounce('${o.level}')">${o.label}</button>`).join('') + `</div>`
+    : `<div style="font-size:13px;color:var(--tx3);text-align:center">Aktuell keine Ansage möglich.</div>`;
+  return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:10px">Ansage</div>`
+    + body
+    + `<button class="btn btn-secondary" style="width:100%;margin-top:14px" onclick="dokoCloseAnsage()">Schließen</button>`);
 }
 
 function handArea() {
@@ -242,9 +289,8 @@ function handArea() {
     const playable = myTurn && legal.has(c.id);
     return `<div style="margin-left:-6px;${playable ? 'transform:translateY(-8px);' : ''}">${cardFace(c, { playable, dim: myTurn && !playable })}</div>`;
   }).join('');
-  const hint = G.phase === 'play' ? (myTurn ? 'Du bist dran – wähle eine Karte' : (busy ? '…' : 'Warte auf Mitspieler')) : '';
-  return `<div style="padding:6px 10px;border-top:1px solid var(--bdr);background:var(--bg2)">`
-    + `<div style="font-size:11px;color:var(--tx3);margin-bottom:4px">${hint}</div>`
+  const glow = myTurn ? 'box-shadow:inset 0 0 0 2px var(--grn);' : '';
+  return `<div style="padding:8px 10px;border-top:1px solid var(--bdr);background:var(--bg2);${glow}">`
     + `<div style="display:flex;align-items:flex-end;padding-left:6px;overflow-x:auto;min-height:74px">${html}</div></div>`;
 }
 
@@ -275,7 +321,7 @@ function vorbehaltOverlay() {
     body = `<div style="text-align:center;color:var(--tx3);font-size:13px">${G.players[v.order[v.current]].name} überlegt…</div>`;
   }
   return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:6px">Vorbehalt?</div>`
-    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Halte deine Karten? „Gesund" = normales Spiel.</div>`
+    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Halte deine Karten? „Gesund" = normales Spiel. <b>Deine Karten siehst du unten.</b></div>`
     + done + `<div style="margin-top:14px">${body}</div>`);
 }
 
@@ -337,10 +383,11 @@ function render() {
   const autoOn = state.dokoAuto !== false;
   const controls = `<div style="display:flex;gap:8px;align-items:center;justify-content:center;padding:6px 12px;border-top:1px solid var(--bdr)">`
     + (pendingContinue ? `<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="dokoNextTrick()">Nächster Stich ▶</button>` : '')
+    + ansageButton()
     + `<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="dokoToggleAuto()">Auto-Weiter: ${autoOn ? 'an' : 'aus'}</button></div>`;
 
-  c.innerHTML = `<div style="position:relative;height:100%;display:flex;flex-direction:column;overflow:hidden">`
-    + header()
+  // Stage = Overlay-Ziel (oberer Bereich). Hand liegt als Geschwister DARUNTER → von keinem Overlay verdeckt.
+  const stage = `<div style="position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden">`
     + `<div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;overflow-y:auto;background:var(--bg)">`
     + `<div style="display:flex;justify-content:center;padding:10px 8px 0">${opponentBox(2, 'center')}</div>`
     + `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 8px">`
@@ -348,7 +395,14 @@ function render() {
     + `<div style="flex:1">${trickArea()}</div>`
     + `<div>${opponentBox(3, 'flex-end')}</div></div>`
     + `<div></div></div>`
-    + announceBar() + controls + handArea()
-    + vorbehaltOverlay() + resultOverlay()
+    + controls
+    + vorbehaltOverlay() + ansageOverlay() + resultOverlay()
+    + `</div>`;
+
+  c.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;overflow:hidden">`
+    + header()
+    + turnBanner()
+    + stage
+    + (G.phase === 'scoring' ? '' : handArea())
     + `</div>`;
 }
