@@ -897,6 +897,7 @@ export async function submitCreateTurnier(){
     };
     if(turnierName)turnierData.name=turnierName;
     if(ownSpieler)turnierData.createdBy=ownSpieler.id;
+    turnierData.createdByDevice=deviceId; // Fallback-Besitz: erstellendes Geraet kann es auch ohne Profil verwalten
     await dbRef.set(turnierData);
     // Host in hosts-Liste speichern
     if(ownSpieler)await dbRef.child('hosts/'+ownSpieler.id).set(true);
@@ -933,6 +934,7 @@ export async function submitCreateTurnier(){
     save();
     closeCreateTurnier();
     renderTurnierSetup();renderTurnierIndicator();
+    if(!ownSpieler)showToast('Hinweis: Ohne eigenes Profil ist dieses Turnier nur auf diesem Gerät verwaltbar.','info');
     showTurnierShareModal(code);
   }catch(e){
     console.error('createTurnier error:',e);
@@ -2167,7 +2169,7 @@ function emptyTurnierHint(opts){
   if(opts.role==='admin'){
     msg='Es liegen aktuell keine Turniere in der Datenbank.';
   }else if(!opts.ownSpielerId){
-    msg='Auf diesem Gerät ist kein Cloud-Profil hinterlegt – deshalb können keine eigenen Turniere geladen werden. Lege im Turnier-Bereich einen Spieler an. Turniere, an denen du nur teilgenommen hast, findest du unter „Turnier-Archiv".';
+    msg='Hier erscheinen Turniere, die du auf diesem Gerät erstellt hast. Es wurde keins gefunden. Ohne eigenes Cloud-Profil lassen sich Turniere, bei denen du nur Co-Spielleiter bist, nicht zuordnen – lege dafür im Turnier-Bereich einen Spieler an. Reine Teilnahmen findest du unter „Turnier-Archiv".';
   }else{
     msg='Hier erscheinen nur Turniere, die du erstellt hast oder bei denen du Co-Spielleiter bist. Turniere, an denen du nur teilgenommen hast (oder die auf dem Server gelöscht wurden), findest du unter „Turnier-Archiv".';
   }
@@ -2205,8 +2207,11 @@ export function renderTurnierList(turniere,opts){
   if(!el)return;
   let list=turniere.slice();
   if(opts.role!=='admin'){
-    // Eigene Turniere (Ersteller oder Co-Host) – inkl. archivierter, damit sie wiederhergestellt werden können.
-    list=list.filter(t=>opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])));
+    // Eigene Turniere (Ersteller, Co-Host ODER erstellendes Geraet) – inkl. archivierter, damit sie wiederhergestellt werden können.
+    list=list.filter(t=>
+      (opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])))
+      ||(opts.ownDeviceId&&t.createdByDevice===opts.ownDeviceId)
+    );
   }
   if(!list.length){el.innerHTML=emptyTurnierHint(opts);return}
   // Beide Rollen gruppiert: Aktiv / Beendet / Archiviert.
@@ -2316,7 +2321,7 @@ export async function openMyTurniere(){
   html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">„Öffnen / Bearbeiten" wechselt ins Turnier (voller Spielleiter-Zugriff). „Archivieren" nimmt es aus den aktiven Listen – die Daten bleiben erhalten und lassen sich jederzeit wiederherstellen.</div>';
   html+='<div id="turnierListBody"></div>';
   el.innerHTML=html;
-  renderTurnierList(list,{role:'host',ownSpielerId:own?own.id:null,containerId:'turnierListBody'});
+  renderTurnierList(list,{role:'host',ownSpielerId:own?own.id:null,ownDeviceId:getDeviceId(),containerId:'turnierListBody'});
 }
 
 let coHostSelected=[];
