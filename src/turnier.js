@@ -2009,23 +2009,72 @@ export async function showTurnierArchiv(){
   if(!archiv.length){showToast('Keine vergangenen Turniere.','info');return}
   document.getElementById('turnierModal').classList.add('show');
   const el=document.getElementById('turnierModalContent');
+  el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade...</div>';
+  // Serverabgleich: welche archivierten Turniere existieren noch in der Datenbank?
+  // serverCodes=null → Abgleich nicht möglich (offline/kein Firebase) → keine „nur lokal"-Markierung.
+  let serverCodes=null;
+  if(initFirebase()){
+    try{
+      const snap=await firebase.database().ref('turniere').get();
+      serverCodes=new Set(Object.keys(snap.val()||{}).map(k=>k.replace(/^DK/,'')));
+    }catch(e){serverCodes=null}
+  }
+  const localOnly=serverCodes?archiv.filter(a=>!serverCodes.has(a.code)).length:0;
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
     +'<h3 style="margin:0">Turnier-Archiv</h3>'
     +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">Tippe auf ein Turnier um die Ergebnisse zu laden.</div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0;line-height:1.5">Das Archiv liegt nur auf diesem Gerät und zeigt Turniere, an denen du teilgenommen hast. Tippe auf ein Turnier, um die Ergebnisse zu laden.'
+    +(localOnly?' <b>'+localOnly+'</b> davon sind <b>nicht mehr auf dem Server</b> – ihre Ergebnisse lassen sich nicht mehr laden.':'')
+    +'</div>';
+  if(localOnly)
+    html+='<button class="btn btn-secondary" style="width:100%;font-size:12px;margin-bottom:10px" onclick="cleanArchivLocalOnly()">Nicht mehr vorhandene aus dem Archiv entfernen ('+localOnly+')</button>';
   archiv.forEach(a=>{
     const d=new Date(a.date);
     const dateStr=d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
     const role=a.role==='host'?'Spielleiter':'Teilnehmer';
-    html+='<div class="card turnier-tisch-card" style="cursor:pointer" onclick="openArchivTurnier(\''+a.code+'\')">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<div style="font-weight:600;font-size:15px">'+(a.name||'DK-'+a.code)+'</div>'
-      +'<div style="font-size:11px;color:var(--tx3)">'+dateStr+'</div></div>'
+    const onServer=serverCodes?serverCodes.has(a.code):true; // unbekannt → wie vorhanden behandeln
+    const stale=serverCodes&&!onServer;
+    html+='<div class="card turnier-tisch-card" style="cursor:pointer'+(stale?';opacity:.7':'')+'" onclick="openArchivTurnier(\''+a.code+'\')">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<div style="font-weight:600;font-size:15px;min-width:0">'+(a.name||'DK-'+a.code)+'</div>'
+      +'<div style="font-size:11px;color:var(--tx3);flex:0 0 auto">'+dateStr+'</div></div>'
       +(a.name?'<div style="font-size:11px;color:var(--tx3);margin-top:1px">DK-'+a.code+'</div>':'')
-      +'<div style="font-size:12px;color:var(--tx2);margin-top:2px">'+role+'</div></div>';
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px">'
+      +'<div style="font-size:12px;color:var(--tx2)">'+role
+      +(stale?' · <span style="color:var(--red)">nur lokal · nicht mehr auf dem Server</span>':'')+'</div>'
+      +(stale?'<button onclick="event.stopPropagation();removeArchivEntry(\''+a.code+'\')" style="flex:0 0 auto;background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;font-size:11px;padding:4px 8px;border-radius:var(--r-sm)">Entfernen</button>':'')
+      +'</div></div>';
   });
   el.innerHTML=html;
+}
+
+// Einzelnen (lokalen) Archiv-Eintrag entfernen.
+export function removeArchivEntry(code){
+  try{
+    let archiv=JSON.parse(localStorage.getItem('doko-v4-turnierArchiv')||'[]');
+    archiv=archiv.filter(a=>a.code!==code);
+    localStorage.setItem('doko-v4-turnierArchiv',JSON.stringify(archiv));
+  }catch(e){}
+  showToast('Aus Archiv entfernt.','success');
+  if(JSON.parse(localStorage.getItem('doko-v4-turnierArchiv')||'[]').length)showTurnierArchiv();
+  else closeTurnierDashboard();
+}
+
+// Alle Archiv-Einträge entfernen, die es serverseitig nicht mehr gibt.
+export async function cleanArchivLocalOnly(){
+  if(!initFirebase()){showToast('Kein Serverabgleich möglich.','error');return}
+  let serverCodes;
+  try{
+    const snap=await firebase.database().ref('turniere').get();
+    serverCodes=new Set(Object.keys(snap.val()||{}).map(k=>k.replace(/^DK/,'')));
+  }catch(e){showToast('Serverabgleich fehlgeschlagen.','error');return}
+  let archiv=JSON.parse(localStorage.getItem('doko-v4-turnierArchiv')||'[]');
+  const before=archiv.length;
+  archiv=archiv.filter(a=>serverCodes.has(a.code));
+  localStorage.setItem('doko-v4-turnierArchiv',JSON.stringify(archiv));
+  showToast((before-archiv.length)+' Eintrag/Einträge entfernt.','success');
+  if(archiv.length)showTurnierArchiv(); else closeTurnierDashboard();
 }
 
 export async function openArchivTurnier(code){
@@ -2111,6 +2160,20 @@ export function turnierCreatorName(t){
   return s?s.name:id;
 }
 
+// Erklärender Leer-Zustand statt nur „Keine Turniere." – macht klar, warum die Liste leer ist
+// und wo vergangene Teilnahmen (lokales Archiv) zu finden sind.
+function emptyTurnierHint(opts){
+  let msg;
+  if(opts.role==='admin'){
+    msg='Es liegen aktuell keine Turniere in der Datenbank.';
+  }else if(!opts.ownSpielerId){
+    msg='Auf diesem Gerät ist kein Cloud-Profil hinterlegt – deshalb können keine eigenen Turniere geladen werden. Lege im Turnier-Bereich einen Spieler an. Turniere, an denen du nur teilgenommen hast, findest du unter „Turnier-Archiv".';
+  }else{
+    msg='Hier erscheinen nur Turniere, die du erstellt hast oder bei denen du Co-Spielleiter bist. Turniere, an denen du nur teilgenommen hast (oder die auf dem Server gelöscht wurden), findest du unter „Turnier-Archiv".';
+  }
+  return '<div style="font-size:13px;color:var(--tx3);padding:12px 0;line-height:1.5">'+msg+'</div>';
+}
+
 let turnierListOpts=null;
 function turnierRow(t,opts){
   const tableCount=t.tische?Object.keys(t.tische).length:0;
@@ -2145,7 +2208,7 @@ export function renderTurnierList(turniere,opts){
     // Eigene Turniere (Ersteller oder Co-Host) – inkl. archivierter, damit sie wiederhergestellt werden können.
     list=list.filter(t=>opts.ownSpielerId&&(t.createdBy===opts.ownSpielerId||(t.hosts&&t.hosts[opts.ownSpielerId])));
   }
-  if(!list.length){el.innerHTML='<div style="font-size:13px;color:var(--tx3);padding:8px 0">Keine Turniere.</div>';return}
+  if(!list.length){el.innerHTML=emptyTurnierHint(opts);return}
   // Beide Rollen gruppiert: Aktiv / Beendet / Archiviert.
   const groups=[['active','Aktiv'],['ended','Beendet'],['deleted','Archiviert']];
   let h='';
