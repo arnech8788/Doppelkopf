@@ -19,6 +19,7 @@ let showingTrick = null;  // fertiger Stich, der gerade angezeigt wird
 let pendingContinue = null; // Fortsetzung bei „Auto-Weiter" aus
 let vorbExpanded = false; // Vorbehalt-Untermenü offen
 let ansageOpen = false;   // Ansage-Popup offen
+let peekTrick = false;    // „Letzter Stich"-Popup offen
 
 // ── Mount / Persistenz ──
 export function mountGame() { render(); }
@@ -96,6 +97,7 @@ export function playHumanCard(id) {
   afterPlay(res);
 }
 function afterPlay(res) {
+  peekTrick = false;
   persistGame();
   if (res.trickComplete) {
     showingTrick = G.tricks[G.tricks.length - 1];
@@ -144,6 +146,8 @@ export function dokoAnnounce(level) {
 }
 export function dokoOpenAnsage() { if (!G || G.phase !== 'play' || busy || showingTrick) return; ansageOpen = true; render(); }
 export function dokoCloseAnsage() { ansageOpen = false; render(); }
+export function dokoPeekLast() { if (!G || !G.tricks.length || showingTrick) return; peekTrick = true; render(); }
+export function dokoClosePeek() { peekTrick = false; render(); }
 
 // Aktuell regelkonform erlaubte Ansagen des Menschen (idx0).
 const ANN_LABEL = { re: 'Re', kontra: 'Kontra', '90': 'Keine 90', '60': 'Keine 60', '30': 'Keine 30', schwarz: 'Schwarz' };
@@ -267,6 +271,28 @@ function ansageButton() {
   return `<button onclick="dokoOpenAnsage()" ${can ? '' : 'disabled'} style="padding:6px 12px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg3);color:var(--tx2);cursor:${can ? 'pointer' : 'not-allowed'};opacity:${can ? 1 : .4}">📣 Ansage</button>`;
 }
 
+// „Letzter Stich"-Button (nur wenn ein abgeschlossener Stich existiert).
+function peekButton() {
+  if (!G || G.phase !== 'play' || !G.tricks.length || showingTrick) return '';
+  return `<button onclick="dokoPeekLast()" style="padding:6px 12px;font-size:12px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg3);color:var(--tx2);cursor:pointer">🔍 Letzter Stich</button>`;
+}
+
+// Popup mit dem zuletzt abgeschlossenen Stich (Karten, Spieler, Gewinner, Augen).
+function peekOverlay() {
+  if (!peekTrick || !G || !G.tricks.length) return '';
+  const tr = G.tricks[G.tricks.length - 1];
+  const items = tr.cards.map(pc => {
+    const hl = pc.idx === tr.winner;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">`
+      + `<span style="font-size:11px;color:${hl ? 'var(--grn)' : 'var(--tx3)'}">${G.players[pc.idx].name}${hl ? ' ✓' : ''}</span>`
+      + cardFace(pc.card, { highlight: hl }) + `</div>`;
+  }).join('');
+  return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:2px">Letzter Stich (Stich ${G.tricks.length})</div>`
+    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:14px">${G.players[tr.winner].name} gewinnt · ${tr.augen} Augen</div>`
+    + `<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">${items}</div>`
+    + `<button class="btn btn-secondary" style="width:100%" onclick="dokoClosePeek()">Schließen</button>`);
+}
+
 // Ansage-Popup über der Stage (Hand bleibt darunter sichtbar).
 function ansageOverlay() {
   if (!ansageOpen || !G || G.phase !== 'play') return '';
@@ -383,6 +409,7 @@ function render() {
   const autoOn = state.dokoAuto !== false;
   const controls = `<div style="display:flex;gap:8px;align-items:center;justify-content:center;padding:6px 12px;border-top:1px solid var(--bdr)">`
     + (pendingContinue ? `<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="dokoNextTrick()">Nächster Stich ▶</button>` : '')
+    + peekButton()
     + ansageButton()
     + `<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="dokoToggleAuto()">Auto-Weiter: ${autoOn ? 'an' : 'aus'}</button></div>`;
 
@@ -396,7 +423,7 @@ function render() {
     + `<div>${opponentBox(3, 'flex-end')}</div></div>`
     + `<div></div></div>`
     + controls
-    + vorbehaltOverlay() + ansageOverlay() + resultOverlay()
+    + vorbehaltOverlay() + ansageOverlay() + peekOverlay() + resultOverlay()
     + `</div>`;
 
   c.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;overflow:hidden">`
