@@ -1,5 +1,5 @@
 import Chart from 'chart.js/auto';
-import { state, COLORS, getChartColors, showScreen, setViewingArchive, setPrerenderedTabelle, setPrerenderedStats } from './main.js';
+import { state, COLORS, getChartColors, showScreen, setViewingArchive, setPrerenderedTabelle, setPrerenderedStats, renderCollapsibleCard } from './main.js';
 import { showConfirm, ICO } from './ui.js';
 
 export function loadArchive(){
@@ -62,20 +62,20 @@ export function renderArchiveList(){
   if(!el)return;
   const archive=loadArchive();
   if(!archive.length){el.innerHTML='';return}
-  let html='<div class="section-label" style="margin-top:20px">Vergangene Spiele ('+archive.length+')</div>';
+  let body='';
   archive.forEach(g=>{
     const dateStr=formatArchiveDate(g,false);
     const winner=getArchiveWinner(g);
-    html+='<div class="archive-item" onclick="openArchivedGame('+g.id+')">';
-    html+='<div class="archive-item-info">';
-    html+='<div class="archive-item-title">'+dateStr+'</div>';
-    html+='<div class="archive-item-meta">'+g.players.length+' Spieler \u00b7 '+g.rounds.length+' Runden'+(winner!=='\u2013'?' \u00b7 Sieger: '+winner:'')+'</div>';
-    html+='</div>';
-    html+='<button class="archive-item-delete" onclick="event.stopPropagation();deleteArchived('+g.id+')">'+ICO.trash+'</button>';
-    html+='</div>';
+    body+='<div class="archive-item" onclick="openArchivedGame('+g.id+')">';
+    body+='<div class="archive-item-info">';
+    body+='<div class="archive-item-title">'+dateStr+'</div>';
+    body+='<div class="archive-item-meta">'+g.players.length+' Spieler \u00b7 '+g.rounds.length+' Runden'+(winner!=='\u2013'?' \u00b7 Sieger: '+winner:'')+'</div>';
+    body+='</div>';
+    body+='<button class="archive-item-delete" onclick="event.stopPropagation();deleteArchived('+g.id+')">'+ICO.trash+'</button>';
+    body+='</div>';
   });
-  if(archive.length>=2)html+='<button class="btn btn-secondary" style="margin-top:12px;width:100%" onclick="openAllTimeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg> Ewige Tabelle</button>';
-  el.innerHTML=html;
+  if(archive.length>=2)body+='<button class="btn btn-secondary" style="margin-top:4px;width:100%" onclick="openAllTimeModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg> Ewige Tabelle</button>';
+  el.innerHTML=renderCollapsibleCard('mehr','archive','Vergangene Spiele ('+archive.length+')',body);
 }
 
 export async function deleteArchived(id){
