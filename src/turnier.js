@@ -2161,7 +2161,10 @@ export async function loadAllTurniere(){
   try{
     const snap=await firebase.database().ref('turniere').get();
     const data=snap.val()||{};
-    return Object.entries(data).map(([key,t])=>({code:key.replace(/^DK/,''),key,...t}));
+    // Geteilte Einzelspiele (turniere/SG…) sind keine Turniere → herausfiltern.
+    return Object.entries(data)
+      .filter(([key,t])=>!key.startsWith('SG')&&!(t&&t.kind==='sharedGame'))
+      .map(([key,t])=>({code:key.replace(/^DK/,''),key,...t}));
   }catch(e){console.error('loadAllTurniere:',e);return[]}
 }
 
