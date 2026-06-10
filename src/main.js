@@ -124,6 +124,8 @@ export async function getDeviceInfo(){
 // ── Persistenz ──
 export function load(){
   try{const s=localStorage.getItem('doko-v4');if(s){const d=JSON.parse(s);Object.assign(state,d)}}catch(e){}
+  // Abend-Achievements am aktuellen Abend ausrichten (heilt haengengebliebene Badges, ohne Toast).
+  try{eingabe.refreshEveningAchievements({announce:false})}catch(e){}
   renderTurnierIndicator();
   if(getAllPlayers().length>=4)showScreen('eingabe');
   else showScreen('spieler');
@@ -402,7 +404,7 @@ export function renderMehrScreen(){
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.14 · 04.06.2026 22:20</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.15 · 04.06.2026 22:40</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -492,6 +494,7 @@ export async function openInfoModal(){
   // Changelog
   html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
   const log=[
+    {v:'6.15',d:'04.06.2026 22:40',t:'Abend-Achievements (Hot Streak, Comeback Kid, Solist, Unbesiegbar, Pechvogel) beziehen sich jetzt korrekt nur auf den aktuellen Spielabend. Bisher blieben einmal verdiente Abend-Badges dauerhaft hängen (auch nach „Neues Spiel"), wodurch z. B. „Solist" angezeigt wurde, obwohl im laufenden Abend gar keine 3 Soli gespielt wurden. Die Badges werden nun bei jeder Runde frisch aus den aktuellen Runden berechnet und beim Start eines neuen Abends zurückgesetzt; falsch hängengebliebene Badges verschwinden automatisch.'},
     {v:'6.14',d:'04.06.2026 22:20',t:'Turnier-Archiv aufräumbar: Jeder Eintrag hat jetzt einen „Entfernen"-Button, und ganz unten gibt es „Gesamtes Archiv leeren". So lassen sich alte/nur-lokale Einträge jederzeit aufräumen – unabhängig davon, ob ein Server-Abgleich möglich ist. (Die Turnierdaten auf dem Server bleiben unberührt.)'},
     {v:'6.13',d:'04.06.2026 22:00',t:'Turniere ohne Cloud-Profil verwaltbar: Beim Erstellen wird das Turnier jetzt dem Gerät zugeordnet (zusätzlich zum Ersteller-Profil, falls vorhanden). Dadurch erscheint ein selbst erstelltes Turnier unter „Meine Turniere" auch dann, wenn (noch) kein eigenes Profil angelegt wurde. Hinweis beim Erstellen ohne Profil, dass das Turnier dann nur auf diesem Gerät verwaltbar ist.'},
     {v:'6.12',d:'04.06.2026 21:40',t:'Turnier-Verwaltung verständlicher: „Meine Turniere" und die Admin-Liste zeigen jetzt bei leerer Ansicht einen erklärenden Hinweis (z. B. „nur eigene/co-geleitete Turniere" bzw. „kein Cloud-Profil auf diesem Gerät") statt nur „Keine Turniere". Das „Turnier-Archiv" gleicht außerdem mit der Datenbank ab und markiert Einträge, die nur noch lokal vorhanden (auf dem Server gelöscht) sind – diese lassen sich einzeln oder gesammelt aus dem Archiv entfernen.'},

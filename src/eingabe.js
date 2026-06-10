@@ -259,75 +259,83 @@ export function confirmSoloType(){
 export function skipSoloType(){if(pendingRound)finalizeRound(pendingRound);document.getElementById('soloModal').classList.remove('show');setPendingRound(null)}
 document.getElementById('soloModal').addEventListener('click',function(e){if(e.target===this)skipSoloType()});
 
-export function checkRoundAchievements(round){
+// Berechnet die Abend-Achievements eines Spielers FRISCH aus den aktuellen Runden.
+// Gibt das Set der erfuellten Badge-IDs zurueck (keine Seiteneffekte auf state).
+function computeEveningBadges(p,rounds,all){
+  const earned=[];
+  const playerRounds=rounds.filter(r=>r.playing.includes(p));
+  // hotStreak: 5 Siege in Folge (pausierte Runden ignorieren)
+  {let streak=0,maxStreak=0;
+    playerRounds.forEach(r=>{if(r.winners.includes(p)){streak++;if(streak>maxStreak)maxStreak=streak}else{streak=0}});
+    if(maxStreak>=5)earned.push('hotStreak');}
+  // pechvogel: 5 Niederlagen in Folge
+  {let streak=0,maxStreak=0;
+    playerRounds.forEach(r=>{if(!r.winners.includes(p)){streak++;if(streak>maxStreak)maxStreak=streak}else{streak=0}});
+    if(maxStreak>=5)earned.push('pechvogel');}
+  // solist: 3 Soli an einem Abend
+  {let soloCount=0;
+    rounds.forEach(r=>{
+      if(!r.solo||!r.playing.includes(p))return;
+      let solist=null;
+      if(r.winners.length===1)solist=r.winners[0];
+      else if(r.winners.length===3)solist=r.playing.find(x=>!r.winners.includes(x));
+      if(p===solist)soloCount++;
+    });
+    if(soloCount>=3)earned.push('solist');}
+  // unbesiegbar: Keine Niederlage, mind. 5 Spiele
+  if(playerRounds.length>=5&&!playerRounds.some(r=>!r.winners.includes(p)))earned.push('unbesiegbar');
+  // comebackKid: Von letztem Platz auf Platz 1
+  if(rounds.length>=2){
+    const totals={};all.forEach(x=>totals[x]=0);
+    let wasLast=false;
+    rounds.forEach((r,i)=>{
+      all.forEach(x=>totals[x]+=(r.scores[x]||0));
+      const active=all.filter(x=>rounds.slice(0,i+1).some(rr=>rr.playing.includes(x)));
+      if(active.length<2)return;
+      const sorted=active.slice().sort((a,b)=>totals[a]-totals[b]);
+      if(sorted[0]===p&&totals[p]<totals[sorted[sorted.length-1]])wasLast=true;
+    });
+    if(wasLast){
+      const finalTotals={};all.forEach(x=>finalTotals[x]=0);
+      rounds.forEach(r=>all.forEach(x=>finalTotals[x]+=(r.scores[x]||0)));
+      const activeFinal=all.filter(x=>rounds.some(r=>r.playing.includes(x)));
+      const sortedFinal=activeFinal.slice().sort((a,b)=>finalTotals[b]-finalTotals[a]);
+      if(sortedFinal[0]===p)earned.push('comebackKid');
+    }
+  }
+  return earned;
+}
+
+// Abend-Achievements autoritativ aus state.rounds neu berechnen und state.achievements
+// ueberschreiben. Toast/Konfetti nur fuer NEU hinzugekommene Badges (opts.announce!==false).
+// So bleiben die Badges immer am aktuellen Abend ausgerichtet und haengengebliebene Badges
+// aus frueheren Abenden (z.B. nach „Neues Spiel") heilen sich von selbst.
+export function refreshEveningAchievements(opts){
+  opts=opts||{};
   if(!state.achievements)state.achievements={};
   const all=getHistoricalPlayers();
   const rounds=state.rounds;
   const newAchievements=[];
+  const fresh={};
   all.forEach(p=>{
-    if(!state.achievements[p])state.achievements[p]=[];
-    const playerRounds=rounds.filter(r=>r.playing.includes(p));
-    // hotStreak: 5 Siege in Folge (pausierte Runden ignorieren)
-    if(!state.achievements[p].includes('hotStreak')){
-      let streak=0,maxStreak=0;
-      playerRounds.forEach(r=>{
-        if(r.winners.includes(p)){streak++;if(streak>maxStreak)maxStreak=streak}else{streak=0}
-      });
-      if(maxStreak>=5){state.achievements[p].push('hotStreak');newAchievements.push({player:p,id:'hotStreak'})}
-    }
-    // pechvogel: 5 Niederlagen in Folge
-    if(!state.achievements[p].includes('pechvogel')){
-      let streak=0,maxStreak=0;
-      playerRounds.forEach(r=>{
-        if(!r.winners.includes(p)){streak++;if(streak>maxStreak)maxStreak=streak}else{streak=0}
-      });
-      if(maxStreak>=5){state.achievements[p].push('pechvogel');newAchievements.push({player:p,id:'pechvogel'})}
-    }
-    // solist: 3 Soli an einem Abend
-    if(!state.achievements[p].includes('solist')){
-      let soloCount=0;
-      rounds.forEach(r=>{
-        if(!r.solo||!r.playing.includes(p))return;
-        let solist=null;
-        if(r.winners.length===1)solist=r.winners[0];
-        else if(r.winners.length===3)solist=r.playing.find(x=>!r.winners.includes(x));
-        if(p===solist)soloCount++;
-      });
-      if(soloCount>=3){state.achievements[p].push('solist');newAchievements.push({player:p,id:'solist'})}
-    }
-    // unbesiegbar: Keine Niederlage, mind. 5 Spiele
-    if(!state.achievements[p].includes('unbesiegbar')&&playerRounds.length>=5){
-      const hasLoss=playerRounds.some(r=>!r.winners.includes(p));
-      if(!hasLoss){state.achievements[p].push('unbesiegbar');newAchievements.push({player:p,id:'unbesiegbar'})}
-    }
-    // comebackKid: Von letztem Platz auf Platz 1
-    if(!state.achievements[p].includes('comebackKid')&&rounds.length>=2){
-      const totals={};all.forEach(x=>totals[x]=0);
-      let wasLast=false;
-      rounds.forEach((r,i)=>{
-        all.forEach(x=>totals[x]+=(r.scores[x]||0));
-        const active=all.filter(x=>rounds.slice(0,i+1).some(rr=>rr.playing.includes(x)));
-        if(active.length<2)return;
-        const sorted=active.slice().sort((a,b)=>totals[a]-totals[b]);
-        if(sorted[0]===p&&totals[p]<totals[sorted[sorted.length-1]])wasLast=true;
-      });
-      if(wasLast){
-        const finalTotals={};all.forEach(x=>finalTotals[x]=0);
-        rounds.forEach(r=>all.forEach(x=>finalTotals[x]+=(r.scores[x]||0)));
-        const activeFinal=all.filter(x=>rounds.some(r=>r.playing.includes(x)));
-        const sortedFinal=activeFinal.slice().sort((a,b)=>finalTotals[b]-finalTotals[a]);
-        if(sortedFinal[0]===p){state.achievements[p].push('comebackKid');newAchievements.push({player:p,id:'comebackKid'})}
-      }
-    }
+    const before=state.achievements[p]||[];
+    const earned=computeEveningBadges(p,rounds,all);
+    if(earned.length)fresh[p]=earned;
+    earned.forEach(id=>{if(!before.includes(id))newAchievements.push({player:p,id})});
   });
-  // Announce new achievements
-  newAchievements.forEach(a=>{
-    const def=ACHIEVEMENTS.evening[a.id];
-    showToast(def.emoji+' '+a.player+': '+def.name+'!','info');
-    setTimeout(launchMiniConfetti,300);
-  });
+  state.achievements=fresh;
+  if(opts.announce!==false){
+    newAchievements.forEach(a=>{
+      const def=ACHIEVEMENTS.evening[a.id];
+      showToast(def.emoji+' '+a.player+': '+def.name+'!','info');
+      setTimeout(launchMiniConfetti,300);
+    });
+  }
   save();
 }
+
+// Beibehaltener Name fuer den Aufruf nach jeder Runde.
+export function checkRoundAchievements(round){ refreshEveningAchievements(); }
 
 export function loadSeasonAchievements(){
   try{const s=localStorage.getItem('doko-v4-achievements');return s?JSON.parse(s):{}}catch(e){return{}}
@@ -642,6 +650,7 @@ export async function endGame(){
   archiveCurrentGame();
   checkSeasonAchievements();
   state.rounds=[];
+  state.achievements={}; // Abend-Achievements gehoeren zum beendeten Abend
   state.bockQueue=0;
   state.gameStartTime=null;
   state.kursleiterCupSeen=false;

@@ -187,6 +187,7 @@ export async function startNewGame(){
   archiveCurrentGame();
   checkSeasonAchievements();
   state.rounds=[];
+  state.achievements={}; // Abend-Achievements gehoeren zum vorigen Abend
   state.bockQueue=0;
   state.gameStartTime=null;
   state.kursleiterCupSeen=false;
