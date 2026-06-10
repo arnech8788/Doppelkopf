@@ -400,11 +400,14 @@ export function renderMehrScreen(){
   let html='';
   html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+='<div id="archiveList"></div>';
-  html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info &amp; Changelog</div><div style="font-size:11px;color:var(--tx3)">Anleitung, Feedback, Versionshistorie</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openInfoModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><div><div style="font-weight:500">Info</div><div style="font-size:11px;color:var(--tx3)">So funktioniert die App</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openCalcHelpModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div><div style="font-weight:500">Punkte zählen</div><div style="font-size:11px;color:var(--tx3)">Wie beim Doppelkopf gezählt wird</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openFeedbackModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg><div><div style="font-weight:500">Feedback &amp; Bugs</div><div style="font-size:11px;color:var(--tx3)">Rückmeldung senden</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.16</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.15 · 04.06.2026 22:40</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.16 · 10.06.2026 13:00</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -475,32 +478,38 @@ export async function openInfoModal(){
     html+='</div>';
   }
 
-  // Punkte zählen Hinweis
-  html+='<div class="section-label" style="margin-top:16px">Punkte zählen</div>';
-  html+='<div class="card" style="font-size:12px;color:var(--tx2);line-height:1.6">';
-  html+='Eine ausführliche Erklärung wie Punkte beim Doppelkopf gezählt werden, findest du über den <strong>?-Button</strong> neben "Punkte zählen" in der Eingabe.';
-  html+='<button class="btn btn-secondary" style="margin-top:10px" onclick="closeInfoModal();openCalcHelpModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Punktezählung anzeigen</button>';
-  html+='</div>';
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeInfoModal()">Schließen</button>';
+  document.getElementById('infoModalContent').innerHTML=html;
+  document.getElementById('infoModal').classList.add('show');
+}
 
-  // Feedback
+// Feedback als eigener Menüpunkt.
+export async function openFeedbackModal(){
   const devInfo=await getDeviceInfo();
   const deviceShort=(devInfo.model?devInfo.model+' · ':'')+devInfo.os+' · '+devInfo.browser;
-  html+='<div class="section-label" style="margin-top:16px">Feedback & Bugs</div>';
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Feedback &amp; Bugs</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div style="margin-bottom:4px;font-size:11px;color:var(--tx3)">Dein Gerät (optional anpassen)</div>';
   html+='<input type="text" id="feedbackDevice" value="'+deviceShort.replace(/"/g,'&quot;')+'" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;margin-bottom:10px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg);color:var(--tx)">';
   html+='<a id="feedbackMailBtn" href="#" class="btn btn-secondary" style="text-decoration:none;margin-bottom:4px" onclick="sendFeedbackMail(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg> Feedback senden</a>';
   html+='<div style="font-size:10px;color:var(--tx3);text-align:center;margin-top:2px">Geräteinfos und App-Version werden automatisch angehängt</div>';
+  html+='<button class="btn btn-secondary" style="margin-top:16px;position:sticky;bottom:0" onclick="closeInfoModal()">Schließen</button>';
+  document.getElementById('infoModalContent').innerHTML=html;
+  document.getElementById('infoModal').classList.add('show');
+}
 
-  // Changelog
-  html+='<div class="section-label" style="margin-top:16px">Changelog</div><div class="card" style="max-height:200px;overflow-y:auto">';
+// Changelog als eigener Menüpunkt (neueste oben).
+export function openChangelogModal(){
+  let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Changelog</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+  html+='<div class="card">';
   const log=[
-    {v:'6.15',d:'04.06.2026 22:40',t:'Abend-Achievements (Hot Streak, Comeback Kid, Solist, Unbesiegbar, Pechvogel) beziehen sich jetzt korrekt nur auf den aktuellen Spielabend. Bisher blieben einmal verdiente Abend-Badges dauerhaft hängen (auch nach „Neues Spiel"), wodurch z. B. „Solist" angezeigt wurde, obwohl im laufenden Abend gar keine 3 Soli gespielt wurden. Die Badges werden nun bei jeder Runde frisch aus den aktuellen Runden berechnet und beim Start eines neuen Abends zurückgesetzt; falsch hängengebliebene Badges verschwinden automatisch.'},
-    {v:'6.14',d:'04.06.2026 22:20',t:'Turnier-Archiv aufräumbar: Jeder Eintrag hat jetzt einen „Entfernen"-Button, und ganz unten gibt es „Gesamtes Archiv leeren". So lassen sich alte/nur-lokale Einträge jederzeit aufräumen – unabhängig davon, ob ein Server-Abgleich möglich ist. (Die Turnierdaten auf dem Server bleiben unberührt.)'},
-    {v:'6.13',d:'04.06.2026 22:00',t:'Turniere ohne Cloud-Profil verwaltbar: Beim Erstellen wird das Turnier jetzt dem Gerät zugeordnet (zusätzlich zum Ersteller-Profil, falls vorhanden). Dadurch erscheint ein selbst erstelltes Turnier unter „Meine Turniere" auch dann, wenn (noch) kein eigenes Profil angelegt wurde. Hinweis beim Erstellen ohne Profil, dass das Turnier dann nur auf diesem Gerät verwaltbar ist.'},
-    {v:'6.12',d:'04.06.2026 21:40',t:'Turnier-Verwaltung verständlicher: „Meine Turniere" und die Admin-Liste zeigen jetzt bei leerer Ansicht einen erklärenden Hinweis (z. B. „nur eigene/co-geleitete Turniere" bzw. „kein Cloud-Profil auf diesem Gerät") statt nur „Keine Turniere". Das „Turnier-Archiv" gleicht außerdem mit der Datenbank ab und markiert Einträge, die nur noch lokal vorhanden (auf dem Server gelöscht) sind – diese lassen sich einzeln oder gesammelt aus dem Archiv entfernen.'},
-    {v:'6.11',d:'04.06.2026 21:20',t:'Doppelkopf-Spiel (Admins): Letzten Stich auf Abruf einsehen. Während des Spiels gibt es jetzt einen „🔍 Letzter Stich"-Button, der den zuletzt abgeschlossenen Stich noch einmal zeigt (welche Karte von wem, Gewinner und Augenzahl). Schließt sich automatisch, sobald die nächste Karte gespielt wird.'},
-    {v:'6.10',d:'04.06.2026 21:00',t:'Doppelkopf-Spiel (Admins): Bedienung übersichtlicher. Beim Vorbehalt/Solo bleiben deine Karten jetzt sichtbar (Popup verdeckt die Hand nicht mehr). Ein deutlicher Banner zeigt, wer dran ist bzw. wann du dran bist, samt Hervorhebung des aktiven Spielers und deiner Hand. Ansagen (Re/Kontra/Keine 90 …) laufen jetzt über einen „Ansage"-Button, der ein Popup mit den gerade erlaubten Ansagen öffnet.'},
-    {v:'6.9',d:'04.06.2026 20:30',t:'NEU (nur für Admins): Doppelkopf gegen den Computer! Über „Mehr → Doppelkopf spielen" startet ein echtes Kartenspiel gegen drei KI-Gegner – mit voller Trumpf-Ordnung, Bedienpflicht, Stichen, Vorbehalt/Solo/Hochzeit, Re/Kontra & Absagen sowie automatischer Wertung (Doppelkopf/Fuchs/Karlchen). Spielstand wird gespeichert und kann fortgesetzt werden. Erste Version – Feedback willkommen.'},
+    {v:'6.16',d:'10.06.2026 13:00',t:'„Mehr" aufgeräumt: Info, Punkte zählen, Feedback und Changelog sind jetzt eigene Menüpunkte (vorher in einem gemeinsamen Modal zusammengefasst). Changelog-Datumsangaben korrigiert.'},
+    {v:'6.15',d:'10.06.2026 12:20',t:'Abend-Achievements (Hot Streak, Comeback Kid, Solist, Unbesiegbar, Pechvogel) beziehen sich jetzt korrekt nur auf den aktuellen Spielabend. Bisher blieben einmal verdiente Abend-Badges dauerhaft hängen (auch nach „Neues Spiel"), wodurch z. B. „Solist" angezeigt wurde, obwohl im laufenden Abend gar keine 3 Soli gespielt wurden. Die Badges werden nun bei jeder Runde frisch aus den aktuellen Runden berechnet und beim Start eines neuen Abends zurückgesetzt; falsch hängengebliebene Badges verschwinden automatisch.'},
+    {v:'6.14',d:'10.06.2026 11:45',t:'Turnier-Archiv aufräumbar: Jeder Eintrag hat jetzt einen „Entfernen"-Button, und ganz unten gibt es „Gesamtes Archiv leeren". So lassen sich alte/nur-lokale Einträge jederzeit aufräumen – unabhängig davon, ob ein Server-Abgleich möglich ist. (Die Turnierdaten auf dem Server bleiben unberührt.)'},
+    {v:'6.13',d:'10.06.2026 11:15',t:'Turniere ohne Cloud-Profil verwaltbar: Beim Erstellen wird das Turnier jetzt dem Gerät zugeordnet (zusätzlich zum Ersteller-Profil, falls vorhanden). Dadurch erscheint ein selbst erstelltes Turnier unter „Meine Turniere" auch dann, wenn (noch) kein eigenes Profil angelegt wurde. Hinweis beim Erstellen ohne Profil, dass das Turnier dann nur auf diesem Gerät verwaltbar ist.'},
+    {v:'6.12',d:'10.06.2026 10:45',t:'Turnier-Verwaltung verständlicher: „Meine Turniere" und die Admin-Liste zeigen jetzt bei leerer Ansicht einen erklärenden Hinweis (z. B. „nur eigene/co-geleitete Turniere" bzw. „kein Cloud-Profil auf diesem Gerät") statt nur „Keine Turniere". Das „Turnier-Archiv" gleicht außerdem mit der Datenbank ab und markiert Einträge, die nur noch lokal vorhanden (auf dem Server gelöscht) sind – diese lassen sich einzeln oder gesammelt aus dem Archiv entfernen.'},
+    {v:'6.11',d:'10.06.2026 10:20',t:'Doppelkopf-Spiel (Admins): Letzten Stich auf Abruf einsehen. Während des Spiels gibt es jetzt einen „🔍 Letzter Stich"-Button, der den zuletzt abgeschlossenen Stich noch einmal zeigt (welche Karte von wem, Gewinner und Augenzahl). Schließt sich automatisch, sobald die nächste Karte gespielt wird.'},
+    {v:'6.10',d:'10.06.2026 09:55',t:'Doppelkopf-Spiel (Admins): Bedienung übersichtlicher. Beim Vorbehalt/Solo bleiben deine Karten jetzt sichtbar (Popup verdeckt die Hand nicht mehr). Ein deutlicher Banner zeigt, wer dran ist bzw. wann du dran bist, samt Hervorhebung des aktiven Spielers und deiner Hand. Ansagen (Re/Kontra/Keine 90 …) laufen jetzt über einen „Ansage"-Button, der ein Popup mit den gerade erlaubten Ansagen öffnet.'},
+    {v:'6.9',d:'10.06.2026 09:30',t:'NEU (nur für Admins): Doppelkopf gegen den Computer! Über „Mehr → Doppelkopf spielen" startet ein echtes Kartenspiel gegen drei KI-Gegner – mit voller Trumpf-Ordnung, Bedienpflicht, Stichen, Vorbehalt/Solo/Hochzeit, Re/Kontra & Absagen sowie automatischer Wertung (Doppelkopf/Fuchs/Karlchen). Spielstand wird gespeichert und kann fortgesetzt werden. Erste Version – Feedback willkommen.'},
     {v:'6.8',d:'04.06.2026 20:11',t:'Turnier-Verwaltung verfeinert: „Ausblenden" heißt jetzt „Archivieren" und ist reversibel – Ersteller (und Admins) können ihre archivierten Turniere selbst wieder herstellen. „Meine Turniere" und die Admin-Ansicht zeigen Turniere gruppiert nach Aktiv/Beendet/Archiviert; „Öffnen / Bearbeiten" gibt vollen Spielleiter-Zugriff. Admins können weiterhin alle Turniere bearbeiten und endgültig löschen.'},
     {v:'6.7',d:'01.06.2026 13:00',t:'Eingabe: Mehrere Spieler lassen sich jetzt gleichzeitig mit mehreren Fingern markieren (Multi-Touch). Vorher reagierte beim gleichzeitigen Drücken zweier Spieler nur einer.'},
     {v:'6.6',d:'01.06.2026 12:00',t:'Neue Hintergrundfarbe frei wählbar (Mehr → Darstellung): Wähle aus dezenten Vorlagen oder per Farbwähler eine eigene Hintergrundfarbe – die Flächen (Seite, Karten, Felder) werden stimmig abgestuft und die Textfarbe passt sich automatisch an, damit alles lesbar bleibt. Die Akzentfarbe lässt sich weiterhin unabhängig einstellen; „Standard" setzt auf das Theme zurück.'},
@@ -934,7 +943,7 @@ Object.assign(window,
     showToast, hideToast, showConfirm, showPrompt, launchConfetti, launchMiniConfetti,
     showScreen, shareCurrentScreen, toggleTheme, getChartColors, openSettings, closeSettings, renderMehrScreen,
     applyAccent, setAccent, applyBg, setBg,
-    openInfoModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
+    openInfoModal, openChangelogModal, openFeedbackModal, closeInfoModal, sendFeedbackMail, handleVersionTap,
     openDebugModal, closeDebugModal, copyStateJSON, toggleStateImport, importState,
     renderAll, applyUpdate, checkForUpdate, toggleCollapse
   },
