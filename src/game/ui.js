@@ -2,7 +2,7 @@
 import * as E from './engine.js';
 import * as AI from './ai.js';
 import { state, save } from '../main.js';
-import { showConfirm, launchConfetti, ICO } from '../ui.js';
+import { showConfirm, launchConfetti, ICO, showToast } from '../ui.js';
 
 const AI_DELAY = 750;     // KI-Bedenkzeit pro Karte
 const TRICK_PAUSE = 1100; // Anzeige eines fertigen Stichs
@@ -20,6 +20,7 @@ let pendingContinue = null; // Fortsetzung bei „Auto-Weiter" aus
 let vorbExpanded = false; // Vorbehalt-Untermenü offen
 let ansageOpen = false;   // Ansage-Popup offen
 let peekTrick = false;    // „Letzter Stich"-Popup offen
+let debugOpen = false;    // Debug-/Bot-Feedback-Panel offen
 
 // ── Mount / Persistenz ──
 export function mountGame() { render(); }
@@ -148,6 +149,23 @@ export function dokoOpenAnsage() { if (!G || G.phase !== 'play' || busy || showi
 export function dokoCloseAnsage() { ansageOpen = false; render(); }
 export function dokoPeekLast() { if (!G || !G.tricks.length || showingTrick) return; peekTrick = true; render(); }
 export function dokoClosePeek() { peekTrick = false; render(); }
+export function dokoOpenDebug() { if (!G) return; debugOpen = true; render(); }
+export function dokoCloseDebug() { debugOpen = false; render(); }
+export function dokoCopyDebug() {
+  const ta = document.getElementById('dokoDebugNote');
+  const note = ta ? ta.value.trim() : '';
+  const text = buildDebugReport(note);
+  const ok = () => showToast('Debug kopiert – im Claude-Chat einfügen.', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(() => { fallbackCopy(text); ok(); });
+  } else { fallbackCopy(text); ok(); }
+}
+function fallbackCopy(text) {
+  const tx = document.createElement('textarea');
+  tx.value = text; document.body.appendChild(tx); tx.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(tx);
+}
 
 // Aktuell regelkonform erlaubte Ansagen des Menschen (idx0).
 const ANN_LABEL = { re: 'Re', kontra: 'Kontra', '90': 'Keine 90', '60': 'Keine 60', '30': 'Keine 30', schwarz: 'Schwarz' };
@@ -417,6 +435,7 @@ function resultOverlay() {
     + `<div style="font-size:13px;color:var(--tx2);margin-bottom:10px">${win} gewinnt · ${r.augenRe} : ${r.augenKontra} Augen · Wert ${r.value}</div>`
     + `<div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px 10px;margin-bottom:10px">${scoreRows}</div>`
     + `<div style="margin-bottom:12px">${bd}</div>`
+    + `<button class="btn btn-secondary" style="width:100%;margin-bottom:6px" onclick="dokoOpenDebug()">🐞 Spielstand/Feedback kopieren</button>`
     + `<button class="btn btn-primary" style="width:100%" onclick="dokoNewGame()">Neues Spiel</button>`
     + `<button class="btn btn-secondary" style="width:100%;margin-top:6px" onclick="closeDokoGame()">Schließen</button>`);
 }
@@ -424,6 +443,76 @@ function resultOverlay() {
 function overlay(inner) {
   return `<div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10">`
     + `<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:var(--r);padding:18px;max-width:360px;width:100%;max-height:90%;overflow-y:auto">${inner}</div></div>`;
+}
+
+// ── Debug-/Bot-Feedback-Export ──
+function pName(g, idx) { return (g.players && g.players[idx]) ? g.players[idx].name : ('P' + idx); }
+function escDbg(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// Menschenlesbares Protokoll der Partie (für mich/Claude und zum Drüberlesen).
+function buildReadableLog(g) {
+  const L = [];
+  let typeStr = E.gameTypeLabel(g);
+  if (g.gameType === 'solo' && g.soloist != null) typeStr += ' (Solist: ' + pName(g, g.soloist) + ')';
+  if (g.gameType === 'hochzeit' && g.hochzeit) typeStr += ' (Braut: ' + pName(g, g.hochzeit.brideIdx) + (g.hochzeit.partnerIdx != null ? ', Partner: ' + pName(g, g.hochzeit.partnerIdx) : '') + ')';
+  L.push('Spieltyp: ' + typeStr);
+  L.push('Geber: ' + pName(g, g.dealer) + ' · Vorhand: ' + pName(g, g.forehand) + ' · Karten: ' + (g.mitNeunen ? 48 : 40) + ' · Seed: ' + g.seed);
+  L.push('Phase: ' + g.phase + ' · Stich ' + Math.min(g.trickIndex + 1, g.handSize) + '/' + g.handSize);
+  if (g.vorbehalt && g.vorbehalt.declarations) {
+    const ds = Object.keys(g.vorbehalt.declarations).map(k => { const d = g.vorbehalt.declarations[k]; return pName(g, +k) + ': ' + d.type + (d.soloType ? '/' + d.soloType : ''); });
+    if (ds.length) L.push('Vorbehalt: ' + ds.join(' · '));
+  }
+  const a = g.announcements || {};
+  const ann = [];
+  if (a.re) ann.push('Re von ' + pName(g, a.re.by) + ' (@' + a.re.at + ')');
+  if (a.kontra) ann.push('Kontra von ' + pName(g, a.kontra.by) + ' (@' + a.kontra.at + ')');
+  (a.absagen || []).forEach(ab => ann.push((ab.level === 'schwarz' ? 'Schwarz' : 'Keine ' + ab.level) + ' (' + ab.party + ') von ' + pName(g, ab.by) + ' (@' + ab.at + ')'));
+  if (ann.length) L.push('Ansagen: ' + ann.join(' · '));
+  L.push('');
+  L.push('Stiche:');
+  (g.tricks || []).forEach((tr, i) => {
+    const seq = tr.cards.map(c => pName(g, c.idx) + ' ' + E.cardLabel(c.card)).join(', ');
+    L.push('  ' + (i + 1) + '. ' + seq + '  → ' + pName(g, tr.winner) + ' (' + tr.augen + ')');
+  });
+  if (g.trick && g.trick.cards && g.trick.cards.length) {
+    L.push('  (laufend) ' + g.trick.cards.map(c => pName(g, c.idx) + ' ' + E.cardLabel(c.card)).join(', '));
+  }
+  L.push('');
+  L.push('Aktuelle Hände:');
+  (g.players || []).forEach(p => { L.push('  ' + p.name + ': ' + p.hand.map(id => E.cardLabel(E.cardFromId(id))).join(' ')); });
+  if (g.phase === 'scoring' && g.result) {
+    const r = g.result;
+    L.push('');
+    L.push('Ergebnis: ' + (r.winner === 're' ? 'Re' : 'Kontra') + ' gewinnt · ' + r.augenRe + ':' + r.augenKontra + ' · Wert ' + r.value);
+    if (r.breakdown) L.push('  ' + r.breakdown.join(' | '));
+    if (r.perPlayer) L.push('  ' + [0, 1, 2, 3].map(i => pName(g, i) + ' ' + (r.perPlayer[i] >= 0 ? '+' : '') + r.perPlayer[i]).join(' · '));
+  }
+  return L.join('\n');
+}
+
+// Voller Export: Notiz + lesbares Protokoll + JSON (für exakten Replay).
+function buildDebugReport(note) {
+  const ver = (document.getElementById('versionLabel') || {}).textContent || '';
+  const L = ['=== Doppelkopf Bot-Debug ==='];
+  if (note) { L.push('NOTIZ: ' + note); }
+  L.push('App: ' + ver.trim() + ' · Zeit: ' + new Date().toISOString());
+  L.push('');
+  L.push(buildReadableLog(G));
+  L.push('');
+  L.push('--- JSON (exakter Replay-Stand) ---');
+  L.push(JSON.stringify({ game: G, totals: state.dokoTotals || null }));
+  return L.join('\n');
+}
+
+function debugOverlay() {
+  if (!debugOpen || !G) return '';
+  return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:6px">🐞 Debug / Bot-Feedback</div>`
+    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:8px">Beschreibe kurz den Zug, der dir auffällt (z. B. „Stich 4: Max hätte das Ass nicht abwerfen sollen"). Dann <b>Kopieren</b> und im Claude-Chat einfügen.</div>`
+    + `<textarea id="dokoDebugNote" rows="3" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;margin-bottom:10px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg);color:var(--tx)" placeholder="Was ist dir aufgefallen?"></textarea>`
+    + `<div style="font-size:11px;color:var(--tx3);margin-bottom:4px">Vorschau (Protokoll · JSON wird zusätzlich mitkopiert):</div>`
+    + `<pre style="font-size:10px;white-space:pre-wrap;word-break:break-word;background:var(--bg3);border-radius:var(--r-sm);padding:8px;max-height:160px;overflow:auto;margin:0 0 12px">${escDbg(buildReadableLog(G))}</pre>`
+    + `<button class="btn btn-primary" style="width:100%" onclick="dokoCopyDebug()">📋 Kopieren</button>`
+    + `<button class="btn btn-secondary" style="width:100%;margin-top:6px" onclick="dokoCloseDebug()">Schließen</button>`);
 }
 
 function startScreen() {
@@ -457,7 +546,8 @@ function render() {
     + (pendingContinue ? `<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="dokoNextTrick()">Nächster Stich ▶</button>` : '')
     + peekButton()
     + ansageButton()
-    + `<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="dokoToggleAuto()">Auto-Weiter: ${autoOn ? 'an' : 'aus'}</button></div>`;
+    + `<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="dokoToggleAuto()">Auto-Weiter: ${autoOn ? 'an' : 'aus'}</button>`
+    + `<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px" onclick="dokoOpenDebug()" title="Debug / Bot-Feedback">🐞</button></div>`;
 
   // Stage = Overlay-Ziel (oberer Bereich). Hand liegt als Geschwister DARUNTER → von keinem Overlay verdeckt.
   const stage = `<div style="position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden">`
@@ -469,7 +559,7 @@ function render() {
     + `<div>${opponentBox(3, 'flex-end')}</div></div>`
     + `<div></div></div>`
     + controls
-    + vorbehaltOverlay() + ansageOverlay() + peekOverlay() + resultOverlay()
+    + vorbehaltOverlay() + ansageOverlay() + peekOverlay() + resultOverlay() + debugOverlay()
     + `</div>`;
 
   c.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;overflow:hidden">`
