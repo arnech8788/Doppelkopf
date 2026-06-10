@@ -208,7 +208,51 @@ function annBadge(idx) {
   const a = G.announcements; let h = '';
   if (a.re && a.re.by === idx) h += ' <span style="font-size:10px;color:var(--grn);font-weight:700">Re!</span>';
   if (a.kontra && a.kontra.by === idx) h += ' <span style="font-size:10px;color:var(--red);font-weight:700">Kontra!</span>';
+  if (a.absagen) {
+    const L = { '90': 'Keine 90', '60': 'Keine 60', '30': 'Keine 30', 'schwarz': 'Schwarz' };
+    a.absagen.filter(x => x.by === idx).forEach(x => {
+      const col = x.party === 're' ? 'var(--grn)' : 'var(--red)';
+      h += ` <span style="font-size:10px;color:${col};font-weight:700">${L[x.level] || x.level}!</span>`;
+    });
+  }
   return h;
+}
+// Anzahl gewonnener Stiche eines Spielers im laufenden Spiel.
+function tricksWon(idx) {
+  let n = 0;
+  if (G && G.tricks) for (const t of G.tricks) if (t.winner === idx) n++;
+  return n;
+}
+// Name des Ansagers eines Solos/einer Hochzeit (für die Kopfzeile).
+function gameTypeActor() {
+  if (!G) return '';
+  if (G.gameType === 'solo' && G.soloist != null) return G.players[G.soloist].name;
+  if (G.gameType === 'hochzeit' && G.hochzeit) return G.players[G.hochzeit.brideIdx].name;
+  return '';
+}
+// Hochzeit-Status: Suche / geklärt durch welchen Stich (Fehl/Trumpf) / hängen gelassen.
+function hochzeitBanner() {
+  if (!G || G.gameType !== 'hochzeit' || !G.hochzeit) return '';
+  const h = G.hochzeit;
+  const bride = G.players[h.brideIdx].name;
+  let text;
+  if (!h.clarified) {
+    text = `💍 Hochzeit von ${bride} · Partner wird gesucht (bis Stich 3)`;
+  } else if (h.partnerIdx == null) {
+    text = `💍 Hochzeit hängen gelassen → Stilles Solo von ${bride}`;
+  } else {
+    const partner = G.players[h.partnerIdx].name;
+    const ct = G.tricks.find(t => t.winner === h.partnerIdx);
+    let info = '';
+    if (ct) {
+      const n = G.tricks.indexOf(ct) + 1;
+      const lead = ct.cards.find(c => c.idx === ct.leadIdx);
+      const isT = lead ? E.isTrump(lead.card, E.trumpCtx(G)) : false;
+      info = ` · geklärt durch Stich ${n} (${isT ? 'Trumpf-Stich' : 'Fehl-Stich'})`;
+    }
+    text = `💍 Hochzeit: ${bride} + ${partner}${info}`;
+  }
+  return `<div style="padding:6px 12px;text-align:center;font-size:12px;font-weight:600;background:var(--bg3);color:var(--tx);border-bottom:1px solid var(--bdr)">${text}</div>`;
 }
 
 function opponentBox(idx, align) {
@@ -219,7 +263,7 @@ function opponentBox(idx, align) {
   return `<div style="display:flex;flex-direction:column;align-items:${align};gap:4px;${active ? 'filter:drop-shadow(0 0 9px var(--acc));' : ''}">`
     + `<div style="font-size:12px;font-weight:700;${nameStyle}">${active ? '▶ ' : ''}${p.name}${sideBadge(idx)}${annBadge(idx)}</div>`
     + `<div style="display:flex;gap:1px;flex-wrap:wrap;max-width:150px;justify-content:${align}">${backs}</div>`
-    + `<div style="font-size:10px;color:var(--tx3)">${p.hand.length} Karten</div></div>`;
+    + `<div style="font-size:10px;color:var(--tx3)">${p.hand.length} Karten · ${tricksWon(idx)} Stiche</div></div>`;
 }
 
 function trickArea() {
@@ -238,8 +282,9 @@ function trickArea() {
 function header() {
   const stich = Math.min(G.trickIndex + 1, G.handSize);
   const dealerName = G.players[G.dealer].name;
+  const actor = gameTypeActor();
   return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr)">`
-    + `<div><div style="font-weight:700;font-size:15px">${E.gameTypeLabel(G)}</div>`
+    + `<div><div style="font-weight:700;font-size:15px">${E.gameTypeLabel(G)}${actor ? ' · ' + actor : ''}</div>`
     + `<div style="font-size:11px;color:var(--tx3)">Stich ${stich}/${G.handSize} · Geber ${dealerName}</div></div>`
     + `<button onclick="closeDokoGame()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:34px;height:34px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">${ICO.x}</button></div>`;
 }
@@ -317,6 +362,7 @@ function handArea() {
   }).join('');
   const glow = myTurn ? 'box-shadow:inset 0 0 0 2px var(--grn);' : '';
   return `<div style="padding:8px 10px;border-top:1px solid var(--bdr);background:var(--bg2);${glow}">`
+    + `<div style="font-size:10px;color:var(--tx3);padding:0 0 4px 6px">Deine Karten · ${tricksWon(0)} Stiche</div>`
     + `<div style="display:flex;align-items:flex-end;padding-left:6px;overflow-x:auto;min-height:74px">${html}</div></div>`;
 }
 
@@ -429,6 +475,7 @@ function render() {
   c.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;overflow:hidden">`
     + header()
     + turnBanner()
+    + hochzeitBanner()
     + stage
     + (G.phase === 'scoring' ? '' : handArea())
     + `</div>`;

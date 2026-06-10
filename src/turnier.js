@@ -232,6 +232,15 @@ export async function isAdmin(){
   return spielerIsAdmin(await getOwnSpieler());
 }
 
+// True, wenn der Spieler „Doppelkopf spielen" (Beta) nutzen darf: Admins immer,
+// sonst per Flag spieler/<id>/betaGame.
+export function spielerCanBeta(s){
+  return spielerIsAdmin(s) || !!(s && s.betaGame===true);
+}
+export async function canBetaDoko(){
+  return spielerCanBeta(await getOwnSpieler());
+}
+
 // ── Presence / Online-Anzeige ──
 // Hinweis: Schreibt presence/<spielerId> und entfernt den Knoten automatisch beim
 // Verbindungsverlust (onDisconnect). Nur Nutzer MIT Profil melden sich; ohne Profil/

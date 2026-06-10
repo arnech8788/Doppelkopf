@@ -1,21 +1,24 @@
-// game.js – Einstieg „Spielbares Doppelkopf gegen Computer" (nur für Admins).
-// Dünner Glue analog admin.js: Admin-Gating, Mehr-Eintrag, Vollbild-Modal-Lifecycle.
+// game.js – Einstieg „Spielbares Doppelkopf gegen Computer" (Admins + freigeschaltete Beta-Tester).
+// Dünner Glue analog admin.js: Gating, Mehr-Eintrag, Vollbild-Modal-Lifecycle.
 // Re-exportiert die UI-Handler, damit sie über main.js global (onclick) verfügbar sind.
-import { isAdmin } from './turnier.js';
+import { isAdmin, canBetaDoko } from './turnier.js';
 import { showToast } from './ui.js';
 import * as gameUi from './game/ui.js';
 
 export * from './game/ui.js';
 
-// Blendet den Spiel-Einstieg im Mehr-Screen ein, falls Admin.
+// Blendet den Spiel-Einstieg im Mehr-Screen ein, falls berechtigt (Admin oder Beta-freigeschaltet).
 export async function fillGameEntry() {
   const el = document.getElementById('gameEntrySlot');
   if (!el) return;
-  let admin = false;
-  try { admin = await isAdmin(); } catch (e) { admin = false; }
-  if (!admin) { el.innerHTML = ''; return; }
+  let allowed = false, admin = false;
+  try { allowed = await canBetaDoko(); admin = await isAdmin(); } catch (e) { allowed = false; }
+  if (!allowed) { el.innerHTML = ''; return; }
   const running = gameUi.hasRunningGame();
-  el.innerHTML = '<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openDokoGame()">'
+  // Reine Beta-Tester (kein Admin) bekommen ein eigenes „Beta-Test"-Label, da bei ihnen
+  // das „Nur für Admins"-Label (aus fillAdminEntry) fehlt.
+  const label = admin ? '' : '<div class="section-label" style="margin-top:20px">Beta-Test</div>';
+  el.innerHTML = label + '<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openDokoGame()">'
     + '<div style="display:flex;align-items:center;gap:10px">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc)"><rect x="3" y="5" width="14" height="16" rx="2"/><path d="M7 5V3h10a2 2 0 012 2v14"/></svg>'
     + '<div><div style="font-weight:500">Doppelkopf spielen</div>'
@@ -23,9 +26,9 @@ export async function fillGameEntry() {
 }
 
 export async function openDokoGame() {
-  let admin = false;
-  try { admin = await isAdmin(); } catch (e) { admin = false; }
-  if (!admin) { showToast('Kein Zugriff.', 'error'); return; }
+  let allowed = false;
+  try { allowed = await canBetaDoko(); } catch (e) { allowed = false; }
+  if (!allowed) { showToast('Kein Zugriff.', 'error'); return; }
   document.getElementById('dokoGameModal').classList.add('show');
   gameUi.mountGame();
 }
