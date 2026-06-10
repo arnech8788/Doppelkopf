@@ -3,7 +3,6 @@ import * as E from './engine.js';
 import * as AI from './ai.js';
 import { state, save } from '../main.js';
 import { showConfirm, launchConfetti, ICO, showToast } from '../ui.js';
-import { isAdmin } from '../turnier.js';
 
 const AI_DELAY = 750;     // KI-Bedenkzeit pro Karte
 const TRICK_PAUSE = 1100; // Anzeige eines fertigen Stichs
@@ -22,13 +21,9 @@ let vorbExpanded = false; // Vorbehalt-Untermenü offen
 let ansageOpen = false;   // Ansage-Popup offen
 let peekTrick = false;    // „Letzter Stich"-Popup offen
 let debugOpen = false;    // Debug-/Bot-Feedback-Panel offen
-let dokoIsAdmin = false;  // Debug-Button nur für Admins (async beim Mount gesetzt)
 
 // ── Mount / Persistenz ──
-export function mountGame() {
-  render();
-  isAdmin().then(v => { if (v !== dokoIsAdmin) { dokoIsAdmin = v; render(); } }).catch(() => {});
-}
+export function mountGame() { render(); }
 export function hasRunningGame() { return !!(G || (state.dokoGame && state.dokoGame.phase)); }
 export function persistGame() {
   state.dokoGame = (G && G.phase !== 'scoring') ? G : null;
@@ -154,7 +149,7 @@ export function dokoOpenAnsage() { if (!G || G.phase !== 'play' || busy || showi
 export function dokoCloseAnsage() { ansageOpen = false; render(); }
 export function dokoPeekLast() { if (!G || !G.tricks.length || showingTrick) return; peekTrick = true; render(); }
 export function dokoClosePeek() { peekTrick = false; render(); }
-export function dokoOpenDebug() { if (!G || !dokoIsAdmin) return; debugOpen = true; render(); }
+export function dokoOpenDebug() { if (!G) return; debugOpen = true; render(); }
 export function dokoCloseDebug() { debugOpen = false; render(); }
 export function dokoCopyDebug() {
   const ta = document.getElementById('dokoDebugNote');
@@ -440,7 +435,7 @@ function resultOverlay() {
     + `<div style="font-size:13px;color:var(--tx2);margin-bottom:10px">${win} gewinnt · ${r.augenRe} : ${r.augenKontra} Augen · Wert ${r.value}</div>`
     + `<div style="background:var(--bg3);border-radius:var(--r-sm);padding:8px 10px;margin-bottom:10px">${scoreRows}</div>`
     + `<div style="margin-bottom:12px">${bd}</div>`
-    + (dokoIsAdmin ? `<button class="btn btn-secondary" style="width:100%;margin-bottom:6px" onclick="dokoOpenDebug()">🐞 Spielstand/Feedback kopieren</button>` : '')
+    + `<button class="btn btn-secondary" style="width:100%;margin-bottom:6px" onclick="dokoOpenDebug()">🐞 Spielstand/Feedback kopieren</button>`
     + `<button class="btn btn-primary" style="width:100%" onclick="dokoNewGame()">Neues Spiel</button>`
     + `<button class="btn btn-secondary" style="width:100%;margin-top:6px" onclick="closeDokoGame()">Schließen</button>`);
 }
@@ -552,7 +547,7 @@ function render() {
     + peekButton()
     + ansageButton()
     + `<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px" onclick="dokoToggleAuto()">Auto-Weiter: ${autoOn ? 'an' : 'aus'}</button>`
-    + (dokoIsAdmin ? `<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px" onclick="dokoOpenDebug()" title="Debug / Bot-Feedback">🐞</button>` : '') + `</div>`;
+    + `<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px" onclick="dokoOpenDebug()" title="Debug / Bot-Feedback">🐞</button></div>`;
 
   // Stage = Overlay-Ziel (oberer Bereich). Hand liegt als Geschwister DARUNTER → von keinem Overlay verdeckt.
   const stage = `<div style="position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden">`
