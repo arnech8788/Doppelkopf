@@ -167,10 +167,15 @@ export function renderSpielerScreen(){
   html+='</div>';
   if(state.rounds.length>0){
     html+='<div class="card"><div class="card-title">Aktuelles Spiel</div>';
-    html+='<div style="display:flex;gap:8px">';
+    html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
     html+='<button class="btn btn-secondary" style="margin:0" onclick="startNewGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><polygon points="5 3 19 12 5 21 5 3"/></svg> Neues Spiel</button>';
     html+='<button class="btn btn-secondary" style="margin:0" onclick="endGame()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><rect x="5" y="5" width="14" height="14" rx="2"/></svg> Spiel beenden</button>';
-    html+='</div></div>';
+    html+='<button class="btn btn-secondary" style="margin:0" onclick="openShareGameModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Spiel teilen</button>';
+    html+='</div>';
+    if(state.sharedGame&&state.sharedGame.mode==='live'){
+      html+='<div style="font-size:12px;color:var(--acc2);margin-top:10px;line-height:1.5">📡 Live geteilt (SG-'+state.sharedGame.code+') – Änderungen werden synchronisiert. <a href="#" onclick="stopSharing();return false" style="color:var(--acc2);font-weight:600">Beenden</a></div>';
+    }
+    html+='</div>';
   }
   el.innerHTML=html;
   renderPlayerTags();
