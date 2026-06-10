@@ -46,7 +46,8 @@ export async function fillAdminEntry(){
   let admin=false;
   try{admin=await isAdmin()}catch(e){admin=false}
   if(!admin){el.innerHTML='';return}
-  el.innerHTML='<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openAdminModal()">'
+  el.innerHTML='<div class="section-label" style="margin-top:20px">Nur für Admins</div>'
+    +'<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openAdminModal()">'
     +'<div style="display:flex;align-items:center;gap:10px">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
     +'<div><div style="font-weight:500">Admin – Datenbank</div><div style="font-size:11px;color:var(--tx3)">Alles einsehen, bearbeiten und löschen</div></div></div></div>';
