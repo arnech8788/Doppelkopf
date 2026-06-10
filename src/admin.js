@@ -50,7 +50,11 @@ export async function fillAdminEntry(){
     +'<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openAdminModal()">'
     +'<div style="display:flex;align-items:center;gap:10px">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
-    +'<div><div style="font-weight:500">Admin – Datenbank</div><div style="font-size:11px;color:var(--tx3)">Alles einsehen, bearbeiten und löschen</div></div></div></div>';
+    +'<div><div style="font-weight:500">Admin – Datenbank</div><div style="font-size:11px;color:var(--tx3)">Alles einsehen, bearbeiten und löschen</div></div></div></div>'
+    +'<div class="card" style="cursor:pointer" onclick="window.open(\'https://doppelkopf.goatcounter.com\',\'_blank\',\'noopener\')">'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
+    +'<div><div style="font-weight:500">Besucher-Statistik</div><div style="font-size:11px;color:var(--tx3)">GoatCounter öffnen</div></div></div></div>';
 }
 
 export async function openAdminModal(){

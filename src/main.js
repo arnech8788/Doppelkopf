@@ -52,7 +52,7 @@ export const ACHIEVEMENTS={
 };
 
 // ── Geteilter State ──
-export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,sharedGame:null,cloudBackup:false,uiCollapsed:{},dokoGame:null,dokoTotals:null,dokoDealer:0,dokoMitNeunen:true,dokoAuto:true};
+export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,sharedGame:null,cloudBackup:false,uiCollapsed:{},dokoGame:null,dokoTotals:null,dokoDealer:0,dokoMitNeunen:true,dokoAuto:false};
 export let currentPts='';
 export let pendingRound=null;
 export let lastUndo=null;
@@ -405,11 +405,11 @@ export function renderMehrScreen(){
   html+='<div id="archiveList"></div>';
   html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+='<div class="card" style="cursor:pointer" onclick="openFeedbackModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg><div><div style="font-weight:500">Feedback &amp; Bugs</div><div style="font-size:11px;color:var(--tx3)">Rückmeldung senden</div></div></div></div>';
-  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.23</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.24</div></div></div></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.23 · 10.06.2026 16:30</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.24 · 10.06.2026 16:45</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -504,6 +504,7 @@ export function openChangelogModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Changelog</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="card">';
   const log=[
+    {v:'6.24',d:'10.06.2026 16:45',t:'Doppelkopf-Spiel: Karten im schöneren Spielkarten-Look (Eck-Symbol + großes Farbzeichen, im Dark-Mode besser lesbar). Mitspieler-Karten als kompakter Stapel statt langer Rückseiten-Reihe. Tippfehler behoben („Du gewinnst" / „Du machst den Stich"). „Auto-Weiter" ist jetzt standardmäßig aus.'},
     {v:'6.23',d:'10.06.2026 16:30',t:'Der 🐞-Debug-/Feedback-Button im Doppelkopf-Spiel ist wieder für alle Spielenden sichtbar (Admins und Beta-Tester) – damit auch Beta-Tester konkrete Bot-Züge melden können.'},
     {v:'6.22',d:'10.06.2026 16:25',t:'Der 🐞-Debug-Button im Doppelkopf-Spiel ist jetzt nur noch für Admins sichtbar (Beta-Tester spielen normal weiter, ohne Debug-Export).'},
     {v:'6.21',d:'10.06.2026 16:25',t:'Doppelkopf-Spiel (Beta): Neuer 🐞-Button (in der Steuerleiste und im Ergebnis-Screen) zum Kopieren des Spielstands inkl. Notizfeld. So kannst du zu einem konkreten Bot-Zug etwas notieren und den kompletten, exakt nachstellbaren Spielstand kopieren – zum Verbessern der Computer-Spielweise.'},
