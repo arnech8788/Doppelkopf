@@ -292,7 +292,7 @@ export async function adminManageAdmins(){
   let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
     +'<h3 style="margin:0">👥 Admins verwalten</h3>'
     +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
-  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Tippe auf den Schalter, um Admin-Rechte zu vergeben oder zu entziehen.</div>';
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">„Admin" vergibt volle Rechte. „Doko-Beta" schaltet nur „Doppelkopf spielen" frei (Admins dürfen ohnehin).</div>';
   h+='<div class="card" style="padding:4px 0">';
   if(!adminAdminList.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Keine Spieler.</div>';
   adminAdminList.forEach((s,i)=>{
@@ -301,10 +301,16 @@ export async function adminManageAdmins(){
     h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
     h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(s.name||'(ohne Name)')+(s.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(s.short)+'</span>':'')+'</div>';
     h+='<div style="font-size:11px;color:var(--tx3)">'+escHtml(s.id)+(boot?' · fest':'')+'</div></div>';
+    h+='<div style="display:flex;gap:14px;align-items:flex-end;flex-shrink:0">';
+    h+='<div style="text-align:center"><div style="font-size:9px;color:var(--tx3);margin-bottom:3px">Admin</div>';
     if(boot)
-      h+='<span style="font-size:11px;color:var(--acc);border:1px solid var(--acc);border-radius:999px;padding:2px 8px">Admin</span>';
+      h+='<span style="font-size:11px;color:var(--acc);border:1px solid var(--acc);border-radius:999px;padding:2px 8px">fest</span>';
     else
       h+='<button class="toggle'+(on?' on':'')+'" onclick="adminToggleAdmin('+i+')"></button>';
+    h+='</div>';
+    h+='<div style="text-align:center"><div style="font-size:9px;color:var(--tx3);margin-bottom:3px">Doko-Beta</div>';
+    h+='<button class="toggle'+(s.betaGame===true?' on':'')+'" onclick="adminToggleBeta('+i+')"></button></div>';
+    h+='</div>';
     h+='</div>';
   });
   h+='</div>';
@@ -323,6 +329,20 @@ export async function adminToggleAdmin(i){
     showToast(makeAdmin?(s.name||'Spieler')+' ist jetzt Admin.':'Admin-Rechte entzogen.','info');
     adminManageAdmins();
   }catch(e){console.error('adminToggleAdmin error:',e);showToast('Fehler beim Ändern.','error')}
+}
+
+// Schaltet „Doppelkopf spielen" (Beta) für einen Spieler frei/aus (spieler/<id>/betaGame).
+export async function adminToggleBeta(i){
+  const s=adminAdminList[i];
+  if(!s)return;
+  const makeBeta=!(s.betaGame===true);
+  try{
+    const ref=firebase.database().ref('spieler/'+s.id+'/betaGame');
+    if(makeBeta)await ref.set(true);else await ref.remove();
+    s.betaGame=makeBeta?true:undefined;
+    showToast(makeBeta?(s.name||'Spieler')+' ist jetzt Doko-Beta-Tester.':'Doko-Beta entzogen.','info');
+    adminManageAdmins();
+  }catch(e){console.error('adminToggleBeta error:',e);showToast('Fehler beim Ändern.','error')}
 }
 
 // Admin: alle Turniere sehen und verwalten (aktuell setzen, ausblenden, wiederherstellen, hart loeschen).
