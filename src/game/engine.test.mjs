@@ -15,11 +15,14 @@ ok(E.isTrump(C('k', 'A'), ctxN), 'Karo-Ass ist Trumpf');
 ok(!E.isTrump(C('h', 'A'), ctxN), 'Herz-Ass ist Fehl');
 ok(!E.isTrump(C('p', 'K'), ctxN), 'Pik-König ist Fehl');
 
-// Dulle schlägt Kreuz-Dame; zwei gleiche → erste gewinnt.
+// Dulle schlägt Kreuz-Dame; zwei Dullen → zweite (zuletzt gelegte) gewinnt.
 let trick = [{ idx: 0, card: C('c', 'D') }, { idx: 1, card: C('h', '10') }, { idx: 2, card: C('k', 'A') }, { idx: 3, card: C('p', 'D') }];
 eq(E.trickWinner(trick, ctxN).idx, 1, 'Dulle (Herz-10) schlägt alle Damen');
 trick = [{ idx: 0, card: C('h', '10', 0) }, { idx: 1, card: C('h', '10', 1) }, { idx: 2, card: C('c', 'D') }, { idx: 3, card: C('k', '9') }];
-eq(E.trickWinner(trick, ctxN).idx, 0, 'Bei zwei Dullen gewinnt die zuerst gespielte');
+eq(E.trickWinner(trick, ctxN).idx, 1, 'Bei zwei Dullen schlägt die zweite (zuletzt gelegte) die erste');
+// Andere Doppelkarten bleiben „erste gewinnt": zwei Kreuz-Damen → zuerst gelegte.
+trick = [{ idx: 0, card: C('c', 'D', 0) }, { idx: 1, card: C('c', 'D', 1) }, { idx: 2, card: C('p', 'D') }, { idx: 3, card: C('k', '9') }];
+eq(E.trickWinner(trick, ctxN).idx, 0, 'Bei zwei gleichen Damen gewinnt die zuerst gespielte');
 
 // Fehl-Stich: höchste Farbkarte gewinnt, Abwurf anderer Fehlfarbe zählt nicht.
 trick = [{ idx: 0, card: C('p', 'K') }, { idx: 1, card: C('p', 'A') }, { idx: 2, card: C('h', 'A') }, { idx: 3, card: C('p', '10') }];

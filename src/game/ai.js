@@ -128,9 +128,18 @@ export function chooseCard(state, idx) {
       const pick = (safe.length ? safe : aces).slice().sort(byAugenDesc)[0];
       return pick.id;
     }
+    // Sichere Trumpf-Stiche kassieren: „Boss"-Trumpf = höher als jeder noch ausstehende.
+    const trumps = legal.filter(c => isTrump(c, ctx));
+    const sot = strongestOutstandingTrump(state, ctx, idx);
+    const boss = trumps.filter(c => trumpStrength(c, ctx) < sot);
+    const endgame = state.trickIndex >= state.handSize - 3;
+    if (boss.length && (endgame || nonTrump.length === 0)) {
+      // billigsten sicheren Gewinner führen (schwächster Boss schont Dulle/Spitzen).
+      return boss.slice().sort((a, b) => trumpStrength(b, ctx) - trumpStrength(a, ctx) || a.id.localeCompare(b.id))[0].id;
+    }
     if (nonTrump.length) return lowSafe(nonTrump).id;       // Fehl abwerfen, Punkte sparen
-    // Nur Trümpfe: schwächsten zuerst (höchster Stärke-Index).
-    return legal.slice().sort((a, b) => trumpStrength(b, ctx) - trumpStrength(a, ctx))[0].id;
+    // Nur Trümpfe, keiner sicher: schwächsten zuerst (höchster Stärke-Index).
+    return trumps.slice().sort((a, b) => trumpStrength(b, ctx) - trumpStrength(a, ctx) || a.id.localeCompare(b.id))[0].id;
   }
 
   // ── Bedienen ──
@@ -183,6 +192,19 @@ function trumpOrder(ctx) {
   }
   _orderCache.set(key, o);
   return o;
+}
+
+// Stärkster noch ausstehender Trumpf (nicht gespielt, nicht in eigener Hand) als Order-Index.
+// 99 = kein Trumpf mehr außerhalb der eigenen Hand. Jede Trumpfkarte existiert 2×.
+function strongestOutstandingTrump(state, ctx, idx) {
+  const order = trumpOrder(ctx);
+  const left = new Map(order.map(k => [k, 2]));
+  const dec = card => { const k = card.suit + card.rank; if (left.has(k)) left.set(k, left.get(k) - 1); };
+  for (const tr of state.tricks) for (const pc of tr.cards) dec(pc.card);
+  for (const pc of state.trick.cards) dec(pc.card);
+  for (const id of state.players[idx].hand) dec(cardFromId(id));
+  for (let i = 0; i < order.length; i++) if (left.get(order[i]) > 0) return i;
+  return 99;
 }
 
 function cheapestWinner(winners, ctx) {

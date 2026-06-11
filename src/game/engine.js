@@ -111,7 +111,12 @@ export function trickWinner(trick, ctx) {
     const c = trick[i];
     const t = isTrump(c.card, ctx);
     if (bestTrump) {
-      if (t && trumpIdx(c.card, ctx) < trumpIdx(best.card, ctx)) best = c; // gleiche Karte → erste bleibt
+      if (t) {
+        const di = trumpIdx(c.card, ctx), bi = trumpIdx(best.card, ctx);
+        // Höherer Trumpf gewinnt; bei zwei Dullen (h10) gewinnt die zweite (zuletzt gelegte),
+        // sonst bleibt bei Gleichstand die zuerst gelegte.
+        if (di < bi || (di === bi && c.card.suit === 'h' && c.card.rank === '10')) best = c;
+      }
     } else if (t) {
       best = c; bestTrump = true;
     } else if (c.card.suit === leadSuit && FEHL_POWER[c.card.rank] > FEHL_POWER[best.card.rank]) {
