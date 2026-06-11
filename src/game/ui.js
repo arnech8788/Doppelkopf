@@ -104,7 +104,7 @@ function afterPlay(res) {
     showingTrick = G.tricks[G.tricks.length - 1];
     render();
     const cont = () => { showingTrick = null; if (res.gameOver) { onGameOver(); } else { render(); continuePlay(); } };
-    if (state.dokoAuto !== false) { busy = true; setTimeout(cont, TRICK_PAUSE); }
+    if (state.dokoAuto === true) { busy = true; setTimeout(cont, TRICK_PAUSE); }
     else { pendingContinue = cont; busy = true; render(); }
   } else {
     render(); continuePlay();
@@ -114,7 +114,7 @@ export function dokoNextTrick() {
   if (!pendingContinue) return;
   const fn = pendingContinue; pendingContinue = null; busy = false; fn();
 }
-export function dokoToggleAuto() { state.dokoAuto = !(state.dokoAuto !== false); save(); render(); }
+export function dokoToggleAuto() { state.dokoAuto = !(state.dokoAuto === true); save(); render(); }
 
 // ── Ansagen ──
 // Sicher bekannte EIGENE Partei eines Spielers (jeder kennt seine eigene Seite).
@@ -200,19 +200,25 @@ function onGameOver() {
 
 // ════════════════════════ Rendering ════════════════════════
 const RED = c => c.suit === 'k' || c.suit === 'h';
+// Echter Spielkarten-Look: Eck-Pip (Rang+Farbe) oben links + großes Farbsymbol zentriert.
+// Karten sind immer weiß → feste dunkle/rote Farben (kein var(--tx), das im Dark-Mode hell wäre).
 function cardFace(card, { playable = false, dim = false, small = false, highlight = false } = {}) {
-  const w = small ? 38 : 46, h = small ? 54 : 66;
-  const col = RED(card) ? '#d23' : 'var(--tx)';
+  const w = small ? 40 : 50, h = small ? 58 : 72;
+  const col = RED(card) ? '#d5263b' : '#1a1a2e';
+  const sym = E.SUIT_SYM[card.suit];
+  const rank = card.rank === '10' ? '10' : card.rank;
   const click = playable ? ` onclick="playHumanCard('${card.id}')"` : '';
-  const bd = highlight ? 'var(--grn)' : 'var(--bdr)';
-  const shadow = highlight ? 'box-shadow:0 0 0 2px var(--grn);' : '';
-  return `<div class="doko-card"${click} style="width:${w}px;height:${h}px;flex:0 0 auto;background:#fff;border:1px solid ${bd};${shadow}border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${col};font-weight:700;${playable ? 'cursor:pointer;' : ''}${dim ? 'opacity:.38;filter:grayscale(.5);' : ''}user-select:none">`
-    + `<span style="font-size:${small ? 13 : 16}px;line-height:1">${card.rank === '10' ? '10' : card.rank}</span>`
-    + `<span style="font-size:${small ? 16 : 20}px;line-height:1.1">${E.SUIT_SYM[card.suit]}</span></div>`;
+  const bd = highlight ? 'var(--grn)' : 'rgba(0,0,0,.18)';
+  const shadow = highlight ? '0 0 0 2px var(--grn),0 2px 5px rgba(0,0,0,.3)' : '0 1px 3px rgba(0,0,0,.25)';
+  const pipR = small ? 10 : 12, pipS = small ? 9 : 11, big = small ? 22 : 30;
+  return `<div class="doko-card"${click} style="position:relative;width:${w}px;height:${h}px;flex:0 0 auto;background:#fff;border:1px solid ${bd};box-shadow:${shadow};border-radius:8px;color:${col};font-weight:800;${playable ? 'cursor:pointer;' : ''}${dim ? 'opacity:.4;filter:grayscale(.55);' : ''}user-select:none;overflow:hidden">`
+    + `<div style="position:absolute;top:3px;left:4px;line-height:1;text-align:center"><div style="font-size:${pipR}px">${rank}</div><div style="font-size:${pipS}px">${sym}</div></div>`
+    + `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:${big}px;line-height:1">${sym}</div></div>`;
 }
+// Kleine Rückseite für den kompakten Gegner-Stapel.
 function cardBack(small) {
-  const w = small ? 26 : 34, h = small ? 38 : 50;
-  return `<div style="width:${w}px;height:${h}px;flex:0 0 auto;background:linear-gradient(135deg,var(--acc),var(--acc2,#666));border:1px solid var(--bdr);border-radius:5px"></div>`;
+  const w = small ? 22 : 34, h = small ? 32 : 50;
+  return `<div style="width:${w}px;height:${h}px;flex:0 0 auto;background:linear-gradient(135deg,var(--acc),var(--acc2,#666));border:1px solid rgba(255,255,255,.35);border-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,.25)"></div>`;
 }
 function sideBadge(idx) {
   if (!G) return '';
@@ -276,11 +282,13 @@ function hochzeitBanner() {
 function opponentBox(idx, align) {
   const p = G.players[idx];
   const active = G.phase === 'play' && E.currentPlayer(G) === idx && !showingTrick;
-  const backs = Array.from({ length: Math.min(p.hand.length, 12) }, () => cardBack(true)).join('');
+  // Kompakter, leicht überlappender Mini-Stapel (max. 5 Rückseiten) – die genaue Kartenzahl steht darunter.
+  const stackN = Math.min(p.hand.length, 5);
+  const backs = Array.from({ length: stackN }, (_, i) => `<div style="margin-left:${i ? -14 : 0}px">${cardBack(true)}</div>`).join('');
   const nameStyle = active ? 'background:var(--acc);color:#fff;padding:2px 9px;border-radius:11px' : 'color:var(--tx2)';
   return `<div style="display:flex;flex-direction:column;align-items:${align};gap:4px;${active ? 'filter:drop-shadow(0 0 9px var(--acc));' : ''}">`
     + `<div style="font-size:12px;font-weight:700;${nameStyle}">${active ? '▶ ' : ''}${p.name}${sideBadge(idx)}${annBadge(idx)}</div>`
-    + `<div style="display:flex;gap:1px;flex-wrap:wrap;max-width:150px;justify-content:${align}">${backs}</div>`
+    + `<div style="display:flex;align-items:center;min-height:32px">${backs}</div>`
     + `<div style="font-size:10px;color:var(--tx3)">${p.hand.length} Karten · ${tricksWon(idx)} Stiche</div></div>`;
 }
 
@@ -317,7 +325,7 @@ function turnBanner() {
     else text = `${G.players[who]?.name ?? ''} überlegt …`;
   } else { // play
     if (showingTrick) {
-      text = `Stich geht an ${G.players[showingTrick.winner].name}`;
+      text = showingTrick.winner === 0 ? 'Du machst den Stich' : `Stich geht an ${G.players[showingTrick.winner].name}`;
     } else {
       const cur = E.currentPlayer(G);
       if (cur === 0 && !busy) { text = '▶ Du bist dran – wähle eine Karte'; bg = 'var(--grn)'; col = '#fff'; }
@@ -351,7 +359,7 @@ function peekOverlay() {
       + cardFace(pc.card, { highlight: hl }) + `</div>`;
   }).join('');
   return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:2px">Letzter Stich (Stich ${G.tricks.length})</div>`
-    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:14px">${G.players[tr.winner].name} gewinnt · ${tr.augen} Augen</div>`
+    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:14px">${tr.winner === 0 ? 'Du gewinnst' : G.players[tr.winner].name + ' gewinnt'} · ${tr.augen} Augen</div>`
     + `<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px">${items}</div>`
     + `<button class="btn btn-secondary" style="width:100%" onclick="dokoClosePeek()">Schließen</button>`);
 }
@@ -541,7 +549,7 @@ function render() {
   const c = document.getElementById('dokoGameModalContent');
   if (!c) return;
   if (!G) { c.innerHTML = startScreen(); return; }
-  const autoOn = state.dokoAuto !== false;
+  const autoOn = state.dokoAuto === true;
   const controls = `<div style="display:flex;gap:8px;align-items:center;justify-content:center;padding:6px 12px;border-top:1px solid var(--bdr)">`
     + (pendingContinue ? `<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="dokoNextTrick()">Nächster Stich ▶</button>` : '')
     + peekButton()
