@@ -227,10 +227,13 @@ export function endScoring(state) {
   }
   const winner = augenRe >= 121 ? 're' : 'kontra';
   const loserAugen = winner === 're' ? augenKontra : augenRe;
+  // Solo (auch stilles Solo): kein „Gegen die Alten", keine Fuchs/Doppelkopf/Karlchen,
+  // dafür ein fester, nicht verdoppelter Solopunkt – analog zum manuellen Punkterechner.
+  const isSolo = state.gameType === 'solo' || state.gameType === 'stille';
   const breakdown = [];
 
   let base = 1; breakdown.push('Gewonnen +1');
-  if (winner === 'kontra') { base += 1; breakdown.push('Gegen die Alten +1'); }
+  if (!isSolo && winner === 'kontra') { base += 1; breakdown.push('Gegen die Alten +1'); }
   if (loserAugen < 90) { base += 1; breakdown.push('Keine 90 +1'); }
   if (loserAugen < 60) { base += 1; breakdown.push('Keine 60 +1'); }
   if (loserAugen < 30) { base += 1; breakdown.push('Keine 30 +1'); }
@@ -250,33 +253,38 @@ export function endScoring(state) {
   if (a.kontra) { mult *= 2; breakdown.push('Kontra angesagt ×2'); }
   const spielwert = base * mult;
 
-  // ── Sonderpunkte (NICHT verdoppelt), je Seite ──
+  // ── Sonderpunkte (NICHT verdoppelt), je Seite – beim Solo gibt es keine. ──
   let sonderRe = 0, sonderKontra = 0;
-  const credit = (winnerIdx, n) => { if (reSet.has(winnerIdx)) sonderRe += n; else sonderKontra += n; };
-  // Doppelkopf: Stich mit ≥40 Augen.
-  for (const tr of state.tricks) if (tr.augen >= 40) { credit(tr.winner, 1); breakdown.push('Doppelkopf +1'); }
-  // Fuchs gefangen: Karo-Ass im Stich der Gegenpartei (nur wenn Karo Trumpf ist).
-  if (ctx.regime === 'full' && ctx.trumpSuit === 'k') {
-    for (const tr of state.tricks) {
-      const winnerIsRe = reSet.has(tr.winner);
-      for (const pc of tr.cards) {
-        if (pc.card.suit === 'k' && pc.card.rank === 'A') {
-          const playerIsRe = reSet.has(pc.idx);
-          if (playerIsRe !== winnerIsRe) { credit(tr.winner, 1); breakdown.push('Fuchs gefangen +1'); }
+  if (!isSolo) {
+    const credit = (winnerIdx, n) => { if (reSet.has(winnerIdx)) sonderRe += n; else sonderKontra += n; };
+    // Doppelkopf: Stich mit ≥40 Augen.
+    for (const tr of state.tricks) if (tr.augen >= 40) { credit(tr.winner, 1); breakdown.push('Doppelkopf +1'); }
+    // Fuchs gefangen: Karo-Ass im Stich der Gegenpartei (nur wenn Karo Trumpf ist).
+    if (ctx.regime === 'full' && ctx.trumpSuit === 'k') {
+      for (const tr of state.tricks) {
+        const winnerIsRe = reSet.has(tr.winner);
+        for (const pc of tr.cards) {
+          if (pc.card.suit === 'k' && pc.card.rank === 'A') {
+            const playerIsRe = reSet.has(pc.idx);
+            if (playerIsRe !== winnerIsRe) { credit(tr.winner, 1); breakdown.push('Fuchs gefangen +1'); }
+          }
         }
       }
     }
-  }
-  // Karlchen/Charlie: Kreuz-Bube gewinnt den letzten Stich.
-  const last = state.tricks[state.tricks.length - 1];
-  if (last) {
-    const wc = last.cards.find(c => c.idx === last.winner);
-    if (wc && wc.card.suit === 'c' && wc.card.rank === 'B') { credit(last.winner, 1); breakdown.push('Karlchen +1'); }
+    // Karlchen/Charlie: Kreuz-Bube gewinnt den letzten Stich.
+    const last = state.tricks[state.tricks.length - 1];
+    if (last) {
+      const wc = last.cards.find(c => c.idx === last.winner);
+      if (wc && wc.card.suit === 'c' && wc.card.rank === 'B') { credit(last.winner, 1); breakdown.push('Karlchen +1'); }
+    }
   }
 
   const sonderWinner = winner === 're' ? sonderRe : sonderKontra;
   const sonderLoser = winner === 're' ? sonderKontra : sonderRe;
-  const V = spielwert + sonderWinner - sonderLoser;
+  // Solopunkt: fester +1-Punkt beim Solo, wird NICHT verdoppelt (geht an die Gewinnerseite).
+  let soloPkt = 0;
+  if (isSolo) { soloPkt = 1; breakdown.push('Solopunkt +1'); }
+  const V = spielwert + soloPkt + sonderWinner - sonderLoser;
 
   const perPlayer = distribute(parties, winner, V);
   return {
