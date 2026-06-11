@@ -54,24 +54,24 @@ export function buildDeck(mitNeunen) {
 }
 
 // ── Trumpf-Regime je Spieltyp ──
-// regime 'full': Dulle (außer bei Herz-Trumpf) + alle Damen + alle Buben + Trumpffarbe.
+// regime 'full': Dulle + alle Damen + alle Buben + Karo (Normalspiel / Trumpf-Solo).
 // regime 'damen'/'buben': nur Damen bzw. Buben sind Trumpf.
+// regime 'fleischlos': kein Trumpf (höchste Karte der angespielten Farbe gewinnt).
 export function trumpCtx(state) {
   const gt = state.gameType;
   if (gt === 'solo') {
     const st = state.soloType;
     if (st === 'damen') return { regime: 'damen' };
     if (st === 'buben') return { regime: 'buben' };
-    if (st === 'farbe-h') return { regime: 'full', trumpSuit: 'h' };
-    if (st === 'farbe-p') return { regime: 'full', trumpSuit: 'p' };
-    if (st === 'farbe-c') return { regime: 'full', trumpSuit: 'c' };
-    return { regime: 'full', trumpSuit: 'k' }; // 'trumpf' / 'farbe-k'
+    if (st === 'fleischlos') return { regime: 'fleischlos' };
+    return { regime: 'full', trumpSuit: 'k' }; // 'trumpf'
   }
   return { regime: 'full', trumpSuit: 'k' }; // normal / hochzeit / stille
 }
 
 // Geordnete Liste der Trumpf-Schlüssel (suit+rank), stärkster zuerst.
 function trumpList(ctx) {
+  if (ctx.regime === 'fleischlos') return [];
   if (ctx.regime === 'damen') return ['cD', 'pD', 'hD', 'kD'];
   if (ctx.regime === 'buben') return ['cB', 'pB', 'hB', 'kB'];
   const list = [];
@@ -348,10 +348,16 @@ export function canDeclareHochzeit(state, idx) {
 }
 
 // Vorbehalte auflösen → setzt gameType/soloType/soloist bzw. Hochzeit; sonst normal/stille.
+// Schmeißen-Berechtigung: „nicht über den Fuchs" – keine Dulle, keine Dame, kein Bube.
+export function canThrow(handIds) {
+  const cards = handIds.map(cardFromId);
+  return !cards.some(c => c.rank === 'D' || c.rank === 'B' || (c.suit === 'h' && c.rank === '10'));
+}
+
 export function resolveVorbehalt(state) {
   const decls = state.vorbehalt.declarations;
   const order = state.vorbehalt.order;
-  // Solo schlägt Hochzeit; bei mehreren Soli gewinnt der frühste ab Vorhand.
+  // Solo hat Vorrang; bei mehreren Soli gewinnt der frühste ab Vorhand.
   for (const idx of order) {
     const d = decls[idx];
     if (d && d.type === 'solo') {
@@ -359,6 +365,13 @@ export function resolveVorbehalt(state) {
       state.trick.leadIdx = state.forehand;
       state.phase = 'play';
       return;
+    }
+  }
+  // Schmeißen → Neugeben (sofern nicht durch Sicherheitsstopp unterdrückt).
+  if (!state.noThrow) {
+    for (const idx of order) {
+      const d = decls[idx];
+      if (d && d.type === 'schmeissen') { state.thrownBy = idx; state.phase = 'redeal'; return; }
     }
   }
   for (const idx of order) {
@@ -377,8 +390,7 @@ export function resolveVorbehalt(state) {
 
 export function gameTypeLabel(state) {
   if (state.gameType === 'solo') {
-    const m = { trumpf: 'Trumpf-Solo', damen: 'Damen-Solo', buben: 'Buben-Solo',
-      'farbe-k': 'Karo-Solo', 'farbe-h': 'Herz-Solo', 'farbe-p': 'Pik-Solo', 'farbe-c': 'Kreuz-Solo' };
+    const m = { trumpf: 'Trumpf-Solo', damen: 'Damen-Solo', buben: 'Buben-Solo', fleischlos: 'Fleischlos' };
     return m[state.soloType] || 'Solo';
   }
   if (state.gameType === 'hochzeit') return 'Hochzeit';

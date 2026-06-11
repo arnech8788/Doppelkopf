@@ -6,10 +6,16 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
 
 function playFullGame(seed) {
-  const g = E.createGame({ names: ['KI0', 'KI1', 'KI2', 'KI3'], dealer: seed % 4, seed });
-  // Vorbehalt: jeder in Reihenfolge.
-  for (const idx of g.vorbehalt.order) g.vorbehalt.declarations[idx] = AI.decideVorbehalt(g, idx);
-  E.resolveVorbehalt(g);
+  let g = E.createGame({ names: ['KI0', 'KI1', 'KI2', 'KI3'], dealer: seed % 4, seed });
+  // Vorbehalt: jeder in Reihenfolge. Beim Schmeißen wird deterministisch neu gegeben.
+  let tries = 0;
+  while (true) {
+    for (const idx of g.vorbehalt.order) g.vorbehalt.declarations[idx] = AI.decideVorbehalt(g, idx);
+    E.resolveVorbehalt(g);
+    if (g.phase !== 'redeal') break;
+    if (++tries > 10) { g.noThrow = true; E.resolveVorbehalt(g); break; }
+    g = E.createGame({ names: ['KI0', 'KI1', 'KI2', 'KI3'], dealer: seed % 4, seed: (seed * 7 + tries) | 0 });
+  }
   ok(g.phase === 'play', 'Phase nach Vorbehalt = play (seed ' + seed + ')');
 
   let guard = 0;

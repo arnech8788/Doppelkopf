@@ -9,8 +9,7 @@ const TRICK_PAUSE = 1100; // Anzeige eines fertigen Stichs
 
 const NAMES = ['Du', 'Lisa', 'Max', 'Tom'];
 const SOLO_LIST = [
-  ['trumpf', 'Trumpf-Solo'], ['damen', 'Damen-Solo'], ['buben', 'Buben-Solo'],
-  ['farbe-k', 'Karo-Solo'], ['farbe-h', 'Herz-Solo'], ['farbe-p', 'Pik-Solo'], ['farbe-c', 'Kreuz-Solo'],
+  ['trumpf', 'Trumpf-Solo'], ['damen', 'Damen-Solo'], ['buben', 'Buben-Solo'], ['fleischlos', 'Fleischlos'],
 ];
 
 let G = null;             // aktueller Engine-State
@@ -21,6 +20,7 @@ let vorbExpanded = false; // Vorbehalt-Untermenü offen
 let ansageOpen = false;   // Ansage-Popup offen
 let peekTrick = false;    // „Letzter Stich"-Popup offen
 let debugOpen = false;    // Debug-/Bot-Feedback-Panel offen
+let redealCount = 0;      // Anzahl Neugaben durch Schmeißen (Sicherheitsstopp)
 
 // ── Mount / Persistenz ──
 export function mountGame() { render(); }
@@ -35,7 +35,7 @@ export function startNewDokoGame() {
   const mitNeunen = state.dokoMitNeunen !== false;
   const dealer = ((state.dokoDealer || 0)) % 4;
   G = E.createGame({ names: NAMES, dealer, mitNeunen, seed: (Date.now() ^ (Math.random() * 1e9)) | 0 });
-  busy = false; showingTrick = null; pendingContinue = null; vorbExpanded = false;
+  busy = false; showingTrick = null; pendingContinue = null; vorbExpanded = false; redealCount = 0;
   state.dokoDealer = (dealer + 1) % 4;
   persistGame();
   advanceVorbehalt();
@@ -58,12 +58,27 @@ function advanceVorbehalt() {
     v.declarations[idx] = AI.decideVorbehalt(G, idx);
     v.current++;
   }
-  E.resolveVorbehalt(G); persistGame(); render(); continuePlay();
+  E.resolveVorbehalt(G);
+  if (G.phase === 'redeal') { doRedeal(); return; }
+  persistGame(); render(); continuePlay();
+}
+// Schmeißen → neu geben (gleicher Geber, neues Blatt). Sicherheitsstopp gegen Endlos-Neugaben.
+function doRedeal() {
+  const thrower = (G.players[G.thrownBy] && G.players[G.thrownBy].name) || 'Jemand';
+  redealCount++;
+  const mitNeunen = G.mitNeunen, dealer = G.dealer;
+  G = E.createGame({ names: NAMES, dealer, mitNeunen, seed: (Date.now() ^ (Math.random() * 1e9)) | 0 });
+  if (redealCount >= 6) G.noThrow = true;
+  busy = false; showingTrick = null; pendingContinue = null; vorbExpanded = false;
+  showToast(`${thrower} wirft das Blatt – neu gegeben`, 'info');
+  persistGame(); render();
+  advanceVorbehalt();
 }
 export function dokoVorbehalt(kind) {
   if (G.phase !== 'vorbehalt') return;
   if (kind === 'gesund') { G.vorbehalt.declarations[0] = { type: 'gesund' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
   else if (kind === 'hochzeit') { G.vorbehalt.declarations[0] = { type: 'hochzeit' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
+  else if (kind === 'schmeissen') { G.vorbehalt.declarations[0] = { type: 'schmeissen' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
   else if (kind === 'expand') { vorbExpanded = true; render(); }
 }
 export function dokoChooseSolo(soloType) {
@@ -397,16 +412,20 @@ function vorbehaltOverlay() {
   const v = G.vorbehalt;
   const waitingHuman = v.order[v.current] === 0;
   const done = v.order.slice(0, v.current).map(i => {
-    const d = v.declarations[i]; const t = d.type === 'gesund' ? 'Gesund' : d.type === 'hochzeit' ? 'Hochzeit!' : 'Vorbehalt!';
+    const d = v.declarations[i];
+    const t = d.type === 'gesund' ? 'Gesund' : d.type === 'hochzeit' ? 'Hochzeit!' : d.type === 'schmeissen' ? 'Wirft!' : 'Vorbehalt!';
     return `<div style="font-size:12px;color:var(--tx3)">${G.players[i].name}: ${t}</div>`;
   }).join('');
   let body;
   if (waitingHuman) {
     const canHz = E.canDeclareHochzeit(G, 0);
+    const canThrow = E.canThrow(G.players[0].hand);
     if (!vorbExpanded) {
       body = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">`
         + `<button class="btn btn-primary" onclick="dokoVorbehalt('gesund')">Gesund</button>`
-        + `<button class="btn btn-secondary" onclick="dokoVorbehalt('expand')">Vorbehalt…</button></div>`;
+        + `<button class="btn btn-secondary" onclick="dokoVorbehalt('expand')">Vorbehalt…</button>`
+        + (canThrow ? `<button class="btn btn-secondary" style="font-size:12px" onclick="dokoVorbehalt('schmeissen')">Schmeißen (Blatt zu schwach)</button>` : '')
+        + `</div>`;
     } else {
       const solos = SOLO_LIST.map(([t, l]) => `<button class="btn btn-secondary" style="font-size:12px" onclick="dokoChooseSolo('${t}')">${l}</button>`).join('');
       body = `<div style="display:flex;flex-direction:column;gap:8px">`
