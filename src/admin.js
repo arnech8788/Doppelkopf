@@ -296,7 +296,7 @@ export async function adminManageAdmins(){
   let h='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
     +'<h3 style="margin:0">👥 Admins verwalten</h3>'
     +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
-  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">„Admin" vergibt volle Rechte. „Doko-Beta" schaltet nur „Doppelkopf spielen" frei (Admins dürfen ohnehin).</div>';
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">„Admin" vergibt volle Rechte. „Doko-Beta" schaltet nur „Doppelkopf spielen" frei, „Liga" nur den Ligabereich (Admins dürfen ohnehin).</div>';
   h+='<div class="card" style="padding:4px 0">';
   if(!adminAdminList.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Keine Spieler.</div>';
   adminAdminList.forEach((s,i)=>{
@@ -314,6 +314,8 @@ export async function adminManageAdmins(){
     h+='</div>';
     h+='<div style="text-align:center"><div style="font-size:9px;color:var(--tx3);margin-bottom:3px">Doko-Beta</div>';
     h+='<button class="toggle'+(s.betaGame===true?' on':'')+'" onclick="adminToggleBeta('+i+')"></button></div>';
+    h+='<div style="text-align:center"><div style="font-size:9px;color:var(--tx3);margin-bottom:3px">Liga</div>';
+    h+='<button class="toggle'+(s.liga===true?' on':'')+'" onclick="adminToggleLiga('+i+')"></button></div>';
     h+='</div>';
     h+='</div>';
   });
@@ -347,6 +349,20 @@ export async function adminToggleBeta(i){
     showToast(makeBeta?(s.name||'Spieler')+' ist jetzt Doko-Beta-Tester.':'Doko-Beta entzogen.','info');
     adminManageAdmins();
   }catch(e){console.error('adminToggleBeta error:',e);showToast('Fehler beim Ändern.','error')}
+}
+
+// Schaltet den „Ligabereich" für einen Spieler frei/aus (spieler/<id>/liga).
+export async function adminToggleLiga(i){
+  const s=adminAdminList[i];
+  if(!s)return;
+  const makeLiga=!(s.liga===true);
+  try{
+    const ref=firebase.database().ref('spieler/'+s.id+'/liga');
+    if(makeLiga)await ref.set(true);else await ref.remove();
+    s.liga=makeLiga?true:undefined;
+    showToast(makeLiga?(s.name||'Spieler')+' hat jetzt Liga-Zugang.':'Liga-Zugang entzogen.','info');
+    adminManageAdmins();
+  }catch(e){console.error('adminToggleLiga error:',e);showToast('Fehler beim Ändern.','error')}
 }
 
 // Admin: alle Turniere sehen und verwalten (aktuell setzen, ausblenden, wiederherstellen, hart loeschen).

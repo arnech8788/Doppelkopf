@@ -241,6 +241,15 @@ export async function canBetaDoko(){
   return spielerCanBeta(await getOwnSpieler());
 }
 
+// True, wenn der Spieler den „Ligabereich" nutzen darf: Admins immer,
+// sonst per Flag spieler/<id>/liga.
+export function spielerCanLiga(s){
+  return spielerIsAdmin(s) || !!(s && s.liga===true);
+}
+export async function canLiga(){
+  return spielerCanLiga(await getOwnSpieler());
+}
+
 // ── Presence / Online-Anzeige ──
 // Hinweis: Schreibt presence/<spielerId> und entfernt den Knoten automatisch beim
 // Verbindungsverlust (onDisconnect). Nur Nutzer MIT Profil melden sich; ohne Profil/
@@ -2170,9 +2179,9 @@ export async function loadAllTurniere(){
   try{
     const snap=await firebase.database().ref('turniere').get();
     const data=snap.val()||{};
-    // Geteilte Einzelspiele (turniere/SG…) sind keine Turniere → herausfiltern.
+    // Geteilte Einzelspiele (turniere/SG…) und Ligen (turniere/LG…) sind keine Turniere → herausfiltern.
     return Object.entries(data)
-      .filter(([key,t])=>!key.startsWith('SG')&&!(t&&t.kind==='sharedGame'))
+      .filter(([key,t])=>!key.startsWith('SG')&&!key.startsWith('LG')&&!(t&&t.kind==='sharedGame')&&!(t&&t.kind==='liga'))
       .map(([key,t])=>({code:key.replace(/^DK/,''),key,...t}));
   }catch(e){console.error('loadAllTurniere:',e);return[]}
 }

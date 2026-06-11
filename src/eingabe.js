@@ -2,6 +2,8 @@ import { state, save, getAllPlayers, getHistoricalPlayers, getPlayerEmoji, getVo
 import { showToast, showConfirm, showPrompt, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
 import { renderPlayerTags, renderQuickStart, initAddPlayerInput } from './setup.js';
 import { archiveCurrentGame } from './archiv.js';
+import { canLiga } from './turnier.js';
+import * as liga from './liga.js';
 
 export function renderEingabe(){
   document.getElementById('successMsg').style.display='none';
@@ -648,6 +650,17 @@ export async function endGame(){
   }
   if(!await showConfirm('Aktuelles Spiel archivieren und beenden?','Beenden',true))return;
   archiveCurrentGame();
+  // Optional: dieses Spiel in eine Liga-Gesamttabelle aufnehmen (nur bei Liga-Zugang & Mitgliedschaft).
+  try{
+    if(Array.isArray(state.ligen)&&state.ligen.length&&await canLiga()){
+      await liga.addCurrentGameToLiga({
+        date:state.gameStartTime||new Date().toISOString(),
+        players:[...state.players],
+        rounds:JSON.parse(JSON.stringify(state.rounds)),
+        gameStartTime:state.gameStartTime
+      });
+    }
+  }catch(e){console.error('liga add on endGame:',e)}
   checkSeasonAchievements();
   state.rounds=[];
   state.achievements={}; // Abend-Achievements gehoeren zum beendeten Abend
