@@ -1,16 +1,38 @@
-// liga.js – Ligabereich: admin-freischaltbare Liga-Tabellen mit Beitrittscode.
-// Ligen liegen im offenen Firebase-Pfad turniere/LG<code> (kind:'liga') – keine Regeländerung.
-// Zugang wird clientseitig über canLiga() gegated. Spiele sind Schnappschüsse wie im Archiv;
-// die Gesamttabelle wird clientseitig via computeStandings (archiv.js) berechnet.
+// liga.js – Ligabereich (öffentlich, „wie Turniere"). Ligen liegen im offenen Firebase-Pfad
+// turniere/LG<code> (kind:'liga'). Jede:r kann anlegen/beitreten. Rollen: globale Admins +
+// Liga-Ersteller + per Ersteller ernannte Liga-Admins verwalten. Gesamttabelle = manuelle
+// Termin-Punkte + Punkte aus eingetragenen App-Spielen (computeStandings, Match per Name).
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import { state, save } from './main.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
-import { initFirebase, getOwnSpieler, getDeviceId, canLiga, isAdmin, generateQR } from './turnier.js';
+import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
 import { computeStandings } from './archiv.js';
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const ligaRef = code => firebase.database().ref('turniere/LG' + code);
+
+// ── Namens-Ähnlichkeit (für „Bist du das?"-Verknüpfung) ──
+function normalizeName(s) {
+  return String(s || '').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+}
+function lev(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+function similar(a, b) {
+  const x = normalizeName(a), y = normalizeName(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (x.split(' ')[0] === y.split(' ')[0]) return true; // gleicher Vorname
+  const d = lev(x, y);
+  return d <= 2 && d < Math.max(x.length, y.length);
+}
 
 // ── Lokale Liga-Liste (state.ligen = [{code,name}]) ──
 function addLocalLiga(code, name) {
@@ -20,20 +42,38 @@ function addLocalLiga(code, name) {
   save();
 }
 
-// ── Mehr-Screen-Eintrag (nur bei Berechtigung) ──
-export async function fillLigaEntry() {
-  const el = document.getElementById('ligaEntrySlot');
+function isLigaAdmin(data, myId, globalAdmin) {
+  if (globalAdmin) return true;
+  if (!myId) return false;
+  if (data.createdBy && data.createdBy === myId) return true;
+  return !!(data.admins && data.admins[myId]);
+}
+
+// ── Einklappbare Karte im „Mehr"-Screen (analog Turnier) ──
+export async function renderLigaSetup() {
+  const el = document.getElementById('ligaSetupContent');
   if (!el) return;
-  let allowed = false, admin = false;
-  try { allowed = await canLiga(); admin = await isAdmin(); } catch (e) { allowed = false; }
-  if (!allowed) { el.innerHTML = ''; return; }
-  const label = admin ? '' : '<div class="section-label" style="margin-top:20px">Liga</div>';
-  const n = (state.ligen || []).length;
-  el.innerHTML = label + '<div class="card" style="cursor:pointer;border-color:var(--acc)" onclick="openLigaModal()">'
-    + '<div style="display:flex;align-items:center;gap:10px">'
-    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc)"><path d="M8 21h8M12 17v4M6 4h12v4a6 6 0 01-12 0V4zM6 6H3v1a3 3 0 003 3M18 6h3v1a3 3 0 01-3 3"/></svg>'
-    + '<div><div style="font-weight:500">Liga</div><div style="font-size:11px;color:var(--tx3)">'
-    + (n ? n + ' Liga' + (n > 1 ? 'en' : '') + ' · Gesamttabelle' : 'Liga anlegen oder beitreten') + '</div></div></div></div>';
+  const ligen = state.ligen || [];
+  let h = '';
+  if (ligen.length) {
+    h += '<div class="card" style="padding:4px 0;margin-top:4px">';
+    ligen.forEach((l, i) => {
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;' + (i < ligen.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '" onclick="openLigaDetail(\'' + l.code + '\')">';
+      h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(l.name || ('Liga LG-' + l.code)) + '</div><div style="font-size:11px;color:var(--tx3)">LG-' + esc(l.code) + '</div></div>';
+      h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--tx3)"><polyline points="9 18 15 12 9 6"/></svg></div>';
+    });
+    h += '</div>';
+  }
+  h += '<div style="display:flex;gap:8px;margin-top:8px">'
+    + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Erstellen</button>'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaJoinPrompt()">Beitreten</button></div>';
+  el.innerHTML = h;
+  // Globale Admins bekommen zusätzlich „Alle Ligen verwalten".
+  try {
+    if (await isAdmin()) {
+      el.innerHTML += '<div style="margin-top:8px"><button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="ligaAdminAll()">Alle Ligen verwalten</button></div>';
+    }
+  } catch (e) { /* ignore */ }
 }
 
 function modalHeader(title) {
@@ -41,44 +81,13 @@ function modalHeader(title) {
     + '<h3 style="margin:0">' + title + '</h3>'
     + '<button onclick="closeLigaModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">' + ICO.x + '</button></div>';
 }
-
-export async function openLigaModal() {
-  let allowed = false;
-  try { allowed = await canLiga(); } catch (e) { allowed = false; }
-  if (!allowed) { showToast('Kein Zugriff.', 'error'); return; }
-  document.getElementById('ligaModal').classList.add('show');
-  renderLigaHome();
-}
+function showLigaModal() { document.getElementById('ligaModal').classList.add('show'); }
 export function closeLigaModal() {
   document.getElementById('ligaModal').classList.remove('show');
-  const el = document.getElementById('ligaEntrySlot');
-  if (el) fillLigaEntry();
+  renderLigaSetup();
 }
 
-// ── Übersicht: meine Ligen + anlegen/beitreten ──
-export function renderLigaHome() {
-  const el = document.getElementById('ligaModalContent');
-  if (!el) return;
-  let h = modalHeader('🏆 Liga');
-  const ligen = state.ligen || [];
-  if (ligen.length) {
-    h += '<div class="section-label">Meine Ligen</div><div class="card" style="padding:4px 0">';
-    ligen.forEach((l, i) => {
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;' + (i < ligen.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '" onclick="ligaOpenTable(\'' + l.code + '\')">';
-      h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(l.name || ('Liga LG-' + l.code)) + '</div><div style="font-size:11px;color:var(--tx3)">LG-' + esc(l.code) + '</div></div>';
-      h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--tx3)"><polyline points="9 18 15 12 9 6"/></svg></div>';
-    });
-    h += '</div>';
-  } else {
-    h += '<div style="font-size:13px;color:var(--tx3);padding:8px 2px 16px;line-height:1.5">Du bist noch in keiner Liga. Lege eine neue Liga an oder tritt mit einem Code bei. Beim Beenden eines Punkte-Spiels kannst du es dann in die Liga-Gesamttabelle aufnehmen.</div>';
-  }
-  h += '<div style="display:flex;gap:8px;margin-top:16px">'
-    + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Liga anlegen</button>'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaJoinPrompt()">Per Code beitreten</button></div>';
-  el.innerHTML = h;
-}
-
-// ── Liga anlegen ──
+// ── Anlegen ──
 export async function ligaCreate() {
   if (!initFirebase()) { showToast('Keine Datenbank-Verbindung.', 'error'); return; }
   const name = await showPrompt('Wie soll die Liga heißen?', 'z. B. Stammrunde', 'Anlegen');
@@ -98,19 +107,24 @@ export async function ligaCreate() {
   };
   try {
     await ligaRef(code).set(data);
-    if (own) await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '' });
+    if (own) {
+      await ligaRef(code).child('admins/' + own.id).set(true);
+      await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '', joinedAt: firebase.database.ServerValue.TIMESTAMP });
+    }
     addLocalLiga(code, name);
     showToast('Liga „' + name + '" angelegt (LG-' + code + ').', 'info');
-    ligaOpenTable(code);
+    showLigaModal();
+    openLigaDetail(code);
   } catch (e) { console.error('ligaCreate:', e); showToast('Anlegen fehlgeschlagen.', 'error'); }
 }
 
-// ── Liga beitreten ──
+// ── Beitreten ──
 export async function ligaJoinPrompt() {
   const input = await showPrompt('Liga-Code eingeben (z. B. LG-4729 oder 4729):', 'LG-4729', 'Beitreten');
   if (!input) return;
   const code = input.replace(/[^0-9]/g, '').slice(-4);
   if (!/^\d{4}$/.test(code)) { showToast('Ungültiger Code.', 'error'); return; }
+  showLigaModal();
   ligaJoin(code);
 }
 export async function ligaJoin(code) {
@@ -119,58 +133,148 @@ export async function ligaJoin(code) {
   try { const snap = await ligaRef(code).get(); data = snap.val(); } catch (e) { showToast('Beitritt fehlgeschlagen.', 'error'); return; }
   if (!data || data.kind !== 'liga') { showToast('Liga LG-' + code + ' nicht gefunden.', 'error'); return; }
   const own = await getOwnSpieler().catch(() => null);
-  try { if (own) await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '' }); } catch (e) { /* ignore */ }
+  try { if (own) await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '', joinedAt: firebase.database.ServerValue.TIMESTAMP }); } catch (e) { /* ignore */ }
   addLocalLiga(code, data.name || '');
   showToast('Liga „' + (data.name || ('LG-' + code)) + '" beigetreten.', 'info');
-  ligaOpenTable(code);
+  await ligaSuggestClaim(code, data, own);
+  openLigaDetail(code);
+}
+// Beim Beitritt: ähnlich benannten, noch nicht zugeordneten Roster-Spieler vorschlagen.
+async function ligaSuggestClaim(code, data, own) {
+  if (!own) return;
+  const myName = own.name || state.myPlayer || '';
+  if (!myName) return;
+  const players = data.players || {};
+  const cand = Object.entries(players).find(([pid, p]) => !p.claimedBy && similar(p.name, myName));
+  if (!cand) return;
+  const [pid, p] = cand;
+  const ok = await showConfirm('In dieser Liga gibt es den Spieler „' + p.name + '". Bist du das? Dann wird er mit dir verknüpft.', 'Ja, das bin ich');
+  if (!ok) return;
+  try { await ligaRef(code).child('players/' + pid).update({ claimedBy: own.id, claimedByName: myName }); } catch (e) { /* ignore */ }
 }
 
-// ── Liga-Tabelle anzeigen ──
-export async function ligaOpenTable(code) {
+// ── Gesamttabelle berechnen: manuelle Termin-Punkte + App-Spiele (per Name) ──
+function ligaStandings(data) {
+  const players = data.players || {};
+  const termine = data.termine || {};
+  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g }));
+  const gs = games.length ? computeStandings(games) : { stats: {} };
+  const manual = {};
+  Object.keys(players).forEach(pid => manual[pid] = 0);
+  Object.values(termine).forEach(t => { const pts = t.points || {}; Object.entries(pts).forEach(([pid, v]) => { manual[pid] = (manual[pid] || 0) + (Number(v) || 0); }); });
+  const rows = [];
+  const usedNames = new Set();
+  Object.entries(players).forEach(([pid, p]) => {
+    const name = p.name || '?';
+    usedNames.add(name);
+    const g = gs.stats[name];
+    rows.push({ pid, name, claimedByName: p.claimedByName || null, manuell: manual[pid] || 0, spiel: g ? g.punkte : 0, spiele: g ? g.abende : 0, runden: g ? g.spiele : 0, siege: g ? g.siege : 0, soloWins: g ? g.soloWins : 0, soloTotal: g ? g.soloTotal : 0 });
+  });
+  Object.keys(gs.stats || {}).forEach(name => {
+    if (usedNames.has(name)) return;
+    const g = gs.stats[name];
+    rows.push({ pid: null, name, claimedByName: null, manuell: 0, spiel: g.punkte, spiele: g.abende, runden: g.spiele, siege: g.siege, soloWins: g.soloWins, soloTotal: g.soloTotal });
+  });
+  rows.forEach(r => r.total = r.manuell + r.spiel);
+  rows.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  return rows;
+}
+
+// ── Detailansicht einer Liga ──
+export async function openLigaDetail(code) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  showLigaModal();
   el.innerHTML = modalHeader('🏆 Liga') + '<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
   if (!initFirebase()) { el.innerHTML = modalHeader('🏆 Liga') + '<div style="padding:20px;color:var(--tx3)">Keine Datenbank-Verbindung.</div>'; return; }
   let data;
   try { const snap = await ligaRef(code).get(); data = snap.val(); } catch (e) { data = null; }
-  if (!data) { showToast('Liga nicht gefunden.', 'error'); renderLigaHome(); return; }
+  if (!data || data.kind !== 'liga') { showToast('Liga nicht gefunden.', 'error'); renderLigaHome(); return; }
   addLocalLiga(code, data.name || '');
-  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g }));
-  const admin = await isAdmin().catch(() => false);
   const own = await getOwnSpieler().catch(() => null);
   const myId = own ? own.id : null;
+  const globalAdmin = await isAdmin().catch(() => false);
+  const admin = isLigaAdmin(data, myId, globalAdmin);
+  const isCreator = globalAdmin || (data.createdBy && data.createdBy === myId);
+  const joined = (state.ligen || []).some(l => l.code === code);
   const url = location.origin + location.pathname + '?liga=LG' + code;
+  const players = data.players || {};
+  const members = data.members || {};
+  const admins = data.admins || {};
 
   let h = modalHeader('🏆 ' + esc(data.name || ('Liga LG-' + code)));
+
+  // Teilen / Code
   h += '<div style="text-align:center;margin:6px 0 18px">'
-    + '<div style="font-size:26px;font-weight:700;letter-spacing:3px;margin-bottom:10px">LG-' + esc(code) + '</div>'
-    + '<img src="' + generateQR(url, 5) + '" style="width:150px;height:150px;image-rendering:pixelated;border-radius:var(--r-sm)">'
+    + '<div style="font-size:24px;font-weight:700;letter-spacing:3px;margin-bottom:10px">LG-' + esc(code) + '</div>'
+    + '<img src="' + generateQR(url, 5) + '" style="width:140px;height:140px;image-rendering:pixelated;border-radius:var(--r-sm)">'
     + '<div style="display:flex;gap:8px;margin-top:12px;justify-content:center">'
     + (navigator.share ? '<button class="btn btn-secondary" onclick="ligaShare(\'' + code + '\')">Teilen</button>' : '')
-    + '<button class="btn btn-secondary" onclick="ligaCopyLink(\'' + code + '\')">Link kopieren</button></div></div>';
+    + '<button class="btn btn-secondary" onclick="ligaCopyLink(\'' + code + '\')">Link kopieren</button>'
+    + (joined ? '' : '<button class="btn btn-primary" onclick="ligaJoin(\'' + code + '\')">Beitreten</button>')
+    + '</div></div>';
 
-  if (!games.length) {
-    h += '<div style="font-size:13px;color:var(--tx3);padding:8px 2px;line-height:1.5">Noch keine Spiele in dieser Liga. Beende ein Punkte-Spiel und nimm es in die Liga auf – dann erscheint hier die Gesamttabelle.</div>';
+  // Gesamttabelle
+  const rows = ligaStandings(data);
+  h += '<div class="section-label">Gesamttabelle</div>';
+  if (!rows.length) {
+    h += '<div class="card" style="font-size:13px;color:var(--tx3)">Noch keine Punkte. ' + (admin ? 'Lege Spieler an und trage Termin-Punkte ein oder nimm App-Spiele auf.' : 'Es wurden noch keine Stände eingetragen.') + '</div>';
   } else {
-    const { stats, ranked, sorted } = computeStandings(games);
-    h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:12px">' + sorted.length + ' Spiele · ' + ranked.length + ' Spieler</div>';
-    h += '<div class="section-label">Gesamttabelle</div><div class="card">';
-    ranked.forEach((p, i) => {
-      const s = stats[p];
-      const winRate = s.spiele ? Math.round(s.siege / s.spiele * 100) : 0;
-      const avg = s.abende ? Math.round(s.punkte / s.abende * 10) / 10 : 0;
+    h += '<div class="card">';
+    rows.forEach((r, i) => {
       const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
-      h += '<div style="padding:10px 0;' + (i < ranked.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(p) + '</span><span class="' + (s.punkte >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (s.punkte > 0 ? '+' : '') + s.punkte + '</span></div>';
+      h += '<div style="padding:10px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(r.name) + (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px 12px;font-size:11px;color:var(--tx3);margin-left:26px">';
-      h += '<span>Spiele: ' + s.abende + '</span><span>Runden: ' + s.spiele + '</span><span>Siege: ' + winRate + '%</span><span>Soli: ' + s.soloWins + '/' + s.soloTotal + '</span>';
-      if (s.platz1 > 0) h += '<span>Platz 1: ' + s.platz1 + '×</span>';
-      h += '<span>Ø/Spiel: ' + (avg > 0 ? '+' : '') + avg + '</span></div></div>';
+      h += '<span>Manuell: ' + (r.manuell > 0 ? '+' : '') + r.manuell + '</span><span>App-Spiele: ' + (r.spiel > 0 ? '+' : '') + r.spiel + '</span>';
+      if (r.runden) h += '<span>Runden: ' + r.runden + '</span><span>Siege: ' + Math.round(r.siege / r.runden * 100) + '%</span>';
+      if (r.soloTotal) h += '<span>Soli: ' + r.soloWins + '/' + r.soloTotal + '</span>';
+      h += '</div></div>';
     });
     h += '</div>';
-    h += '<div class="section-label" style="margin-top:20px">Spiele</div><div class="card" style="padding:4px 0">';
-    const gsorted = games.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-    gsorted.forEach((g, i) => {
+  }
+
+  // Spieler (Roster)
+  h += '<div class="section-label" style="margin-top:20px">Spieler' + (admin ? ' <span style="font-weight:400;color:var(--tx3);font-size:11px">· Roster verwalten</span>' : '') + '</div>';
+  h += '<div class="card" style="padding:4px 0">';
+  const pEntries = Object.entries(players);
+  if (!pEntries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Spieler.</div>';
+  pEntries.sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '')).forEach(([pid, p], i) => {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;' + (i < pEntries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(p.name || '?') + '</div>';
+    h += '<div style="font-size:11px;color:var(--tx3)">' + (p.claimedByName ? 'verknüpft mit ' + esc(p.claimedByName) : 'nicht verknüpft') + '</div></div>';
+    if (admin) {
+      h += '<button onclick="ligaSetClaim(\'' + code + '\',\'' + pid + '\')" title="Verknüpfen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Verknüpfen</button>';
+      h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + pid + '\')" title="Umbenennen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.edit + '</button>';
+      h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + pid + '\')" title="Löschen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler hinzufügen</button>';
+
+  // Termine (manuelle Punkte)
+  const termine = Object.entries(data.termine || {}).map(([id, t]) => ({ id, ...t })).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  h += '<div class="section-label" style="margin-top:20px">Termine (manuelle Punkte)</div>';
+  h += '<div class="card" style="padding:4px 0">';
+  if (!termine.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Termine eingetragen.</div>';
+  termine.forEach((t, i) => {
+    const d = t.date ? new Date(t.date) : null;
+    const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+    const cnt = t.points ? Object.keys(t.points).length : 0;
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < termine.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + dateStr + (t.label ? ' · ' + esc(t.label) : '') + '</div><div style="font-size:11px;color:var(--tx3)">' + cnt + ' Spieler-Einträge</div></div>';
+    if (admin) h += '<button onclick="ligaDeleteTermin(\'' + code + '\',\'' + t.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
+    h += '</div>';
+  });
+  h += '</div>';
+  if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="ligaAddTerminForm(\'' + code + '\')">+ Termin eintragen</button>';
+
+  // App-Spiele
+  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g })).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  if (games.length) {
+    h += '<div class="section-label" style="margin-top:20px">App-Spiele</div><div class="card" style="padding:4px 0">';
+    games.forEach((g, i) => {
       const d = g.date ? new Date(g.date) : (g.addedAt ? new Date(g.addedAt) : null);
       const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
       const tot = {}; (g.players || []).forEach(p => tot[p] = 0);
@@ -178,20 +282,170 @@ export async function ligaOpenTable(code) {
       const arr = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
       const top = arr.length ? esc(arr[0]) + ' (' + (tot[arr[0]] > 0 ? '+' : '') + tot[arr[0]] + ')' : '';
       const canDel = admin || (myId && g.addedBy === myId);
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;' + (i < gsorted.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < games.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
       h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + dateStr + ' · ' + (g.rounds ? g.rounds.length : 0) + ' Runden</div><div style="font-size:11px;color:var(--tx3)">Sieger: ' + top + (g.addedByName ? ' · von ' + esc(g.addedByName) : '') + '</div></div>';
-      if (canDel) h += '<button onclick="ligaDeleteGame(\'' + code + '\',\'' + g.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:30px;height:30px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Löschen">' + ICO.trash + '</button>';
+      if (canDel) h += '<button onclick="ligaDeleteGame(\'' + code + '\',\'' + g.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
       h += '</div>';
     });
     h += '</div>';
   }
+
+  // Mitglieder
+  const memEntries = Object.entries(members);
+  h += '<div class="section-label" style="margin-top:20px">Mitglieder</div><div class="card" style="padding:4px 0">';
+  if (!memEntries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Mitglieder.</div>';
+  memEntries.sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '')).forEach(([mid, m], i) => {
+    const isCr = data.createdBy === mid;
+    const isAdm = isCr || !!admins[mid];
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;' + (i < memEntries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(m.name || '(ohne Name)') + (mid === myId ? ' <span style="font-size:10px;color:var(--tx3)">(du)</span>' : '') + '</div>';
+    h += '<div style="font-size:11px;color:var(--tx3)">' + (isCr ? 'Ersteller' : isAdm ? 'Liga-Admin' : 'Mitglied') + '</div></div>';
+    if (isCreator && !isCr) {
+      h += '<button onclick="liga' + (isAdm ? 'Demote' : 'Promote') + '(\'' + code + '\',\'' + mid + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">' + (isAdm ? 'Admin entziehen' : 'Zu Liga-Admin') + '</button>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // Fußzeile
   h += '<div style="display:flex;gap:8px;margin-top:16px">'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaOpenTable(\'' + code + '\')">Aktualisieren</button>'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="renderLigaHome()">Zurück</button></div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaLeave(\'' + code + '\')">Liga verlassen</button>';
+    + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaDetail(\'' + code + '\')">Aktualisieren</button>'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="renderLigaHome()">Übersicht</button></div>';
+  if (joined) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaLeave(\'' + code + '\')">Liga verlassen</button>';
+  if (isCreator) h += '<button class="btn btn-secondary danger" style="width:100%;margin-top:8px;color:var(--neg,#d23);border-color:var(--neg,#d23)" onclick="ligaDeleteLeague(\'' + code + '\')">Liga löschen</button>';
   el.innerHTML = h;
 }
 
+// „Übersicht" (im Modal): meine Ligen + anlegen/beitreten
+export function renderLigaHome() {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  let h = modalHeader('🏆 Liga');
+  const ligen = state.ligen || [];
+  if (ligen.length) {
+    h += '<div class="section-label">Meine Ligen</div><div class="card" style="padding:4px 0">';
+    ligen.forEach((l, i) => {
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;' + (i < ligen.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '" onclick="openLigaDetail(\'' + l.code + '\')">';
+      h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(l.name || ('Liga LG-' + l.code)) + '</div><div style="font-size:11px;color:var(--tx3)">LG-' + esc(l.code) + '</div></div>';
+      h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--tx3)"><polyline points="9 18 15 12 9 6"/></svg></div>';
+    });
+    h += '</div>';
+  } else {
+    h += '<div style="font-size:13px;color:var(--tx3);padding:8px 2px 16px;line-height:1.5">Du bist noch in keiner Liga. Lege eine neue an oder tritt mit einem Code bei.</div>';
+  }
+  h += '<div style="display:flex;gap:8px;margin-top:16px">'
+    + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Erstellen</button>'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaJoinPrompt()">Beitreten</button></div>';
+  el.innerHTML = h;
+}
+
+// ── Roster-Verwaltung ──
+export async function ligaAddPlayer(code) {
+  const name = await showPrompt('Name des Spielers:', 'z. B. Arne', 'Hinzufügen');
+  if (!name) return;
+  try { await ligaRef(code).child('players').push().set({ name: name.trim() }); openLigaDetail(code); }
+  catch (e) { console.error('ligaAddPlayer:', e); showToast('Hinzufügen fehlgeschlagen.', 'error'); }
+}
+export async function ligaRenamePlayer(code, pid) {
+  const name = await showPrompt('Neuer Name:', '', 'Umbenennen');
+  if (!name) return;
+  try { await ligaRef(code).child('players/' + pid + '/name').set(name.trim()); openLigaDetail(code); }
+  catch (e) { showToast('Umbenennen fehlgeschlagen.', 'error'); }
+}
+export async function ligaDeletePlayer(code, pid) {
+  if (!await showConfirm('Diesen Spieler aus der Liga entfernen? (Termin-Einträge zu ihm bleiben, zählen aber nicht mehr.)', 'Löschen', true)) return;
+  try { await ligaRef(code).child('players/' + pid).remove(); openLigaDetail(code); }
+  catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+}
+// Verknüpfung Roster-Spieler ↔ Mitglied setzen/lösen.
+export async function ligaSetClaim(code, pid) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { return; }
+  if (!data) return;
+  const members = Object.entries(data.members || {});
+  const labels = members.map(([, m]) => m.name || '(ohne Name)');
+  labels.push('— Verknüpfung lösen —');
+  const idx = await chooseFromList('Mit welchem Mitglied verknüpfen?', labels);
+  if (idx < 0) return;
+  try {
+    if (idx === members.length) await ligaRef(code).child('players/' + pid).update({ claimedBy: null, claimedByName: null });
+    else { const [mid, m] = members[idx]; await ligaRef(code).child('players/' + pid).update({ claimedBy: mid, claimedByName: m.name || '' }); }
+    openLigaDetail(code);
+  } catch (e) { showToast('Verknüpfen fehlgeschlagen.', 'error'); }
+}
+
+async function chooseFromList(title, labels) {
+  if (!labels.length) { showToast('Keine Auswahl verfügbar.', 'info'); return -1; }
+  const list = labels.map((l, i) => (i + 1) + ') ' + l).join('\n');
+  const ans = await showPrompt(title + '<br><span style="font-size:12px;color:var(--tx3);white-space:pre-line">' + esc(list) + '</span>', '1', 'OK');
+  if (!ans) return -1;
+  const idx = parseInt(ans, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= labels.length) { showToast('Ungültige Auswahl.', 'error'); return -1; }
+  return idx;
+}
+
+// ── Termine (manuelle Punkte) ──
+export async function ligaAddTerminForm(code) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  const today = new Date().toISOString().slice(0, 10);
+  let h = modalHeader('Termin eintragen');
+  h += '<div class="card"><div style="display:flex;gap:8px;margin-bottom:10px">'
+    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Datum</label><input type="date" id="ltDate" value="' + today + '" style="width:100%;box-sizing:border-box;padding:8px"></div>'
+    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Bezeichnung (optional)</label><input type="text" id="ltLabel" placeholder="z. B. Spieltag 5" style="width:100%;box-sizing:border-box;padding:8px"></div></div>';
+  if (!players.length) {
+    h += '<div style="font-size:13px;color:var(--tx3);padding:6px 0">Noch keine Spieler – bitte zuerst Spieler anlegen.</div>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Punkte je Spieler (leer = 0):</div>';
+    players.forEach(([pid, p]) => {
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><div style="flex:1;word-break:break-word">' + esc(p.name || '?') + '</div>'
+        + '<input type="number" id="lt_' + pid + '" inputmode="numeric" placeholder="0" style="width:90px;padding:8px;text-align:right"></div>';
+    });
+  }
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-secondary" style="flex:1" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler</button>';
+  if (players.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\')">Speichern</button>';
+  h += '</div>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaDetail(\'' + code + '\')">Abbrechen</button>';
+  el.innerHTML = h;
+}
+export async function ligaSaveTermin(code) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { return; }
+  if (!data) return;
+  const date = (document.getElementById('ltDate') || {}).value || new Date().toISOString().slice(0, 10);
+  const label = ((document.getElementById('ltLabel') || {}).value || '').trim();
+  const points = {};
+  Object.keys(data.players || {}).forEach(pid => {
+    const inp = document.getElementById('lt_' + pid);
+    if (inp && inp.value !== '' && !isNaN(parseInt(inp.value, 10))) points[pid] = parseInt(inp.value, 10);
+  });
+  if (!Object.keys(points).length) { showToast('Keine Punkte eingegeben.', 'info'); return; }
+  const own = await getOwnSpieler().catch(() => null);
+  try {
+    await ligaRef(code).child('termine').push().set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
+    showToast('Termin gespeichert.', 'info');
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaSaveTermin:', e); showToast('Speichern fehlgeschlagen.', 'error'); }
+}
+export async function ligaDeleteTermin(code, id) {
+  if (!await showConfirm('Diesen Termin löschen?', 'Löschen', true)) return;
+  try { await ligaRef(code).child('termine/' + id).remove(); openLigaDetail(code); }
+  catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+}
+
+// ── Rollen ──
+export async function ligaPromote(code, mid) {
+  try { await ligaRef(code).child('admins/' + mid).set(true); showToast('Ist jetzt Liga-Admin.', 'info'); openLigaDetail(code); }
+  catch (e) { showToast('Fehler.', 'error'); }
+}
+export async function ligaDemote(code, mid) {
+  try { await ligaRef(code).child('admins/' + mid).remove(); showToast('Liga-Admin entzogen.', 'info'); openLigaDetail(code); }
+  catch (e) { showToast('Fehler.', 'error'); }
+}
+
+// ── Teilen / Spiele / Verlassen / Löschen ──
 export function ligaShare(code) {
   const url = location.origin + location.pathname + '?liga=LG' + code;
   navigator.share({ title: 'Doppelkopf Liga', text: 'Tritt meiner Liga bei! Code: LG-' + code, url }).catch(() => {});
@@ -200,13 +454,11 @@ export function ligaCopyLink(code) {
   const url = location.origin + location.pathname + '?liga=LG' + code;
   navigator.clipboard.writeText(url).then(() => showToast('Link kopiert!', 'info')).catch(() => showToast('LG-' + code, 'info'));
 }
-
 export async function ligaDeleteGame(code, gameId) {
   if (!await showConfirm('Diesen Spiel-Eintrag aus der Liga löschen?', 'Löschen', true)) return;
-  try { await ligaRef(code).child('spiele/' + gameId).remove(); showToast('Eintrag gelöscht.', 'info'); ligaOpenTable(code); }
+  try { await ligaRef(code).child('spiele/' + gameId).remove(); showToast('Eintrag gelöscht.', 'info'); openLigaDetail(code); }
   catch (e) { console.error('ligaDeleteGame:', e); showToast('Löschen fehlgeschlagen.', 'error'); }
 }
-
 export async function ligaLeave(code) {
   if (!await showConfirm('Diese Liga auf diesem Gerät verlassen? Die Liga-Daten bleiben für andere bestehen.', 'Verlassen', true)) return;
   state.ligen = (state.ligen || []).filter(l => l.code !== code);
@@ -214,6 +466,35 @@ export async function ligaLeave(code) {
   try { const own = await getOwnSpieler(); if (own) await ligaRef(code).child('members/' + own.id).remove(); } catch (e) { /* ignore */ }
   showToast('Liga verlassen.', 'info');
   renderLigaHome();
+}
+export async function ligaDeleteLeague(code) {
+  if (!await showConfirm('Die GESAMTE Liga LG-' + code + ' unwiderruflich löschen (für alle)?', 'Endgültig löschen', true)) return;
+  try { await ligaRef(code).remove(); state.ligen = (state.ligen || []).filter(l => l.code !== code); save(); showToast('Liga gelöscht.', 'info'); renderLigaHome(); }
+  catch (e) { console.error('ligaDeleteLeague:', e); showToast('Löschen fehlgeschlagen.', 'error'); }
+}
+
+// ── Admin: alle Ligen ──
+export async function ligaAdminAll() {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  el.innerHTML = modalHeader('Alle Ligen') + '<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  const all = await loadAllLigen();
+  let h = modalHeader('Alle Ligen (Admin)');
+  if (!all.length) h += '<div style="font-size:13px;color:var(--tx3);padding:8px 2px">Keine Ligen in der Datenbank.</div>';
+  else {
+    h += '<div class="card" style="padding:4px 0">';
+    all.sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach((l, i) => {
+      const np = l.players ? Object.keys(l.players).length : 0;
+      const nm = l.members ? Object.keys(l.members).length : 0;
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;' + (i < all.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+      h += '<div style="flex:1;min-width:0;cursor:pointer" onclick="openLigaDetail(\'' + l.code + '\')"><div style="font-weight:500;word-break:break-word">' + esc(l.name || ('LG-' + l.code)) + '</div><div style="font-size:11px;color:var(--tx3)">LG-' + esc(l.code) + ' · ' + np + ' Spieler · ' + nm + ' Mitglieder</div></div>';
+      h += '<button onclick="ligaDeleteLeague(\'' + l.code + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="renderLigaHome()">Zurück</button>';
+  el.innerHTML = h;
 }
 
 // ── Spiel beim Beenden in eine Liga aufnehmen ──
@@ -223,12 +504,8 @@ function ligaSig(snapshot) {
 }
 async function chooseLiga() {
   const ligen = state.ligen || [];
-  const list = ligen.map((l, i) => (i + 1) + ') ' + (l.name || ('LG-' + l.code))).join('\n');
-  const ans = await showPrompt('In welche Liga aufnehmen? Nummer eingeben (leer = nicht aufnehmen):<br><span style="font-size:12px;color:var(--tx3);white-space:pre-line">' + esc(list) + '</span>', '1', 'Übernehmen');
-  if (!ans) return null;
-  const idx = parseInt(ans, 10) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= ligen.length) { showToast('Ungültige Auswahl.', 'error'); return null; }
-  return ligen[idx].code;
+  const idx = await chooseFromList('In welche Liga aufnehmen?', ligen.map(l => l.name || ('LG-' + l.code)));
+  return idx < 0 ? null : ligen[idx].code;
 }
 export async function addCurrentGameToLiga(snapshot) {
   const ligen = state.ligen || [];
@@ -261,7 +538,7 @@ export async function addCurrentGameToLiga(snapshot) {
   } catch (e) { console.error('addCurrentGameToLiga:', e); showToast('Konnte Spiel nicht in die Liga schreiben.', 'error'); }
 }
 
-// ── Deep-Link: ?liga=LG<code> ──
+// ── Deep-Link: ?liga=LG<code> (öffentlich) ──
 export function checkLigaUrlParam() {
   const params = new URLSearchParams(location.search);
   const liga = params.get('liga');
@@ -269,11 +546,5 @@ export function checkLigaUrlParam() {
   history.replaceState(null, '', location.pathname);
   const code = liga.replace(/[^0-9]/g, '').slice(-4);
   if (!/^\d{4}$/.test(code)) return;
-  setTimeout(async () => {
-    let allowed = false;
-    try { allowed = await canLiga(); } catch (e) { /* ignore */ }
-    if (!allowed) { showToast('Für den Ligabereich fehlt dir die Freischaltung.', 'info'); return; }
-    document.getElementById('ligaModal').classList.add('show');
-    ligaJoin(code);
-  }, 600);
+  setTimeout(() => { showLigaModal(); openLigaDetail(code); }, 600);
 }

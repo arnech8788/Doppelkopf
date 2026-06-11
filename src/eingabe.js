@@ -2,7 +2,6 @@ import { state, save, getAllPlayers, getHistoricalPlayers, getPlayerEmoji, getVo
 import { showToast, showConfirm, showPrompt, ICO, launchConfetti, launchMiniConfetti } from './ui.js';
 import { renderPlayerTags, renderQuickStart, initAddPlayerInput } from './setup.js';
 import { archiveCurrentGame } from './archiv.js';
-import { canLiga } from './turnier.js';
 import * as liga from './liga.js';
 
 export function renderEingabe(){
@@ -652,7 +651,7 @@ export async function endGame(){
   archiveCurrentGame();
   // Optional: dieses Spiel in eine Liga-Gesamttabelle aufnehmen (nur bei Liga-Zugang & Mitgliedschaft).
   try{
-    if(Array.isArray(state.ligen)&&state.ligen.length&&await canLiga()){
+    if(Array.isArray(state.ligen)&&state.ligen.length){
       await liga.addCurrentGameToLiga({
         date:state.gameStartTime||new Date().toISOString(),
         players:[...state.players],
