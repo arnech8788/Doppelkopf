@@ -56,25 +56,27 @@ function handStats(handIds, ctx) {
 
 // ── Vorbehalt-Entscheidung ──
 export function decideVorbehalt(state, idx) {
-  const ctx = { regime: 'full', trumpSuit: 'k' };
   const hand = state.players[idx].hand;
   // Hochzeit: beide Kreuz-Damen.
   if (canDeclareHochzeit(state, idx)) return { type: 'hochzeit' };
-  const s = handStats(hand, ctx);
   const cards = hand.map(cardFromId);
-  // Sehr starke Trumpfhand → Trumpf-Solo (konservativ).
-  if (s.trumps >= 9 && s.damen >= 2) return { type: 'solo', soloType: 'trumpf' };
-  // Viele Damen → Damen-Solo.
-  if (s.damen >= 3) return { type: 'solo', soloType: 'damen' };
-  // Viele Buben → Buben-Solo.
-  if (s.buben >= 3) return { type: 'solo', soloType: 'buben' };
-  // Lange, starke Farbe (≥6 inkl. Ass) → Farbsolo.
-  for (const suit of ['c', 'p', 'h', 'k']) {
-    const sc = cards.filter(c => c.suit === suit);
-    if (sc.length >= 7 && sc.some(c => c.rank === 'A')) {
-      return { type: 'solo', soloType: 'farbe-' + suit };
+  // Farb-/Trumpf-Solo: im echten Regime des jeweiligen Solos bewerten (Dulle+Damen+Buben+Farbe)
+  // und das trumpfstärkste wählen. Nur bei klarer Trumpf-Mehrheit + hohen Spitzen.
+  // ('trumpf' = Karo-Regime, deckt 'farbe-k' ab; bei Gleichstand gewinnt der erste → Karo/Trumpf.)
+  let best = null;
+  for (const soloType of ['trumpf', 'farbe-c', 'farbe-p', 'farbe-h']) {
+    const s = handStats(hand, trumpCtx({ gameType: 'solo', soloType }));
+    if (s.trumps >= 9 && (s.damen + s.dullen) >= 2 && (!best || s.trumps > best.t)) {
+      best = { soloType, t: s.trumps };
     }
   }
+  if (best) return { type: 'solo', soloType: best.soloType };
+  // Damen-/Buben-Solo: nur bei Dominanz dieser wenigen Trümpfe (≥5 von 8) + Fehl-Assen.
+  const damen = cards.filter(c => c.rank === 'D').length;
+  const buben = cards.filter(c => c.rank === 'B').length;
+  const aces = cards.filter(c => c.rank === 'A').length;
+  if (damen >= 5 && aces >= 1) return { type: 'solo', soloType: 'damen' };
+  if (buben >= 5 && aces >= 1) return { type: 'solo', soloType: 'buben' };
   return { type: 'gesund' };
 }
 
