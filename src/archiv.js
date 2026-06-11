@@ -102,22 +102,18 @@ export function closeAllTimeModal(){document.getElementById('allTimeModal').clas
 document.getElementById('allTimeModal').addEventListener('click',function(e){if(e.target===this)closeAllTimeModal()});
 
 let allTimeChartInstance=null;
-export function openAllTimeModal(){
-  if(allTimeChartInstance){allTimeChartInstance.destroy();allTimeChartInstance=null}
-  const archive=loadArchive();
-  if(archive.length<2)return;
-  // Alle Spieler sammeln
+// Aggregiert Spiele (Archiv-/Liga-Schnappschüsse) zu einer Rangliste pro Spielername.
+// Jedes Spiel = ein „Abend". Reine Funktion → auch von der Liga genutzt.
+export function computeStandings(games){
   const playerSet=new Set();
-  archive.forEach(g=>{
+  games.forEach(g=>{
     g.rounds.forEach(r=>r.playing.forEach(p=>playerSet.add(p)));
     if(g.players)g.players.forEach(p=>playerSet.add(p));
   });
   const allPlayers=[...playerSet];
-  // Statistiken aggregieren
   const stats={};
   allPlayers.forEach(p=>{stats[p]={abende:0,spiele:0,punkte:0,siege:0,soloWins:0,soloTotal:0,platz1:0}});
-  // Archiv chronologisch sortieren
-  const sorted=archive.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const sorted=games.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
   sorted.forEach(g=>{
     const abendPlayers=new Set();
     g.rounds.forEach(r=>r.playing.forEach(p=>abendPlayers.add(p)));
@@ -144,7 +140,6 @@ export function openAllTimeModal(){
       });
     });
     abendPlayers.forEach(p=>{if(stats[p])stats[p].abende++});
-    // Bester Spieler des Abends
     const abendArr=[...abendPlayers];
     if(abendArr.length){
       const maxPts=Math.max(...abendArr.map(p=>abendTotals[p]||0));
@@ -152,8 +147,15 @@ export function openAllTimeModal(){
       if(candidates.length===1&&stats[candidates[0]])stats[candidates[0]].platz1++;
     }
   });
-  // Sortieren nach Gesamt-Punkten
   const ranked=allPlayers.slice().sort((a,b)=>stats[b].punkte-stats[a].punkte);
+  return {stats,ranked,sorted,allPlayers};
+}
+
+export function openAllTimeModal(){
+  if(allTimeChartInstance){allTimeChartInstance.destroy();allTimeChartInstance=null}
+  const archive=loadArchive();
+  if(archive.length<2)return;
+  const {stats,ranked,sorted,allPlayers}=computeStandings(archive);
   // HTML bauen
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">🏆 Ewige Tabelle</h3><button onclick="closeAllTimeModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">'+ICO.x+'</button></div>';
   html+='<div style="font-size:11px;color:var(--tx3);margin-bottom:12px">'+sorted.length+' Spielabende · '+allPlayers.length+' Spieler</div>';
