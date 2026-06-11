@@ -2,7 +2,7 @@
 // Kein eigener Zufall (deterministisch, Tie-Break über Karten-ID) → reproduzierbar testbar.
 import {
   trumpCtx, isTrump, legalCards, trickWinner, cardFromId, countAugen,
-  AUGEN, canDeclareHochzeit, canAnnounce,
+  AUGEN, canDeclareHochzeit, canAnnounce, canThrow,
 } from './engine.js';
 
 // ── Parteien aus Sicht von self ableiten (nur öffentlich Bekanntes) ──
@@ -55,28 +55,33 @@ function handStats(handIds, ctx) {
 }
 
 // ── Vorbehalt-Entscheidung ──
+// Gültige Soli: Trumpf, Damen, Buben, Fleischlos. Reihenfolge: Hochzeit → Trumpf → Damen →
+// Buben → Fleischlos → Schmeißen → gesund. Konservativ, aber lockerer als zuvor.
 export function decideVorbehalt(state, idx) {
   const hand = state.players[idx].hand;
   // Hochzeit: beide Kreuz-Damen.
   if (canDeclareHochzeit(state, idx)) return { type: 'hochzeit' };
   const cards = hand.map(cardFromId);
-  // Farb-/Trumpf-Solo: im echten Regime des jeweiligen Solos bewerten (Dulle+Damen+Buben+Farbe)
-  // und das trumpfstärkste wählen. Nur bei klarer Trumpf-Mehrheit + hohen Spitzen.
-  // ('trumpf' = Karo-Regime, deckt 'farbe-k' ab; bei Gleichstand gewinnt der erste → Karo/Trumpf.)
-  let best = null;
-  for (const soloType of ['trumpf', 'farbe-c', 'farbe-p', 'farbe-h']) {
-    const s = handStats(hand, trumpCtx({ gameType: 'solo', soloType }));
-    if (s.trumps >= 9 && (s.damen + s.dullen) >= 2 && (!best || s.trumps > best.t)) {
-      best = { soloType, t: s.trumps };
-    }
-  }
-  if (best) return { type: 'solo', soloType: best.soloType };
-  // Damen-/Buben-Solo: nur bei Dominanz dieser wenigen Trümpfe (≥5 von 8) + Fehl-Assen.
   const damen = cards.filter(c => c.rank === 'D').length;
   const buben = cards.filter(c => c.rank === 'B').length;
   const aces = cards.filter(c => c.rank === 'A').length;
+  // Trumpf-Solo (Karo-Regime): sehr trumpfreich ODER Top-Kontrolle (höchste Spitzen) + Asse.
+  const ks = handStats(hand, trumpCtx({ gameType: 'solo', soloType: 'trumpf' }));
+  const topTrumps = cards.filter(c =>
+    (c.suit === 'h' && c.rank === '10') ||                  // Dulle
+    ((c.suit === 'c' || c.suit === 'p') && c.rank === 'D')  // Kreuz-/Pik-Dame
+  ).length;
+  if ((ks.trumps >= 9 && (ks.damen + ks.dullen) >= 2)
+      || (topTrumps >= 3 && ks.trumps >= 7 && aces >= 2)) {
+    return { type: 'solo', soloType: 'trumpf' };
+  }
+  // Damen-/Buben-Solo: nur bei Dominanz dieser wenigen Trümpfe (≥5 von 8) + Fehl-Assen.
   if (damen >= 5 && aces >= 1) return { type: 'solo', soloType: 'damen' };
   if (buben >= 5 && aces >= 1) return { type: 'solo', soloType: 'buben' };
+  // Fleischlos: trumpfarme, sehr assreiche Hand.
+  if (aces >= 4 && ks.trumps <= 3) return { type: 'solo', soloType: 'fleischlos' };
+  // Schmeißen: kein Trumpf über dem Fuchs (keine Dulle/Dame/Bube).
+  if (canThrow(hand)) return { type: 'schmeissen' };
   return { type: 'gesund' };
 }
 
