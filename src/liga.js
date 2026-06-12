@@ -87,10 +87,45 @@ function modalHeader(title) {
     + '<h3 style="margin:0">' + title + '</h3>'
     + '<button onclick="closeLigaModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen">' + ICO.x + '</button></div>';
 }
-function showLigaModal() { document.getElementById('ligaModal').classList.add('show'); }
+function showLigaModal() {
+  const m = document.getElementById('ligaModal');
+  if (m && !m.classList.contains('show')) ligaStack = []; // frischer Einstieg → Navigations-Stack leeren
+  if (m) m.classList.add('show');
+}
 export function closeLigaModal() {
+  ligaStack = [];
   document.getElementById('ligaModal').classList.remove('show');
   renderLigaSetup();
+}
+
+// ── Navigations-Stack (echtes „Zurück" innerhalb des Liga-Fensters) ──
+let ligaStack = [];
+function ligaNav(entry) {
+  const same = e => e.t === entry.t && (e.code || '') === (entry.code || '') && (e.id || '') === (entry.id || '') && (e.gameId || '') === (entry.gameId || '');
+  const idx = ligaStack.findIndex(same);
+  if (idx >= 0) ligaStack.splice(idx); // schon im Stack → bis dorthin zurückkürzen
+  ligaStack.push(entry);
+}
+function ligaRenderEntry(e) {
+  switch (e.t) {
+    case 'home': return renderLigaHome();
+    case 'join': return openLigaJoin();
+    case 'detail': return openLigaDetail(e.code);
+    case 'my': return ligaMyLeagues();
+    case 'all': return ligaAdminAll();
+    case 'history': return openLigaHistory(e.code);
+    case 'game': return openLigaGameDetail(e.code, e.gameId);
+    case 'termin': return openLigaTerminDetail(e.code, e.id);
+    case 'terminForm': return ligaTerminForm(e.code, e.id);
+    case 'archive': return ligaAddArchivedGame(e.code);
+    default: return renderLigaHome();
+  }
+}
+export function ligaCanGoBack() { return ligaStack.length > 1; }
+export function ligaBack() {
+  if (ligaStack.length <= 1) { closeLigaModal(); return; }
+  ligaStack.pop();
+  ligaRenderEntry(ligaStack[ligaStack.length - 1]);
 }
 
 // ── Anlegen ──
@@ -130,6 +165,7 @@ export function openLigaJoin() {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   showLigaModal();
+  ligaNav({ t: 'join' });
   let h = modalHeader('Liga beitreten');
   h += '<div class="card"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Liga-Code</label>'
     + '<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:var(--tx2)">LG-</span>'
@@ -137,7 +173,7 @@ export function openLigaJoin() {
   h += '<div style="display:flex;gap:8px;margin-top:10px">'
     + '<button class="btn btn-primary" style="flex:1" onclick="ligaJoinFromInput()">Beitreten</button>'
     + '<button class="btn btn-secondary" style="flex:1" onclick="openQrScanner(\'liga\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:-2px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg> QR scannen</button></div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="renderLigaHome()">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
   const inp = document.getElementById('ligaJoinCodeInput');
   if (inp) setTimeout(() => inp.focus(), 100);
@@ -207,6 +243,7 @@ export async function openLigaDetail(code) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   showLigaModal();
+  ligaNav({ t: 'detail', code });
   el.innerHTML = modalHeader('🏆 Liga') + '<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
   if (!initFirebase()) { el.innerHTML = modalHeader('🏆 Liga') + '<div style="padding:20px;color:var(--tx3)">Keine Datenbank-Verbindung.</div>'; return; }
   let data;
@@ -333,7 +370,7 @@ export async function openLigaDetail(code) {
   // Fußzeile
   h += '<div style="display:flex;gap:8px;margin-top:16px">'
     + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaDetail(\'' + code + '\')">Aktualisieren</button>'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="renderLigaHome()">Übersicht</button></div>';
+    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaBack()">Zurück</button></div>';
   h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaHistory(\'' + code + '\')">🕓 Historie' + (admin ? ' (mit Rückgängig)' : '') + '</button>';
   if (joined) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaLeave(\'' + code + '\')">Liga verlassen</button>';
   if (isCreator) h += '<button class="btn btn-secondary danger" style="width:100%;margin-top:8px;color:var(--neg,#d23);border-color:var(--neg,#d23)" onclick="ligaDeleteLeague(\'' + code + '\')">Liga löschen</button>';
@@ -344,6 +381,7 @@ export async function openLigaDetail(code) {
 export function renderLigaHome() {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  ligaNav({ t: 'home' });
   let h = modalHeader('🏆 Liga');
   const ligen = state.ligen || [];
   if (ligen.length) {
@@ -425,6 +463,7 @@ async function chooseFromList(title, labels) {
 export async function openLigaTerminDetail(code, id) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  ligaNav({ t: 'termin', code, id });
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
   const t = (data.termine || {})[id];
@@ -445,7 +484,7 @@ export async function openLigaTerminDetail(code, id) {
   });
   h += '</div>';
   if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="ligaTerminForm(\'' + code + '\',\'' + id + '\')">Bearbeiten</button>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 // „+ Termin eintragen" (ohne id) bzw. Bearbeiten (mit id). Felder bei Bearbeiten vorbelegt.
@@ -453,6 +492,7 @@ export async function ligaAddTerminForm(code) { return ligaTerminForm(code); }
 export async function ligaTerminForm(code, id) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  ligaNav({ t: 'terminForm', code, id: id || '' });
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
   const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
@@ -478,7 +518,7 @@ export async function ligaTerminForm(code, id) {
   h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-secondary" style="flex:1" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler</button>';
   if (players.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\'' + (id ? ',\'' + id + '\'' : '') + ')">Speichern</button>';
   h += '</div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="' + (id ? 'openLigaTerminDetail(\'' + code + '\',\'' + id + '\')' : 'openLigaDetail(\'' + code + '\')') + '">Abbrechen</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Abbrechen</button>';
   el.innerHTML = h;
 }
 export async function ligaSaveTermin(code, id) {
@@ -573,6 +613,7 @@ export async function ligaAdminAll() {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   showLigaModal();
+  ligaNav({ t: 'all' });
   el.innerHTML = modalHeader('Alle Ligen') + '<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
   const all = await loadAllLigen();
   let h = modalHeader('Alle Ligen (Admin)');
@@ -589,7 +630,7 @@ export async function ligaAdminAll() {
     });
     h += '</div>';
   }
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="renderLigaHome()">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 
@@ -598,6 +639,7 @@ export async function ligaMyLeagues() {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   showLigaModal();
+  ligaNav({ t: 'my' });
   el.innerHTML = modalHeader('Meine Ligen') + '<div style="padding:30px;text-align:center;color:var(--tx3)">Lädt…</div>';
   const own = await getOwnSpieler().catch(() => null);
   const myId = own ? own.id : null;
@@ -620,22 +662,25 @@ export async function ligaMyLeagues() {
     });
     h += '</div>';
   }
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="renderLigaHome()">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 
 // ── Historie der Liga (mit Rückgängig für Liga-Admins) ──
 export async function openLigaHistory(code) {
+  showLigaModal();
+  ligaNav({ t: 'history', code });
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   const own = await getOwnSpieler().catch(() => null);
   const admin = isLigaAdmin(data || {}, own ? own.id : null, await isAdmin().catch(() => false));
-  renderHistory('LG' + code, { title: 'Historie · LG-' + code, container: 'ligaModalContent', canUndo: admin, backOnclick: "openLigaDetail('" + code + "')" });
+  renderHistory('LG' + code, { title: 'Historie · LG-' + code, container: 'ligaModalContent', canUndo: admin, backOnclick: 'ligaBack()' });
 }
 
 // ── App-Spiel-Detail (Runden ansehen) ──
 export async function openLigaGameDetail(code, gameId) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  ligaNav({ t: 'game', code, gameId });
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
   const g = (data.spiele || {})[gameId];
@@ -662,7 +707,7 @@ export async function openLigaGameDetail(code, gameId) {
     h += '<div style="padding:7px 12px;' + (i < rounds.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '"><div style="font-size:12px;font-weight:500">Runde ' + (i + 1) + (r.bock ? ' · Bock' : '') + soloBadge + '</div><div style="font-size:11px;color:var(--tx3)">' + detail + '</div></div>';
   });
   h += '</div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 
@@ -742,6 +787,7 @@ export async function ligaAddArchivedGame(code) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   showLigaModal();
+  ligaNav({ t: 'archive', code });
   if (!initFirebase()) { showToast('Keine Datenbank-Verbindung.', 'error'); return; }
   const archive = loadArchive().slice().sort((a, b) => (new Date(b.date) - new Date(a.date)) || ((b.id || 0) - (a.id || 0)));
   let h = modalHeader('Spiel aus Archiv aufnehmen');
@@ -765,7 +811,7 @@ export async function ligaAddArchivedGame(code) {
     });
     h += '</div>';
   }
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 export async function ligaConfirmArchivedGame(code, archiveId) {
@@ -785,3 +831,7 @@ export function checkLigaUrlParam() {
   if (!/^\d{4}$/.test(code)) return;
   setTimeout(() => { showLigaModal(); openLigaDetail(code); }, 600);
 }
+
+// Klick auf den Hintergrund schließt das Liga-Fenster komplett (und leert den Navigations-Stack).
+const _ligaModalEl = document.getElementById('ligaModal');
+if (_ligaModalEl) _ligaModalEl.addEventListener('click', function (e) { if (e.target === this) closeLigaModal(); });
