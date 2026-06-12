@@ -2195,16 +2195,25 @@ export async function loadAllTurniere(){
   }catch(e){console.error('loadAllTurniere:',e);return[]}
 }
 
-// Alle Ligen (turniere/LG…) laden – für die Admin-Gesamtsicht.
+// Alle Ligen laden – robust: Listing des turniere-Knotens (best effort) + Liga-Index
+// (turniere/_ligaIndex) + lokal bekannte (state.ligen) zusammenführen; fehlende per Direktzugriff
+// nachladen. So erscheinen Ligen auch, wenn das Auflisten des ganzen Knotens eingeschränkt ist.
 export async function loadAllLigen(){
   if(!initFirebase())return[];
-  try{
-    const snap=await firebase.database().ref('turniere').get();
-    const data=snap.val()||{};
-    return Object.entries(data)
-      .filter(([key,t])=>key.startsWith('LG')&&t&&t.kind==='liga')
-      .map(([key,t])=>({code:key.replace(/^LG/,''),key,...t}));
-  }catch(e){console.error('loadAllLigen:',e);return[]}
+  const db=firebase.database();
+  const results={};
+  const add=(key,node)=>{ if(node&&node.kind==='liga'){ const code=String(key).replace(/^LG/,''); if(!results[code])results[code]={code,key:'LG'+code,...node}; } };
+  // 1) Listing (best effort)
+  try{ const snap=await db.ref('turniere').get(); const data=snap.val()||{}; Object.entries(data).forEach(([k,t])=>{ if(String(k).startsWith('LG'))add(k,t); }); }catch(e){ /* listing evtl. eingeschränkt */ }
+  // 2) Index + 3) lokal bekannte Codes
+  const codes=new Set();
+  try{ const isnap=await db.ref('turniere/_ligaIndex').get(); Object.keys(isnap.val()||{}).forEach(c=>codes.add(c)); }catch(e){}
+  (state.ligen||[]).forEach(l=>{ if(l&&l.code)codes.add(l.code); });
+  // Fehlende einzeln nachladen (Direktzugriff ist erlaubt)
+  for(const code of codes){ if(results[code])continue; try{ const s=await db.ref('turniere/LG'+code).get(); add('LG'+code,s.val()); }catch(e){} }
+  // Backfill: gefundene Ligen in den Index schreiben (self-heal, damit andere Admins sie sehen)
+  Object.values(results).forEach(l=>{ if(!codes.has(l.code)){ try{ db.ref('turniere/_ligaIndex/'+l.code).update({name:l.name||''}); }catch(e){} } });
+  return Object.values(results);
 }
 
 export function turnierCreatorName(t){
