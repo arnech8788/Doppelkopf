@@ -13,17 +13,19 @@ const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g,
 const logRef = key => firebase.database().ref('turniere/_log/' + key);
 const entityRef = key => firebase.database().ref('turniere/' + key);
 
-export async function logChange(entityKey, action, relPath, before) {
+export async function logChange(entityKey, action, relPath, before, detail) {
   try {
     const own = await getOwnSpieler().catch(() => null);
-    await logRef(entityKey).push().set({
+    const entry = {
       at: firebase.database.ServerValue.TIMESTAMP,
       by: own ? own.id : null,
       byName: own ? (own.name || '') : (state.myPlayer || ''),
       action: action || '',
       path: relPath || '',
       before: before === undefined ? null : before
-    });
+    };
+    if (detail) entry.detail = String(detail);
+    await logRef(entityKey).push().set(entry);
   } catch (e) { console.warn('logChange:', e); }
 }
 
@@ -63,7 +65,9 @@ export async function renderHistory(entityKey, opts) {
       const ds = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
       const isRevert = String(e.action || '').startsWith('Rückgängig');
       h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < log.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-      h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + esc(e.action || '') + '</div><div style="font-size:11px;color:var(--tx3)">' + esc(e.byName || '?') + ' · ' + ds + '</div></div>';
+      h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + esc(e.action || '') + '</div>'
+        + (e.detail ? '<div style="font-size:12px;color:var(--tx2);margin-top:1px;white-space:pre-line">' + esc(e.detail) + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--tx3)">' + esc(e.byName || '?') + ' · ' + ds + '</div></div>';
       if (_hist.canUndo && !isRevert) h += '<button onclick="auditUndo(\'' + entityKey + '\',\'' + e.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Rückgängig</button>';
       h += '</div>';
     });

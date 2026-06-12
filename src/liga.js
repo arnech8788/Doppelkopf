@@ -17,6 +17,24 @@ const ligaRef = code => firebase.database().ref('turniere/LG' + code);
 function safeParse(s) { try { return JSON.parse(s); } catch (e) { return []; } }
 const gameRounds = g => (g && (g.rounds || (g.roundsJson ? safeParse(g.roundsJson) : []))) || [];
 
+// Kurze Beschreibungstexte für die Historie.
+function fmtDate(v) { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''; }
+function gameSummaryText(g) {
+  const rounds = gameRounds(g);
+  const tot = {}; (g.players || []).forEach(p => tot[p] = 0);
+  rounds.forEach(r => (r.playing || []).forEach(p => { tot[p] = (tot[p] || 0) + ((r.scores && r.scores[p]) || 0); }));
+  const arr = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
+  const winner = arr.length ? arr[0] + ' (' + (tot[arr[0]] > 0 ? '+' : '') + tot[arr[0]] + ')' : '';
+  const ds = fmtDate(g.date);
+  return (ds ? ds + ' · ' : '') + rounds.length + ' Runden · ' + (g.players || []).join(', ') + (winner ? '\nSieger: ' + winner : '');
+}
+function terminSummaryText(t, players) {
+  players = players || {};
+  const parts = Object.entries(t.points || {}).map(([pid, v]) => ((players[pid] && players[pid].name) || '?') + ' ' + (v > 0 ? '+' : '') + v);
+  const ds = fmtDate(t.date);
+  return (ds ? ds + ' · ' : '') + (t.label ? t.label + ' · ' : '') + parts.join(', ');
+}
+
 // ── Namens-Ähnlichkeit (für „Bist du das?"-Verknüpfung) ──
 function normalizeName(s) {
   return String(s || '').toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
@@ -537,12 +555,12 @@ export async function ligaSaveTermin(code, id) {
     if (id) {
       const before = (data.termine || {})[id] || null;
       await ligaRef(code).child('termine/' + id).update({ date, label: label || null, points });
-      await logChange('LG' + code, 'Termin bearbeitet (' + date + ')', 'termine/' + id, before);
+      await logChange('LG' + code, 'Termin bearbeitet', 'termine/' + id, before, terminSummaryText({ date, label, points }, data.players));
       showToast('Termin aktualisiert.', 'info');
     } else {
       const ref = ligaRef(code).child('termine').push();
       await ref.set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
-      await logChange('LG' + code, 'Termin eingetragen (' + date + ')', 'termine/' + ref.key, null);
+      await logChange('LG' + code, 'Termin eingetragen', 'termine/' + ref.key, null, terminSummaryText({ date, label, points }, data.players));
       showToast('Termin gespeichert.', 'info');
     }
     openLigaDetail(code);
@@ -551,9 +569,10 @@ export async function ligaSaveTermin(code, id) {
 export async function ligaDeleteTermin(code, id) {
   if (!await showConfirm('Diesen Termin löschen?', 'Löschen', true)) return;
   try {
-    const before = (await ligaRef(code).child('termine/' + id).get()).val();
+    const data = (await ligaRef(code).get()).val() || {};
+    const before = (data.termine || {})[id] || null;
     await ligaRef(code).child('termine/' + id).remove();
-    await logChange('LG' + code, 'Termin gelöscht' + (before && before.date ? ' (' + before.date + ')' : ''), 'termine/' + id, before);
+    await logChange('LG' + code, 'Termin gelöscht', 'termine/' + id, before, before ? terminSummaryText(before, data.players) : '');
     openLigaDetail(code);
   } catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
 }
@@ -590,7 +609,7 @@ export async function ligaDeleteGame(code, gameId) {
   try {
     const before = (await ligaRef(code).child('spiele/' + gameId).get()).val();
     await ligaRef(code).child('spiele/' + gameId).remove();
-    await logChange('LG' + code, 'App-Spiel-Eintrag gelöscht', 'spiele/' + gameId, before);
+    await logChange('LG' + code, 'App-Spiel-Eintrag gelöscht', 'spiele/' + gameId, before, before ? gameSummaryText(before) : '');
     showToast('Eintrag gelöscht.', 'info'); openLigaDetail(code);
   } catch (e) { console.error('ligaDeleteGame:', e); showToast('Löschen fehlgeschlagen.', 'error'); }
 }
@@ -741,7 +760,7 @@ async function pushGameToLiga(code, snapshot) {
       addedAt: firebase.database.ServerValue.TIMESTAMP,
       sig
     });
-    await logChange('LG' + code, 'App-Spiel aufgenommen', 'spiele/' + ref.key, null);
+    await logChange('LG' + code, 'App-Spiel aufgenommen', 'spiele/' + ref.key, null, gameSummaryText(snapshot));
     showToast('Spiel in die Liga aufgenommen.', 'info');
     return true;
   } catch (e) {
