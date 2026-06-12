@@ -47,6 +47,25 @@ export function showPrompt(text,placeholder,actionLabel){
   });
 }
 
+// Klickbare Auswahlliste (statt Ziffern-Eingabe). Liefert den gewählten Index oder -1.
+export function showChoice(text,labels){
+  return new Promise(resolve=>{
+    const overlay=document.getElementById('confirmOverlay');
+    const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const list=labels.map((l,i)=>'<button type="button" data-idx="'+i+'" style="display:block;width:100%;text-align:left;box-sizing:border-box;padding:11px 12px;margin-top:8px;border:1px solid var(--bdr);border-radius:var(--r-sm);background:var(--bg);color:var(--tx);font-size:14px;cursor:pointer">'+esc(l)+'</button>').join('');
+    const txt=document.getElementById('confirmText');
+    txt.innerHTML=text+'<div style="max-height:50vh;overflow:auto;margin-top:4px">'+list+'</div>';
+    const actionBtn=document.getElementById('confirmAction');
+    actionBtn.style.display='none';
+    const cancel=document.getElementById('confirmCancel');
+    overlay.classList.add('show');
+    function cleanup(){overlay.classList.remove('show');actionBtn.style.display='';actionBtn.onclick=null;cancel.onclick=null;overlay.onclick=null;txt.onclick=null;}
+    txt.onclick=function(e){const b=e.target.closest('[data-idx]');if(!b)return;const idx=parseInt(b.getAttribute('data-idx'),10);cleanup();resolve(idx);};
+    cancel.onclick=function(){cleanup();resolve(-1)};
+    overlay.onclick=function(e){if(e.target===overlay){cleanup();resolve(-1)}};
+  });
+}
+
 export const ICO={
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>',
   down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>',
