@@ -24,6 +24,7 @@ let presenceRef=null;        // ref('presence/<spielerId>') des eigenen Geraets
 let presenceConnRef=null;    // ref('.info/connected')
 let presenceHeartbeat=null;  // Intervall fuer lastSeen-Refresh
 let presenceOwnId=null;      // aktuell gemeldete Spieler-ID (Idempotenz-Guard)
+let presenceVisHandler=null; // visibilitychange/pagehide-Handler (Hintergrund = offline)
 let presenceListRef=null;    // ref('presence') fuer Admin-Live-Ansicht
 let presenceListCb=null;
 
@@ -260,6 +261,15 @@ function writePresence(own){
   }).catch(e=>console.warn('presence write:',e));
 }
 
+function presenceHidden(){ return typeof document!=='undefined' && document.visibilityState==='hidden'; }
+function startHeartbeat(){
+  if(presenceHeartbeat)return;
+  presenceHeartbeat=setInterval(()=>{
+    if(presenceRef && !presenceHidden())presenceRef.child('lastSeen').set(firebase.database.ServerValue.TIMESTAMP);
+  },60000);
+}
+function stopHeartbeat(){ if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;} }
+
 export function startPresence(own){
   if(!own||!initFirebase())return;
   if(presenceOwnId===own.id)return; // bereits aktiv fuer diesen Spieler
@@ -271,16 +281,34 @@ export function startPresence(own){
     if(snap.val()===true){
       // onDisconnect bei jeder (Wieder-)Verbindung neu scharf schalten.
       presenceRef.onDisconnect().remove();
-      writePresence(own);
+      // Nur als online melden, wenn der Tab sichtbar ist (Hintergrund-Tab zaehlt nicht).
+      if(!presenceHidden())writePresence(own);
     }
   });
-  presenceHeartbeat=setInterval(()=>{
-    if(presenceRef)presenceRef.child('lastSeen').set(firebase.database.ServerValue.TIMESTAMP);
-  },60000);
+  // Sichtbarkeit: Hintergrund/Schliessen -> Eintrag entfernen; Vordergrund -> wieder melden.
+  presenceVisHandler=()=>{
+    if(!presenceRef)return;
+    if(presenceHidden()){
+      stopHeartbeat();
+      try{presenceRef.remove()}catch(e){}
+    }else{
+      try{presenceRef.onDisconnect().remove()}catch(e){}
+      writePresence(own);
+      startHeartbeat();
+    }
+  };
+  document.addEventListener('visibilitychange',presenceVisHandler);
+  window.addEventListener('pagehide',presenceVisHandler);
+  if(!presenceHidden())startHeartbeat();
 }
 
 export function stopPresence(){
-  if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;}
+  stopHeartbeat();
+  if(presenceVisHandler){
+    try{document.removeEventListener('visibilitychange',presenceVisHandler)}catch(e){}
+    try{window.removeEventListener('pagehide',presenceVisHandler)}catch(e){}
+    presenceVisHandler=null;
+  }
   if(presenceConnRef){try{presenceConnRef.off('value')}catch(e){}presenceConnRef=null;}
   if(presenceRef){
     try{presenceRef.onDisconnect().cancel()}catch(e){}
