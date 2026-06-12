@@ -5,7 +5,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import { state, save } from './main.js';
-import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
+import { showToast, showConfirm, showPrompt, showChoice, ICO } from './ui.js';
 import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
 import { loadArchive } from './archiv.js';
 import { logChange, renderHistory } from './audit.js';
@@ -55,6 +55,9 @@ function similar(a, b) {
   if (!x || !y) return false;
   if (x === y) return true;
   if (x.split(' ')[0] === y.split(' ')[0]) return true; // gleicher Vorname
+  // Kurzform/Spitzname: das kürzere ist Präfix des längeren (z. B. „Chris" ↔ „Christoph").
+  const short = x.length <= y.length ? x : y, long = x.length <= y.length ? y : x;
+  if (short.length >= 3 && long.startsWith(short)) return true;
   const d = lev(x, y);
   return d <= 2 && d < Math.max(x.length, y.length);
 }
@@ -521,12 +524,7 @@ export async function ligaSetClaim(code, pid) {
 
 async function chooseFromList(title, labels) {
   if (!labels.length) { showToast('Keine Auswahl verfügbar.', 'info'); return -1; }
-  const list = labels.map((l, i) => (i + 1) + ') ' + l).join('\n');
-  const ans = await showPrompt(title + '<br><span style="font-size:12px;color:var(--tx3);white-space:pre-line">' + esc(list) + '</span>', '1', 'OK');
-  if (!ans) return -1;
-  const idx = parseInt(ans, 10) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= labels.length) { showToast('Ungültige Auswahl.', 'error'); return -1; }
-  return idx;
+  return await showChoice(title, labels);
 }
 
 // ── Termine (manuelle Punkte): Detail ansehen, neu anlegen, bearbeiten ──
@@ -905,24 +903,39 @@ function snapshotNames(snapshot) {
 }
 // Pending-Zuordnung (Modul-Var), genutzt vom Formular + Speichern.
 let pendingGameMap = null;
-// Zentrale Aufnahme: eindeutige Namens-Treffer automatisch zuordnen; ist alles klar → direkt
-// speichern, sonst Zuordnungs-Formular öffnen (nur bei Unklarheit).
+// Zentrale Aufnahme: Spielernamen werden mit den vorhandenen Liga-Spielern abgeglichen.
+// - Exakter Namens-Treffer → automatisch zugeordnet.
+// - Kein Treffer, aber ein ähnlicher vorhandener Spieler → unklar → Zuordnungs-Formular.
+// - Gar kein ähnlicher Spieler → neuer Spieler, wird ohne Nachfrage angelegt.
 async function ligaAddGameWithMapping(code, snapshot) {
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
   const players = data.players || {};
+  const pEntries = Object.entries(players);
   const nameIdx = {};
-  Object.entries(players).forEach(([pid, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = pid; });
+  pEntries.forEach(([pid, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = pid; });
   const names = snapshotNames(snapshot);
-  const autoMap = {};
-  let allClear = names.length > 0;
+  const map = {};
+  const newNames = []; // ganz neue Spieler (kein ähnlicher vorhanden) → ohne Nachfrage anlegen
+  let unclear = false;
   names.forEach(n => {
-    const pid = nameIdx[String(n).toLowerCase()];
-    if (pid) autoMap[n] = pid; else allClear = false;
+    const exact = nameIdx[String(n).toLowerCase()];
+    if (exact) { map[n] = exact; return; }
+    if (pEntries.some(([, p]) => similar(p.name, n))) { unclear = true; return; } // könnte ein vorhandener sein
+    newNames.push(n);
   });
-  if (allClear) { const ok = await pushGameToLiga(code, snapshot, autoMap); if (ok) openLigaDetail(code); return; }
-  pendingGameMap = { code, gameId: null, snapshot, names };
-  ligaGameMapForm(code, null);
+  if (unclear) { pendingGameMap = { code, gameId: null, snapshot, names }; ligaGameMapForm(code, null); return; }
+  // Alles eindeutig: neue Spieler anlegen und Spiel direkt aufnehmen.
+  try {
+    for (const n of newNames) {
+      const ref = ligaRef(code).child('players').push();
+      await ref.set({ name: String(n).trim() });
+      await logChange('LG' + code, 'Spieler „' + String(n).trim() + '" hinzugefügt', 'players/' + ref.key, null);
+      map[n] = ref.key;
+    }
+  } catch (e) { console.error('ligaAddGameWithMapping:', e); showToast('Konnte Spieler nicht anlegen: ' + (e && e.message || e), 'error'); return; }
+  const ok = await pushGameToLiga(code, snapshot, map);
+  if (ok) openLigaDetail(code);
 }
 
 // Zuordnungs-Formular: je Spielername ein <select> (Roster-Spieler + „neu anlegen").
@@ -958,7 +971,7 @@ export async function ligaGameMapForm(code, gameId) {
     let unclear = false;
     if (!sel) {
       const simHit = pEntries.find(([, p]) => similar(p.name, n));
-      if (simHit) { sel = simHit[0]; unclear = true; } else { sel = '__new__'; unclear = true; }
+      if (simHit) { sel = simHit[0]; unclear = true; } else { sel = '__new__'; } // neuer Spieler: nicht markieren
     }
     h += '<div style="padding:9px 12px;' + (i < names.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + (unclear ? ';border-left:3px solid var(--neg,#d23)' : '') + '">';
     h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px">Spielername</div>';
