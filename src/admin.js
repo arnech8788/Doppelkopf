@@ -410,7 +410,9 @@ export async function adminPresence(){
     if(!list.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Keine Profile.</div>';
     list.forEach((s,i)=>{
       const dot=s._online?'var(--grn)':'var(--tx3)';
-      const status=s._online?('aktiv '+agoText(s._onTs,now)):(s._seen?('zuletzt online '+agoText(s._seen,now)):'noch nie online');
+      const ver=(s.online&&s.online.version)||s.appVersion||'';
+      const verTxt=ver?' · '+escHtml(ver):'';
+      const status=(s._online?('aktiv '+agoText(s._onTs,now)):(s._seen?('zuletzt online '+agoText(s._seen,now)):'noch nie online'))+verTxt;
       h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;'+(i<list.length-1?'border-bottom:1px solid var(--bdr)':'')+'">';
       h+='<span style="width:8px;height:8px;border-radius:50%;background:'+dot+';flex-shrink:0;'+(s._online?'':'opacity:.5')+'"></span>';
       h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(s.name||'(ohne Name)')+(s.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(s.short)+'</span>':'')+'</div>';

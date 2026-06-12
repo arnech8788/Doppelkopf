@@ -2,7 +2,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
-import { state, save, getAllPlayers, invalidateEingabeCache } from './main.js';
+import { state, save, getAllPlayers, invalidateEingabeCache, APP_VERSION } from './main.js';
 import { showToast, showConfirm, showPrompt } from './ui.js';
 import { logChange, renderHistory } from './audit.js';
 
@@ -257,9 +257,10 @@ function seenRef(){ return presenceOwnId?firebase.database().ref('spieler/'+pres
 function writePresence(own){
   if(!presenceRef)return;
   const now=firebase.database.ServerValue.TIMESTAMP;
-  presenceRef.set({ lastSeen:now, deviceId:getDeviceId() }).catch(e=>console.warn('presence write:',e));
-  // Bleibender „zuletzt online"-Zeitstempel (wird NICHT beim Abmelden entfernt).
+  presenceRef.set({ lastSeen:now, deviceId:getDeviceId(), version:APP_VERSION||'' }).catch(e=>console.warn('presence write:',e));
+  // Bleibender „zuletzt online"-Zeitstempel + App-Version (werden NICHT beim Abmelden entfernt).
   firebase.database().ref('spieler/'+own.id+'/lastSeen').set(now).catch(()=>{});
+  if(APP_VERSION)firebase.database().ref('spieler/'+own.id+'/appVersion').set(APP_VERSION).catch(()=>{});
 }
 
 function presenceHidden(){ return typeof document!=='undefined' && document.visibilityState==='hidden'; }
