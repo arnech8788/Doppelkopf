@@ -849,6 +849,13 @@ function parseTurnierCode(text){
   if(!m)m=s.match(/(?:^|[^\d])(\d{4})(?:[^\d]|$)/);
   return m?m[1]:null;
 }
+function parseLigaCode(text){
+  if(!text)return null;
+  const s=String(text);
+  let m=s.match(/(?:liga=)?LG[-]?(\d{4})/i);
+  if(!m)m=s.match(/(?:^|[^\d])(\d{4})(?:[^\d]|$)/);
+  return m?m[1]:null;
+}
 function haversineKm(lat1,lng1,lat2,lng2){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1);
@@ -1071,7 +1078,7 @@ export async function renderNearbyTurniere(){
 
 // ── In-App QR-Scanner ──
 let qrStream=null, qrRaf=null;
-export async function openQrScanner(){
+export async function openQrScanner(mode){
   const modal=document.getElementById('qrScanModal');
   const video=document.getElementById('qrVideo');
   if(!modal||!video)return;
@@ -1094,8 +1101,13 @@ export async function openQrScanner(){
         const img=ctx.getImageData(0,0,canvas.width,canvas.height);
         const res=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
         if(res&&res.data){
-          const code=parseTurnierCode(res.data);
-          if(code){closeQrScanner();openJoinTurnier(code,null);return;}
+          if(mode==='liga'){
+            const code=parseLigaCode(res.data);
+            if(code){closeQrScanner();if(window.ligaJoin)window.ligaJoin(code);return;}
+          }else{
+            const code=parseTurnierCode(res.data);
+            if(code){closeQrScanner();openJoinTurnier(code,null);return;}
+          }
         }
       }catch(e){}
     }

@@ -7,10 +7,14 @@ import 'firebase/compat/database';
 import { state, save } from './main.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
 import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
-import { computeStandings } from './archiv.js';
+import { computeStandings, loadArchive } from './archiv.js';
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const ligaRef = code => firebase.database().ref('turniere/LG' + code);
+// Runden eines App-Spiels: bevorzugt als JSON-String (roundsJson) gespeichert, da Spielernamen
+// als Objekt-Schlüssel in scores sonst Firebase-verbotene Zeichen (. # $ [ ] /) enthalten können.
+function safeParse(s) { try { return JSON.parse(s); } catch (e) { return []; } }
+const gameRounds = g => (g && (g.rounds || (g.roundsJson ? safeParse(g.roundsJson) : []))) || [];
 
 // ── Namens-Ähnlichkeit (für „Bist du das?"-Verknüpfung) ──
 function normalizeName(s) {
@@ -66,7 +70,7 @@ export async function renderLigaSetup() {
   }
   h += '<div style="display:flex;gap:8px;margin-top:8px">'
     + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Erstellen</button>'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaJoinPrompt()">Beitreten</button></div>';
+    + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaJoin()">Beitreten</button></div>';
   el.innerHTML = h;
   // Globale Admins bekommen zusätzlich „Alle Ligen verwalten".
   try {
@@ -118,13 +122,27 @@ export async function ligaCreate() {
   } catch (e) { console.error('ligaCreate:', e); showToast('Anlegen fehlgeschlagen.', 'error'); }
 }
 
-// ── Beitreten ──
-export async function ligaJoinPrompt() {
-  const input = await showPrompt('Liga-Code eingeben (z. B. LG-4729 oder 4729):', 'LG-4729', 'Beitreten');
-  if (!input) return;
-  const code = input.replace(/[^0-9]/g, '').slice(-4);
-  if (!/^\d{4}$/.test(code)) { showToast('Ungültiger Code.', 'error'); return; }
+// ── Beitreten (UI analog openJoinTurnier: Code-Feld + QR scannen) ──
+export function openLigaJoin() {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
   showLigaModal();
+  let h = modalHeader('Liga beitreten');
+  h += '<div class="card"><label style="font-size:12px;color:var(--tx2);display:block;margin-bottom:4px">Liga-Code</label>'
+    + '<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:var(--tx2)">LG-</span>'
+    + '<input type="text" id="ligaJoinCodeInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4729" style="font-size:16px;padding:10px;letter-spacing:4px;text-align:center;flex:1"></div></div>';
+  h += '<div style="display:flex;gap:8px;margin-top:10px">'
+    + '<button class="btn btn-primary" style="flex:1" onclick="ligaJoinFromInput()">Beitreten</button>'
+    + '<button class="btn btn-secondary" style="flex:1" onclick="openQrScanner(\'liga\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:-2px"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg> QR scannen</button></div>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="renderLigaHome()">Zurück</button>';
+  el.innerHTML = h;
+  const inp = document.getElementById('ligaJoinCodeInput');
+  if (inp) setTimeout(() => inp.focus(), 100);
+}
+export function ligaJoinFromInput() {
+  const inp = document.getElementById('ligaJoinCodeInput');
+  const code = ((inp && inp.value) || '').replace(/[^0-9]/g, '').slice(-4);
+  if (!/^\d{4}$/.test(code)) { showToast('Ungültiger Code.', 'error'); return; }
   ligaJoin(code);
 }
 export async function ligaJoin(code) {
@@ -157,7 +175,7 @@ async function ligaSuggestClaim(code, data, own) {
 function ligaStandings(data) {
   const players = data.players || {};
   const termine = data.termine || {};
-  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g }));
+  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g, rounds: gameRounds(g) }));
   const gs = games.length ? computeStandings(games) : { stats: {} };
   const manual = {};
   Object.keys(players).forEach(pid => manual[pid] = 0);
@@ -263,7 +281,7 @@ export async function openLigaDetail(code) {
     const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
     const cnt = t.points ? Object.keys(t.points).length : 0;
     h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < termine.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-    h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + dateStr + (t.label ? ' · ' + esc(t.label) : '') + '</div><div style="font-size:11px;color:var(--tx3)">' + cnt + ' Spieler-Einträge</div></div>';
+    h += '<div style="flex:1;min-width:0;cursor:pointer" onclick="openLigaTerminDetail(\'' + code + '\',\'' + t.id + '\')"><div style="font-size:13px">' + dateStr + (t.label ? ' · ' + esc(t.label) : '') + '</div><div style="font-size:11px;color:var(--tx3)">' + cnt + ' Spieler-Einträge · ansehen</div></div>';
     if (admin) h += '<button onclick="ligaDeleteTermin(\'' + code + '\',\'' + t.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
     h += '</div>';
   });
@@ -272,23 +290,24 @@ export async function openLigaDetail(code) {
 
   // App-Spiele
   const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g })).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-  if (games.length) {
-    h += '<div class="section-label" style="margin-top:20px">App-Spiele</div><div class="card" style="padding:4px 0">';
-    games.forEach((g, i) => {
-      const d = g.date ? new Date(g.date) : (g.addedAt ? new Date(g.addedAt) : null);
-      const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
-      const tot = {}; (g.players || []).forEach(p => tot[p] = 0);
-      (g.rounds || []).forEach(r => r.playing.forEach(p => { tot[p] = (tot[p] || 0) + (r.scores[p] || 0); }));
-      const arr = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
-      const top = arr.length ? esc(arr[0]) + ' (' + (tot[arr[0]] > 0 ? '+' : '') + tot[arr[0]] + ')' : '';
-      const canDel = admin || (myId && g.addedBy === myId);
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < games.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-      h += '<div style="flex:1;min-width:0"><div style="font-size:13px">' + dateStr + ' · ' + (g.rounds ? g.rounds.length : 0) + ' Runden</div><div style="font-size:11px;color:var(--tx3)">Sieger: ' + top + (g.addedByName ? ' · von ' + esc(g.addedByName) : '') + '</div></div>';
-      if (canDel) h += '<button onclick="ligaDeleteGame(\'' + code + '\',\'' + g.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
-      h += '</div>';
-    });
+  h += '<div class="section-label" style="margin-top:20px">App-Spiele</div><div class="card" style="padding:4px 0">';
+  if (!games.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine App-Spiele aufgenommen.</div>';
+  games.forEach((g, i) => {
+    const rounds = gameRounds(g);
+    const d = g.date ? new Date(g.date) : (g.addedAt ? new Date(g.addedAt) : null);
+    const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+    const tot = {}; (g.players || []).forEach(p => tot[p] = 0);
+    rounds.forEach(r => r.playing.forEach(p => { tot[p] = (tot[p] || 0) + (r.scores[p] || 0); }));
+    const arr = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
+    const top = arr.length ? esc(arr[0]) + ' (' + (tot[arr[0]] > 0 ? '+' : '') + tot[arr[0]] + ')' : '';
+    const canDel = admin || (myId && g.addedBy === myId);
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;' + (i < games.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    h += '<div style="flex:1;min-width:0;cursor:pointer" onclick="openLigaGameDetail(\'' + code + '\',\'' + g.id + '\')"><div style="font-size:13px">' + dateStr + ' · ' + rounds.length + ' Runden</div><div style="font-size:11px;color:var(--tx3)">Sieger: ' + top + (g.addedByName ? ' · von ' + esc(g.addedByName) : '') + ' · ansehen</div></div>';
+    if (canDel) h += '<button onclick="ligaDeleteGame(\'' + code + '\',\'' + g.id + '\')" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
     h += '</div>';
-  }
+  });
+  h += '</div>';
+  if (joined) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="ligaAddArchivedGame(\'' + code + '\')">+ Spiel aus Archiv aufnehmen</button>';
 
   // Mitglieder
   const memEntries = Object.entries(members);
@@ -335,7 +354,7 @@ export function renderLigaHome() {
   }
   h += '<div style="display:flex;gap:8px;margin-top:16px">'
     + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Erstellen</button>'
-    + '<button class="btn btn-secondary" style="flex:1" onclick="ligaJoinPrompt()">Beitreten</button></div>';
+    + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaJoin()">Beitreten</button></div>';
   el.innerHTML = h;
 }
 
@@ -383,35 +402,67 @@ async function chooseFromList(title, labels) {
   return idx;
 }
 
-// ── Termine (manuelle Punkte) ──
-export async function ligaAddTerminForm(code) {
+// ── Termine (manuelle Punkte): Detail ansehen, neu anlegen, bearbeiten ──
+export async function openLigaTerminDetail(code, id) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const t = (data.termine || {})[id];
+  if (!t) { showToast('Termin nicht gefunden.', 'error'); openLigaDetail(code); return; }
+  const own = await getOwnSpieler().catch(() => null);
+  const admin = isLigaAdmin(data, own ? own.id : null, await isAdmin().catch(() => false));
+  const players = data.players || {};
+  const d = t.date ? new Date(t.date) : null;
+  const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  let h = modalHeader('Termin' + (dateStr ? ' · ' + dateStr : ''));
+  if (t.label) h += '<div style="font-size:13px;color:var(--tx2);margin-bottom:8px">' + esc(t.label) + '</div>';
+  const pts = t.points || {};
+  const rows = Object.entries(pts).map(([pid, v]) => ({ name: (players[pid] && players[pid].name) || '(gelöscht)', v: Number(v) || 0 })).sort((a, b) => b.v - a.v);
+  h += '<div class="card">';
+  if (!rows.length) h += '<div style="font-size:13px;color:var(--tx3)">Keine Punkte.</div>';
+  rows.forEach((r, i) => {
+    h += '<div style="display:flex;justify-content:space-between;padding:8px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '"><span>' + esc(r.name) + '</span><span class="' + (r.v >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.v > 0 ? '+' : '') + r.v + '</span></div>';
+  });
+  h += '</div>';
+  if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="ligaTerminForm(\'' + code + '\',\'' + id + '\')">Bearbeiten</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  el.innerHTML = h;
+}
+// „+ Termin eintragen" (ohne id) bzw. Bearbeiten (mit id). Felder bei Bearbeiten vorbelegt.
+export async function ligaAddTerminForm(code) { return ligaTerminForm(code); }
+export async function ligaTerminForm(code, id) {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
   const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
-  const today = new Date().toISOString().slice(0, 10);
-  let h = modalHeader('Termin eintragen');
+  const t = id ? (data.termine || {})[id] : null;
+  const pts = t && t.points || {};
+  const dateVal = (t && t.date) || new Date().toISOString().slice(0, 10);
+  const labelVal = (t && t.label) || '';
+  let h = modalHeader(id ? 'Termin bearbeiten' : 'Termin eintragen');
   h += '<div class="card"><div style="display:flex;gap:8px;margin-bottom:10px">'
-    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Datum</label><input type="date" id="ltDate" value="' + today + '" style="width:100%;box-sizing:border-box;padding:8px"></div>'
-    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Bezeichnung (optional)</label><input type="text" id="ltLabel" placeholder="z. B. Spieltag 5" style="width:100%;box-sizing:border-box;padding:8px"></div></div>';
+    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Datum</label><input type="date" id="ltDate" value="' + dateVal + '" style="width:100%;box-sizing:border-box;padding:8px"></div>'
+    + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Bezeichnung (optional)</label><input type="text" id="ltLabel" value="' + esc(labelVal) + '" placeholder="z. B. Spieltag 5" style="width:100%;box-sizing:border-box;padding:8px"></div></div>';
   if (!players.length) {
     h += '<div style="font-size:13px;color:var(--tx3);padding:6px 0">Noch keine Spieler – bitte zuerst Spieler anlegen.</div>';
   } else {
     h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Punkte je Spieler (leer = 0):</div>';
     players.forEach(([pid, p]) => {
+      const v = pts[pid] != null ? pts[pid] : '';
       h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><div style="flex:1;word-break:break-word">' + esc(p.name || '?') + '</div>'
-        + '<input type="number" id="lt_' + pid + '" inputmode="numeric" placeholder="0" style="width:90px;padding:8px;text-align:right"></div>';
+        + '<input type="number" id="lt_' + pid + '" value="' + v + '" inputmode="numeric" placeholder="0" style="width:90px;padding:8px;text-align:right"></div>';
     });
   }
   h += '</div>';
   h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-secondary" style="flex:1" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler</button>';
-  if (players.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\')">Speichern</button>';
+  if (players.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\'' + (id ? ',\'' + id + '\'' : '') + ')">Speichern</button>';
   h += '</div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaDetail(\'' + code + '\')">Abbrechen</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="' + (id ? 'openLigaTerminDetail(\'' + code + '\',\'' + id + '\')' : 'openLigaDetail(\'' + code + '\')') + '">Abbrechen</button>';
   el.innerHTML = h;
 }
-export async function ligaSaveTermin(code) {
+export async function ligaSaveTermin(code, id) {
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { return; }
   if (!data) return;
   const date = (document.getElementById('ltDate') || {}).value || new Date().toISOString().slice(0, 10);
@@ -424,10 +475,15 @@ export async function ligaSaveTermin(code) {
   if (!Object.keys(points).length) { showToast('Keine Punkte eingegeben.', 'info'); return; }
   const own = await getOwnSpieler().catch(() => null);
   try {
-    await ligaRef(code).child('termine').push().set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
-    showToast('Termin gespeichert.', 'info');
+    if (id) {
+      await ligaRef(code).child('termine/' + id).update({ date, label: label || null, points });
+      showToast('Termin aktualisiert.', 'info');
+    } else {
+      await ligaRef(code).child('termine').push().set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
+      showToast('Termin gespeichert.', 'info');
+    }
     openLigaDetail(code);
-  } catch (e) { console.error('ligaSaveTermin:', e); showToast('Speichern fehlgeschlagen.', 'error'); }
+  } catch (e) { console.error('ligaSaveTermin:', e); showToast('Speichern fehlgeschlagen: ' + (e && e.message || e), 'error'); }
 }
 export async function ligaDeleteTermin(code, id) {
   if (!await showConfirm('Diesen Termin löschen?', 'Löschen', true)) return;
@@ -497,15 +553,76 @@ export async function ligaAdminAll() {
   el.innerHTML = h;
 }
 
-// ── Spiel beim Beenden in eine Liga aufnehmen ──
+// ── App-Spiel-Detail (Runden ansehen) ──
+export async function openLigaGameDetail(code, gameId) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const g = (data.spiele || {})[gameId];
+  if (!g) { showToast('Spiel nicht gefunden.', 'error'); openLigaDetail(code); return; }
+  const rounds = gameRounds(g);
+  const players = (g.players && g.players.length) ? g.players.slice() : (() => { const s = new Set(); rounds.forEach(r => r.playing.forEach(p => s.add(p))); return [...s]; })();
+  const d = g.date ? new Date(g.date) : null;
+  const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  const tot = {}; players.forEach(p => tot[p] = 0);
+  rounds.forEach(r => r.playing.forEach(p => { tot[p] = (tot[p] || 0) + (r.scores[p] || 0); }));
+  let h = modalHeader('Spiel' + (dateStr ? ' · ' + dateStr : ''));
+  // Endstand
+  h += '<div class="section-label">Endstand</div><div class="card">';
+  players.slice().sort((a, b) => (tot[b] || 0) - (tot[a] || 0)).forEach((p, i, arr) => {
+    h += '<div style="display:flex;justify-content:space-between;padding:7px 0;' + (i < arr.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '"><span>' + esc(p) + '</span><span class="' + ((tot[p] || 0) >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + ((tot[p] || 0) > 0 ? '+' : '') + (tot[p] || 0) + '</span></div>';
+  });
+  h += '</div>';
+  // Runden
+  h += '<div class="section-label" style="margin-top:16px">Runden (' + rounds.length + ')</div><div class="card" style="padding:4px 0">';
+  if (!rounds.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Keine Runden.</div>';
+  rounds.forEach((r, i) => {
+    const detail = r.playing.map(p => esc(p) + ' ' + ((r.scores[p] || 0) > 0 ? '+' : '') + (r.scores[p] || 0)).join(' · ');
+    const soloBadge = r.solo ? ' <span style="font-size:10px;color:var(--acc)">' + esc(r.soloType || 'Solo') + '</span>' : '';
+    h += '<div style="padding:7px 12px;' + (i < rounds.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '"><div style="font-size:12px;font-weight:500">Runde ' + (i + 1) + (r.bock ? ' · Bock' : '') + soloBadge + '</div><div style="font-size:11px;color:var(--tx3)">' + detail + '</div></div>';
+  });
+  h += '</div>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  el.innerHTML = h;
+}
+
+// ── Spiel in eine Liga aufnehmen (beim Beenden oder aus Archiv) ──
 function ligaSig(snapshot) {
   const players = (snapshot.players || []).slice().sort().join('|');
   return (snapshot.gameStartTime || snapshot.date || '') + '#' + players + '#' + ((snapshot.rounds || []).length);
 }
 async function chooseLiga() {
   const ligen = state.ligen || [];
+  if (!ligen.length) { showToast('Du bist in keiner Liga.', 'info'); return null; }
   const idx = await chooseFromList('In welche Liga aufnehmen?', ligen.map(l => l.name || ('LG-' + l.code)));
   return idx < 0 ? null : ligen[idx].code;
+}
+// Schreibt ein Spiel in die Liga. Runden als JSON-String (roundsJson) → keine Firebase-
+// Schlüsselverbote durch Spielernamen mit Sonderzeichen (. # $ [ ] /). Dedup via sig.
+async function pushGameToLiga(code, snapshot) {
+  const own = await getOwnSpieler().catch(() => null);
+  const sig = ligaSig(snapshot);
+  try {
+    const snap = await ligaRef(code).child('spiele').get();
+    const existing = snap.val() || {};
+    if (Object.values(existing).some(g => g && g.sig === sig)) { showToast('Dieses Spiel ist schon in der Liga.', 'info'); return false; }
+    await ligaRef(code).child('spiele').push().set({
+      date: snapshot.date || new Date().toISOString(),
+      players: snapshot.players || [],
+      roundsJson: JSON.stringify(snapshot.rounds || []),
+      addedBy: own ? own.id : null,
+      addedByName: own ? (own.name || '') : (state.myPlayer || ''),
+      addedAt: firebase.database.ServerValue.TIMESTAMP,
+      sig
+    });
+    showToast('Spiel in die Liga aufgenommen.', 'info');
+    return true;
+  } catch (e) {
+    console.error('pushGameToLiga:', e);
+    showToast('Konnte Spiel nicht in die Liga schreiben: ' + (e && e.message || e), 'error');
+    return false;
+  }
 }
 export async function addCurrentGameToLiga(snapshot) {
   const ligen = state.ligen || [];
@@ -519,23 +636,23 @@ export async function addCurrentGameToLiga(snapshot) {
     code = await chooseLiga();
     if (!code) return;
   }
-  const own = await getOwnSpieler().catch(() => null);
-  const sig = ligaSig(snapshot);
-  try {
-    const snap = await ligaRef(code).child('spiele').get();
-    const existing = snap.val() || {};
-    if (Object.values(existing).some(g => g && g.sig === sig)) { showToast('Dieses Spiel ist schon in der Liga.', 'info'); return; }
-    await ligaRef(code).child('spiele').push().set({
-      date: snapshot.date || new Date().toISOString(),
-      players: snapshot.players || [],
-      rounds: snapshot.rounds || [],
-      addedBy: own ? own.id : null,
-      addedByName: own ? (own.name || '') : (state.myPlayer || ''),
-      addedAt: firebase.database.ServerValue.TIMESTAMP,
-      sig
-    });
-    showToast('Spiel in die Liga aufgenommen.', 'info');
-  } catch (e) { console.error('addCurrentGameToLiga:', e); showToast('Konnte Spiel nicht in die Liga schreiben.', 'error'); }
+  await pushGameToLiga(code, snapshot);
+}
+// Nachträglich ein Spiel aus dem lokalen Geräte-Archiv aufnehmen.
+export async function ligaAddArchivedGame(code) {
+  if (!initFirebase()) { showToast('Keine Datenbank-Verbindung.', 'error'); return; }
+  const archive = loadArchive();
+  if (!archive.length) { showToast('Kein Spiel im Archiv.', 'info'); return; }
+  const labels = archive.map(g => {
+    const d = g.date ? new Date(g.date) : null;
+    const ds = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
+    return ds + ' · ' + (g.players || []).join(', ').slice(0, 40);
+  });
+  const idx = await chooseFromList('Welches Spiel aus dem Archiv aufnehmen?', labels);
+  if (idx < 0) return;
+  const g = archive[idx];
+  const ok = await pushGameToLiga(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
+  if (ok) openLigaDetail(code);
 }
 
 // ── Deep-Link: ?liga=LG<code> (öffentlich) ──
