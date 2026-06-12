@@ -7,7 +7,7 @@ import 'firebase/compat/database';
 import { state, save } from './main.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
 import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
-import { computeStandings, loadArchive } from './archiv.js';
+import { loadArchive } from './archiv.js';
 import { logChange, renderHistory } from './audit.js';
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -16,6 +16,8 @@ const ligaRef = code => firebase.database().ref('turniere/LG' + code);
 // als Objekt-Schlüssel in scores sonst Firebase-verbotene Zeichen (. # $ [ ] /) enthalten können.
 function safeParse(s) { try { return JSON.parse(s); } catch (e) { return []; } }
 const gameRounds = g => (g && (g.rounds || (g.roundsJson ? safeParse(g.roundsJson) : []))) || [];
+// Zuordnung Spielname → Roster-pid (als JSON-String gespeichert, da Namen Sonderzeichen haben können).
+const gameMap = g => { try { return g && g.mapJson ? JSON.parse(g.mapJson) : {}; } catch (e) { return {}; } };
 
 // Kurze Beschreibungstexte für die Historie.
 function fmtDate(v) { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''; }
@@ -133,6 +135,7 @@ function ligaRenderEntry(e) {
     case 'all': return ligaAdminAll();
     case 'history': return openLigaHistory(e.code);
     case 'game': return openLigaGameDetail(e.code, e.gameId);
+    case 'gamemap': return ligaGameMapForm(e.code, e.gameId || null);
     case 'termin': return openLigaTerminDetail(e.code, e.id);
     case 'terminForm': return ligaTerminForm(e.code, e.id);
     case 'archive': return ligaAddArchivedGame(e.code);
@@ -229,31 +232,71 @@ async function ligaSuggestClaim(code, data, own) {
   try { await ligaRef(code).child('players/' + pid).update({ claimedBy: own.id, claimedByName: myName }); } catch (e) { /* ignore */ }
 }
 
-// ── Gesamttabelle berechnen: manuelle Termin-Punkte + App-Spiele (per Name) ──
+// ── Gesamttabelle berechnen: ALLES kombiniert je Roster-Spieler (pid). ──
+// Spiele werden über mapJson (Spielname→pid) bzw. exakten Namens-Treffer zugeordnet; manuelle
+// Termine sind bereits pid-basiert. Zahlbetrag (payMode): pro Abend (Spiel ODER Termin) das
+// Netto je Spieler, negative Beträge aufaddiert.
 function ligaStandings(data) {
   const players = data.players || {};
   const termine = data.termine || {};
-  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g, rounds: gameRounds(g) }));
-  const gs = games.length ? computeStandings(games) : { stats: {} };
-  const manual = {};
-  Object.keys(players).forEach(pid => manual[pid] = 0);
-  Object.values(termine).forEach(t => { const pts = t.points || {}; Object.entries(pts).forEach(([pid, v]) => { manual[pid] = (manual[pid] || 0) + (Number(v) || 0); }); });
-  const rows = [];
-  const usedNames = new Set();
-  Object.entries(players).forEach(([pid, p]) => {
-    const name = p.name || '?';
-    usedNames.add(name);
-    const g = gs.stats[name];
-    rows.push({ pid, name, claimedByName: p.claimedByName || null, manuell: manual[pid] || 0, spiel: g ? g.punkte : 0, spiele: g ? g.abende : 0, runden: g ? g.spiele : 0, siege: g ? g.siege : 0, soloWins: g ? g.soloWins : 0, soloTotal: g ? g.soloTotal : 0 });
+  const games = Object.entries(data.spiele || {}).map(([id, g]) => ({ id, ...g }));
+  const payMode = !!(data.settings && data.settings.payMode);
+  const nameIdx = {};
+  Object.entries(players).forEach(([pid, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = pid; });
+  const acc = {};
+  const row = key => acc[key] || (acc[key] = {
+    key, pid: players[key] ? key : null,
+    name: players[key] ? (players[key].name || '?') : (String(key).charAt(0) === '~' ? String(key).slice(1) + ' (nicht zugeordnet)' : String(key)),
+    claimedByName: players[key] ? (players[key].claimedByName || null) : null,
+    total: 0, payment: 0, abende: 0, runden: 0, siege: 0, soloWins: 0, soloTotal: 0
   });
-  Object.keys(gs.stats || {}).forEach(name => {
-    if (usedNames.has(name)) return;
-    const g = gs.stats[name];
-    rows.push({ pid: null, name, claimedByName: null, manuell: 0, spiel: g.punkte, spiele: g.abende, runden: g.spiele, siege: g.siege, soloWins: g.soloWins, soloTotal: g.soloTotal });
+  Object.keys(players).forEach(pid => row(pid)); // alle Roster-Spieler vorab (auch ohne Spiele)
+  const resolve = (g, rawName) => {
+    const m = gameMap(g);
+    if (m[rawName] && players[m[rawName]]) return m[rawName];
+    const byName = nameIdx[String(rawName).toLowerCase()];
+    if (byName) return byName;
+    return '~' + rawName;
+  };
+  // Manuelle Termine (je Termin ein Abend)
+  Object.values(termine).forEach(t => {
+    const pts = t.points || {};
+    Object.entries(pts).forEach(([pid, v]) => {
+      const r = row(players[pid] ? pid : ('~' + pid));
+      const val = Number(v) || 0;
+      r.total += val; r.abende += 1;
+      if (payMode && val < 0) r.payment += -val;
+    });
   });
-  rows.forEach(r => r.total = r.manuell + r.spiel);
-  rows.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
-  return rows;
+  // App-Spiele (je Spiel ein Abend)
+  games.forEach(g => {
+    const rounds = gameRounds(g);
+    const net = {};
+    rounds.forEach(rd => {
+      const wins = rd.winners || [];
+      let solistKey = null;
+      if (rd.solo) {
+        const sn = wins.length === 1 ? wins[0] : (rd.playing || []).find(p => !wins.includes(p));
+        if (sn) solistKey = resolve(g, sn);
+      }
+      (rd.playing || []).forEach(p => {
+        const key = resolve(g, p);
+        const r = row(key);
+        const s = (rd.scores && rd.scores[p]) || 0;
+        r.total += s; r.runden += 1;
+        net[key] = (net[key] || 0) + s;
+        if (wins.includes(p)) { r.siege += 1; if (rd.solo && key === solistKey) r.soloWins += 1; }
+        if (rd.solo && key === solistKey) r.soloTotal += 1;
+      });
+    });
+    Object.entries(net).forEach(([key, n]) => {
+      const r = row(key);
+      r.abende += 1;
+      if (payMode && n < 0) r.payment += -n;
+    });
+  });
+  const rows = Object.values(acc).sort((a, b) => b.total - a.total || (a.name || '').localeCompare(b.name || ''));
+  return { rows, payMode };
 }
 
 // ── Detailansicht einer Liga ──
@@ -291,8 +334,8 @@ export async function openLigaDetail(code) {
     + (joined ? '' : '<button class="btn btn-primary" onclick="ligaJoin(\'' + code + '\')">Beitreten</button>')
     + '</div></div>';
 
-  // Gesamttabelle
-  const rows = ligaStandings(data);
+  // Gesamttabelle (alles kombiniert)
+  const { rows, payMode } = ligaStandings(data);
   h += '<div class="section-label">Gesamttabelle</div>';
   if (!rows.length) {
     h += '<div class="card" style="font-size:13px;color:var(--tx3)">Noch keine Punkte. ' + (admin ? 'Lege Spieler an und trage Termin-Punkte ein oder nimm App-Spiele auf.' : 'Es wurden noch keine Stände eingetragen.') + '</div>';
@@ -303,9 +346,10 @@ export async function openLigaDetail(code) {
       h += '<div style="padding:10px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
       h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(r.name) + (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px 12px;font-size:11px;color:var(--tx3);margin-left:26px">';
-      h += '<span>Manuell: ' + (r.manuell > 0 ? '+' : '') + r.manuell + '</span><span>App-Spiele: ' + (r.spiel > 0 ? '+' : '') + r.spiel + '</span>';
+      h += '<span>Abende: ' + r.abende + '</span>';
       if (r.runden) h += '<span>Runden: ' + r.runden + '</span><span>Siege: ' + Math.round(r.siege / r.runden * 100) + '%</span>';
       if (r.soloTotal) h += '<span>Soli: ' + r.soloWins + '/' + r.soloTotal + '</span>';
+      if (payMode) h += '<span style="color:var(--neg,#d23);font-weight:600">zu zahlen: ' + r.payment + '</span>';
       h += '</div></div>';
     });
     h += '</div>';
@@ -322,6 +366,7 @@ export async function openLigaDetail(code) {
     h += '<div style="font-size:11px;color:var(--tx3)">' + (p.claimedByName ? 'verknüpft mit ' + esc(p.claimedByName) : 'nicht verknüpft') + '</div></div>';
     if (admin) {
       h += '<button onclick="ligaSetClaim(\'' + code + '\',\'' + pid + '\')" title="Verknüpfen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Verknüpfen</button>';
+      h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + pid + '\')" title="Mit anderem Spieler zusammenführen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Zusammenf.</button>';
       h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + pid + '\')" title="Umbenennen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.edit + '</button>';
       h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + pid + '\')" title="Löschen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
     }
@@ -384,6 +429,13 @@ export async function openLigaDetail(code) {
     h += '</div>';
   });
   h += '</div>';
+
+  // Einstellungen (nur Admin)
+  if (admin) {
+    h += '<div class="section-label" style="margin-top:20px">Einstellungen</div>';
+    h += '<div class="card"><div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Zahlbetrag anzeigen <span style="font-weight:400;color:var(--tx3);font-size:11px">(Minuspunkte je Abend summieren)</span></span>'
+      + '<button class="toggle' + (payMode ? ' on' : '') + '" onclick="ligaSetPayMode(\'' + code + '\',' + (payMode ? 'false' : 'true') + ')"></button></div></div>';
+  }
 
   // Fußzeile
   h += '<div style="display:flex;gap:8px;margin-top:16px">'
@@ -726,7 +778,10 @@ export async function openLigaGameDetail(code, gameId) {
     h += '<div style="padding:7px 12px;' + (i < rounds.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '"><div style="font-size:12px;font-weight:500">Runde ' + (i + 1) + (r.bock ? ' · Bock' : '') + soloBadge + '</div><div style="font-size:11px;color:var(--tx3)">' + detail + '</div></div>';
   });
   h += '</div>';
-  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
+  const own = await getOwnSpieler().catch(() => null);
+  const admin = isLigaAdmin(data, own ? own.id : null, await isAdmin().catch(() => false));
+  if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaGameMapForm(\'' + code + '\',\'' + gameId + '\')">Spieler zuordnen / korrigieren</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Zurück</button>';
   el.innerHTML = h;
 }
 
@@ -743,7 +798,7 @@ async function chooseLiga() {
 }
 // Schreibt ein Spiel in die Liga. Runden als JSON-String (roundsJson) → keine Firebase-
 // Schlüsselverbote durch Spielernamen mit Sonderzeichen (. # $ [ ] /). Dedup via sig.
-async function pushGameToLiga(code, snapshot) {
+async function pushGameToLiga(code, snapshot, map) {
   const own = await getOwnSpieler().catch(() => null);
   const sig = ligaSig(snapshot);
   try {
@@ -755,6 +810,7 @@ async function pushGameToLiga(code, snapshot) {
       date: snapshot.date || new Date().toISOString(),
       players: snapshot.players || [],
       roundsJson: JSON.stringify(snapshot.rounds || []),
+      mapJson: JSON.stringify(map || {}),
       addedBy: own ? own.id : null,
       addedByName: own ? (own.name || '') : (state.myPlayer || ''),
       addedAt: firebase.database.ServerValue.TIMESTAMP,
@@ -787,7 +843,7 @@ export async function addCurrentGameToLiga(snapshot) {
     code = await chooseLiga();
     if (!code) return;
   }
-  await pushGameToLiga(code, snapshot);
+  await ligaAddGameWithMapping(code, snapshot);
 }
 // Aus dem Spiele-Archiv heraus ein Spiel in eine Liga aufnehmen (Liga-Auswahl).
 export async function ligaAddGameToLeagueFromArchive(archiveId) {
@@ -799,7 +855,7 @@ export async function ligaAddGameToLeagueFromArchive(archiveId) {
   let code;
   if (ligen.length === 1) code = ligen[0].code;
   else { code = await chooseLiga(); if (!code) return; }
-  await pushGameToLiga(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
+  await ligaAddGameWithMapping(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
 }
 // Nachträglich ein Spiel aus dem lokalen Geräte-Archiv aufnehmen – Auswahlliste, neuestes oben.
 export async function ligaAddArchivedGame(code) {
@@ -836,8 +892,176 @@ export async function ligaAddArchivedGame(code) {
 export async function ligaConfirmArchivedGame(code, archiveId) {
   const g = loadArchive().find(x => String(x.id) === String(archiveId));
   if (!g) { showToast('Spiel nicht gefunden.', 'error'); return; }
-  const ok = await pushGameToLiga(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
-  if (ok) openLigaDetail(code);
+  await ligaAddGameWithMapping(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
+}
+
+// ── Spieler-Zuordnung beim Aufnehmen / Korrigieren (Kreuztabelle) ──
+// Sammelt alle Spielernamen eines Snapshots (players[] bzw. aus den Runden abgeleitet).
+function snapshotNames(snapshot) {
+  if (snapshot.players && snapshot.players.length) return snapshot.players.slice();
+  const s = new Set();
+  (snapshot.rounds || []).forEach(r => (r.playing || []).forEach(p => s.add(p)));
+  return [...s];
+}
+// Pending-Zuordnung (Modul-Var), genutzt vom Formular + Speichern.
+let pendingGameMap = null;
+// Zentrale Aufnahme: eindeutige Namens-Treffer automatisch zuordnen; ist alles klar → direkt
+// speichern, sonst Zuordnungs-Formular öffnen (nur bei Unklarheit).
+async function ligaAddGameWithMapping(code, snapshot) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = data.players || {};
+  const nameIdx = {};
+  Object.entries(players).forEach(([pid, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = pid; });
+  const names = snapshotNames(snapshot);
+  const autoMap = {};
+  let allClear = names.length > 0;
+  names.forEach(n => {
+    const pid = nameIdx[String(n).toLowerCase()];
+    if (pid) autoMap[n] = pid; else allClear = false;
+  });
+  if (allClear) { const ok = await pushGameToLiga(code, snapshot, autoMap); if (ok) openLigaDetail(code); return; }
+  pendingGameMap = { code, gameId: null, snapshot, names };
+  ligaGameMapForm(code, null);
+}
+
+// Zuordnungs-Formular: je Spielername ein <select> (Roster-Spieler + „neu anlegen").
+// gameId gesetzt → bestehendes Spiel korrigieren; sonst Neu-Aufnahme über pendingGameMap.
+export async function ligaGameMapForm(code, gameId) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  showLigaModal();
+  ligaNav({ t: 'gamemap', code, gameId: gameId || '' });
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = data.players || {};
+  const pEntries = Object.entries(players).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  const nameIdx = {};
+  Object.entries(players).forEach(([pid, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = pid; });
+  let names, existingMap = {};
+  if (gameId) {
+    const g = (data.spiele || {})[gameId];
+    if (!g) { showToast('Spiel nicht gefunden.', 'error'); openLigaDetail(code); return; }
+    names = snapshotNames({ players: g.players, rounds: gameRounds(g) });
+    existingMap = gameMap(g);
+    pendingGameMap = { code, gameId, snapshot: null, names };
+  } else {
+    if (!pendingGameMap || pendingGameMap.code !== code) { showToast('Kein Spiel zum Zuordnen.', 'error'); openLigaDetail(code); return; }
+    names = pendingGameMap.names;
+  }
+  let h = modalHeader('Spieler zuordnen');
+  h += '<div style="font-size:12px;color:var(--tx3);line-height:1.5;margin:2px 0 12px">Ordne jeden Spielernamen einem vorhandenen Liga-Spieler zu oder lege ihn neu an. So zählt dieselbe Person nur einmal – auch wenn sie unterschiedlich geschrieben wurde.</div>';
+  h += '<div class="card" style="padding:4px 0">';
+  names.forEach((n, i) => {
+    // Vorauswahl: bestehende Zuordnung → exakter Treffer → ähnlicher Treffer → neu.
+    let sel = existingMap[n] && players[existingMap[n]] ? existingMap[n] : (nameIdx[String(n).toLowerCase()] || '');
+    let unclear = false;
+    if (!sel) {
+      const simHit = pEntries.find(([, p]) => similar(p.name, n));
+      if (simHit) { sel = simHit[0]; unclear = true; } else { sel = '__new__'; unclear = true; }
+    }
+    h += '<div style="padding:9px 12px;' + (i < names.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + (unclear ? ';border-left:3px solid var(--neg,#d23)' : '') + '">';
+    h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px">Spielername</div>';
+    h += '<div style="font-weight:600;margin-bottom:6px;word-break:break-word">' + esc(n) + (unclear ? ' <span style="font-size:10px;color:var(--neg,#d23);font-weight:500">· bitte prüfen</span>' : '') + '</div>';
+    h += '<select id="ligamap_' + i + '" data-name="' + esc(n) + '" style="width:100%;padding:8px;border:1px solid var(--bdr);border-radius:var(--r-sm);background:var(--bg3);color:var(--tx);font-size:13px">';
+    pEntries.forEach(([pid, p]) => { h += '<option value="' + pid + '"' + (pid === sel ? ' selected' : '') + '>' + esc(p.name || '?') + '</option>'; });
+    h += '<option value="__new__"' + (sel === '__new__' ? ' selected' : '') + '>➕ neu anlegen: ' + esc(n) + '</option>';
+    h += '</select></div>';
+  });
+  h += '</div>';
+  h += '<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="ligaSaveGameMapping(\'' + code + '\')">Speichern</button>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Abbrechen</button>';
+  el.innerHTML = h;
+}
+
+// Speichert die Zuordnung: „neu"-Auswahlen als Roster-Spieler anlegen, Map bauen, dann Spiel
+// schreiben (Neu-Aufnahme) bzw. mapJson aktualisieren (Korrektur eines bestehenden Spiels).
+export async function ligaSaveGameMapping(code) {
+  if (!pendingGameMap || pendingGameMap.code !== code) { showToast('Keine Zuordnung offen.', 'error'); return; }
+  const { gameId, snapshot, names } = pendingGameMap;
+  const map = {};
+  try {
+    for (let i = 0; i < names.length; i++) {
+      const sel = document.getElementById('ligamap_' + i);
+      const n = names[i];
+      let pid = sel ? sel.value : '__new__';
+      if (pid === '__new__') {
+        const ref = ligaRef(code).child('players').push();
+        await ref.set({ name: String(n).trim() });
+        await logChange('LG' + code, 'Spieler „' + String(n).trim() + '" hinzugefügt', 'players/' + ref.key, null);
+        pid = ref.key;
+      }
+      map[n] = pid;
+    }
+    if (gameId) {
+      await ligaRef(code).child('spiele/' + gameId + '/mapJson').set(JSON.stringify(map));
+      await logChange('LG' + code, 'Spieler-Zuordnung geändert', 'spiele/' + gameId + '/mapJson', null);
+      showToast('Zuordnung gespeichert.', 'info');
+      pendingGameMap = null;
+      openLigaDetail(code);
+    } else {
+      pendingGameMap = null;
+      const ok = await pushGameToLiga(code, snapshot, map);
+      if (ok) openLigaDetail(code);
+    }
+  } catch (e) { console.error('ligaSaveGameMapping:', e); showToast('Zuordnung fehlgeschlagen: ' + (e && e.message || e), 'error'); }
+}
+
+// Zwei Roster-Spieler zusammenführen: Quell-pid → Ziel-pid in allen Spielen (mapJson) und
+// Terminen, dann Quell-Spieler löschen.
+export async function ligaMergePlayer(code, pid) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = data.players || {};
+  const src = players[pid];
+  if (!src) { showToast('Spieler nicht gefunden.', 'error'); return; }
+  const others = Object.entries(players).filter(([id]) => id !== pid);
+  if (!others.length) { showToast('Kein anderer Spieler zum Zusammenführen.', 'info'); return; }
+  const idx = await chooseFromList('„' + (src.name || '?') + '" zusammenführen mit …', others.map(([, p]) => p.name || '?'));
+  if (idx < 0) return;
+  const [tpid, tp] = others[idx];
+  if (!await showConfirm('„' + (src.name || '?') + '" in „' + (tp.name || '?') + '" zusammenführen? Alle Spiele und Termin-Punkte werden übertragen, „' + (src.name || '?') + '" wird gelöscht.', 'Zusammenführen', true)) return;
+  const nameIdx = {};
+  Object.entries(players).forEach(([id, p]) => { if (p && p.name) nameIdx[String(p.name).toLowerCase()] = id; });
+  try {
+    // Spiele: jeden Namen, der aktuell auf die Quelle zeigt (Map oder exakter Treffer), auf Ziel umbiegen.
+    const games = data.spiele || {};
+    for (const [gid, g] of Object.entries(games)) {
+      const m = gameMap(g);
+      const names = snapshotNames({ players: g.players, rounds: gameRounds(g) });
+      let changed = false;
+      names.forEach(n => {
+        const cur = (m[n] && players[m[n]]) ? m[n] : (nameIdx[String(n).toLowerCase()] || null);
+        if (cur === pid) { m[n] = tpid; changed = true; }
+      });
+      if (changed) await ligaRef(code).child('spiele/' + gid + '/mapJson').set(JSON.stringify(m));
+    }
+    // Termine: Punkte der Quelle auf das Ziel aufaddieren.
+    const termine = data.termine || {};
+    for (const [tid, t] of Object.entries(termine)) {
+      const pts = t.points || {};
+      if (pts[pid] != null) {
+        const merged = (Number(pts[tpid]) || 0) + (Number(pts[pid]) || 0);
+        await ligaRef(code).child('termine/' + tid + '/points/' + tpid).set(merged);
+        await ligaRef(code).child('termine/' + tid + '/points/' + pid).remove();
+      }
+    }
+    // Quell-Spieler löschen.
+    await ligaRef(code).child('players/' + pid).remove();
+    await logChange('LG' + code, 'Spieler zusammengeführt: „' + (src.name || '?') + '" → „' + (tp.name || '?') + '"', 'players/' + pid, src);
+    showToast('Spieler zusammengeführt.', 'info');
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaMergePlayer:', e); showToast('Zusammenführen fehlgeschlagen: ' + (e && e.message || e), 'error'); }
+}
+
+// Per-Liga-Einstellung: Zahlbetrag (negative Abende summieren) an/aus.
+export async function ligaSetPayMode(code, on) {
+  try {
+    if (on) await ligaRef(code).child('settings/payMode').set(true);
+    else await ligaRef(code).child('settings/payMode').remove();
+    await logChange('LG' + code, 'Zahlbetrag-Anzeige ' + (on ? 'aktiviert' : 'deaktiviert'), 'settings/payMode', null);
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaSetPayMode:', e); showToast('Einstellung fehlgeschlagen.', 'error'); }
 }
 
 // ── Deep-Link: ?liga=LG<code> (öffentlich) ──
