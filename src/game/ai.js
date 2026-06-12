@@ -111,10 +111,23 @@ export function chooseCard(state, idx) {
   const augenOf = c => AUGEN[c.rank];
   const byAugenAsc = (a, b) => augenOf(a) - augenOf(b) || a.id.localeCompare(b.id);
   const byAugenDesc = (a, b) => augenOf(b) - augenOf(a) || a.id.localeCompare(b.id);
+  // Fehlkarten je Farbe in der Hand zählen (für „Richtung blank werfen").
+  const fehlSuitCount = {};
+  legal.forEach(c => { if (!isTrump(c, ctx)) fehlSuitCount[c.suit] = (fehlSuitCount[c.suit] || 0) + 1; });
   const lowSafe = arr => {
-    // niedrigste Augen; Fuchs (Karo-Ass) nicht verschenken, falls Alternativen.
-    const noFox = arr.filter(c => !(c.suit === 'k' && c.rank === 'A'));
-    return (noFox.length ? noFox : arr).slice().sort(byAugenAsc)[0];
+    // Bevorzugt Fehl (Trümpfe schonen), dann niedrige Augen, dann kürzere Fehlfarbe (Richtung blank).
+    // Fuchs (Karo-Ass) nicht verschenken, falls Alternativen.
+    const fehl = arr.filter(c => !isTrump(c, ctx));
+    let pool = fehl.length ? fehl : arr.filter(c => !(c.suit === 'k' && c.rank === 'A'));
+    if (!pool.length) pool = arr;
+    return pool.slice().sort((a, b) => augenOf(a) - augenOf(b)
+      || (fehlSuitCount[a.suit] || 9) - (fehlSuitCount[b.suit] || 9)
+      || a.id.localeCompare(b.id))[0];
+  };
+  // Schmieren: höchste Augen, aber bevorzugt Fehl (nie Trümpfe auf Partner-Stiche verschwenden).
+  const highSchmier = arr => {
+    const fehl = arr.filter(c => !isTrump(c, ctx));
+    return (fehl.length ? fehl : arr).slice().sort(byAugenDesc)[0];
   };
 
   // ── Ausspiel (Stich leer) ──
@@ -154,13 +167,18 @@ export function chooseCard(state, idx) {
   const trickAugen = countAugen(trick.map(t => t.card));
 
   if (winnerIsMine && winnerIdx !== idx) {
-    // Partner führt → schmieren (hohe Augen), v. a. wenn letzter Spieler oder Partner stark sticht.
+    // Partner führt → niemals selbst überstechen, kein Trumpf verschwenden.
     const partnerStrong = isTrump(curBest.card, ctx) && trumpStrength(curBest.card, ctx) <= 4;
-    if (isLast || partnerStrong) {
+    // Sitzt hinter mir noch ein Gegner, der den Partner überstechen könnte? (unbekannt = vorsichtig)
+    let oppBehind = false;
+    for (let k = 1; k <= 3 - trick.length; k++) { if (view.side((idx + k) % 4) !== mySide) { oppBehind = true; break; } }
+    const safe = isLast || partnerStrong || !oppBehind;
+    if (safe) {
+      // Stich gehört sicher der eigenen Partei → hohe Fehl-Augen schmieren, ohne zu überstechen.
       const nonWin = legal.filter(c => !winners.includes(c));
-      const pool = nonWin.length ? nonWin : legal;
-      return pool.slice().sort(byAugenDesc)[0].id;
+      return highSchmier(nonWin.length ? nonWin : legal).id;
     }
+    // Noch ein Gegner kommt und Partner führt nur schwach → niedrig & Fehl halten (Trumpf schonen).
     return lowSafe(legal).id;
   }
 
