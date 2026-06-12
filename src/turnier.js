@@ -514,7 +514,8 @@ export async function renderTurnierSetup(){
   }
   if(!state.turnier){
     const archiv=JSON.parse(localStorage.getItem('doko-v4-turnierArchiv')||'[]');
-    let html='<div style="display:flex;gap:8px;margin-top:4px">'
+    let html='<div style="font-size:11px;color:var(--tx3);line-height:1.4;margin:2px 0 6px">Ein Spielabend live organisieren – mehrere Tische, Rotation & Dashboard, Beitritt per Code. (Für eine dauerhafte Tabelle über viele Abende ist die „Liga" gedacht.)</div>';
+    html+='<div style="display:flex;gap:8px;margin-top:4px">'
       +'<button class="btn btn-primary" style="flex:1" onclick="openCreateTurnier()">Erstellen</button>'
       +'<button class="btn btn-secondary" style="flex:1" onclick="openJoinTurnier()">Beitreten</button>'
       +'</div>';

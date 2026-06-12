@@ -59,7 +59,7 @@ export async function renderLigaSetup() {
   const el = document.getElementById('ligaSetupContent');
   if (!el) return;
   const ligen = state.ligen || [];
-  let h = '';
+  let h = '<div style="font-size:11px;color:var(--tx3);line-height:1.4;margin:2px 0 4px">Dauerhafte Gesamttabelle über mehrere Spielabende – Punkte sammeln, Rangliste. (Ein einzelnes Live-Event mit mehreren Tischen ist dagegen ein „Turnier".)</div>';
   if (ligen.length) {
     h += '<div class="card" style="padding:4px 0;margin-top:4px">';
     ligen.forEach((l, i) => {
@@ -570,6 +570,7 @@ export async function ligaDeleteLeague(code) {
 export async function ligaAdminAll() {
   const el = document.getElementById('ligaModalContent');
   if (!el) return;
+  showLigaModal();
   el.innerHTML = modalHeader('Alle Ligen') + '<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
   const all = await loadAllLigen();
   let h = modalHeader('Alle Ligen (Admin)');
@@ -716,19 +717,40 @@ export async function addCurrentGameToLiga(snapshot) {
   }
   await pushGameToLiga(code, snapshot);
 }
-// Nachträglich ein Spiel aus dem lokalen Geräte-Archiv aufnehmen.
+// Nachträglich ein Spiel aus dem lokalen Geräte-Archiv aufnehmen – Auswahlliste, neuestes oben.
 export async function ligaAddArchivedGame(code) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  showLigaModal();
   if (!initFirebase()) { showToast('Keine Datenbank-Verbindung.', 'error'); return; }
-  const archive = loadArchive();
-  if (!archive.length) { showToast('Kein Spiel im Archiv.', 'info'); return; }
-  const labels = archive.map(g => {
-    const d = g.date ? new Date(g.date) : null;
-    const ds = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
-    return ds + ' · ' + (g.players || []).join(', ').slice(0, 40);
-  });
-  const idx = await chooseFromList('Welches Spiel aus dem Archiv aufnehmen?', labels);
-  if (idx < 0) return;
-  const g = archive[idx];
+  const archive = loadArchive().slice().sort((a, b) => (new Date(b.date) - new Date(a.date)) || ((b.id || 0) - (a.id || 0)));
+  let h = modalHeader('Spiel aus Archiv aufnehmen');
+  if (!archive.length) {
+    h += '<div style="font-size:13px;color:var(--tx3);padding:10px 2px">Kein Spiel im Geräte-Archiv vorhanden.</div>';
+  } else {
+    h += '<div class="card" style="padding:4px 0">';
+    archive.forEach((g, i) => {
+      const d = g.date ? new Date(g.date) : null;
+      const ds = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+      const rounds = g.rounds || [];
+      const tot = {}; (g.players || []).forEach(p => tot[p] = 0);
+      rounds.forEach(r => (r.playing || []).forEach(p => { tot[p] = (tot[p] || 0) + ((r.scores && r.scores[p]) || 0); }));
+      const arr = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
+      const winner = arr.length ? esc(arr[0]) + ' (' + (tot[arr[0]] > 0 ? '+' : '') + tot[arr[0]] + ')' : '–';
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;' + (i < archive.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '" onclick="ligaConfirmArchivedGame(\'' + code + '\',\'' + g.id + '\')">';
+      h += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + ds + ' · ' + rounds.length + ' Runden</div>';
+      h += '<div style="font-size:11px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((g.players || []).join(', ')) + '</div>';
+      h += '<div style="font-size:11px;color:var(--tx3)">Sieger: ' + winner + '</div></div>';
+      h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--tx3)"><polyline points="9 18 15 12 9 6"/></svg></div>';
+    });
+    h += '</div>';
+  }
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="openLigaDetail(\'' + code + '\')">Zurück</button>';
+  el.innerHTML = h;
+}
+export async function ligaConfirmArchivedGame(code, archiveId) {
+  const g = loadArchive().find(x => String(x.id) === String(archiveId));
+  if (!g) { showToast('Spiel nicht gefunden.', 'error'); return; }
   const ok = await pushGameToLiga(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
   if (ok) openLigaDetail(code);
 }
