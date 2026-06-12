@@ -253,19 +253,24 @@ export async function canBetaDoko(){
 // (spieler/<id>/online) – so braucht es KEINE Firebase-Regeländerung. Name/Kuerzel stehen
 // schon im Spieler-Datensatz. Nur Nutzer MIT Profil melden sich; ohne Profil/offline passiert
 // nichts. Die Liste sieht ausschliesslich der Admin.
+function seenRef(){ return presenceOwnId?firebase.database().ref('spieler/'+presenceOwnId+'/lastSeen'):null; }
 function writePresence(own){
   if(!presenceRef)return;
-  presenceRef.set({
-    lastSeen:firebase.database.ServerValue.TIMESTAMP,
-    deviceId:getDeviceId()
-  }).catch(e=>console.warn('presence write:',e));
+  const now=firebase.database.ServerValue.TIMESTAMP;
+  presenceRef.set({ lastSeen:now, deviceId:getDeviceId() }).catch(e=>console.warn('presence write:',e));
+  // Bleibender „zuletzt online"-Zeitstempel (wird NICHT beim Abmelden entfernt).
+  firebase.database().ref('spieler/'+own.id+'/lastSeen').set(now).catch(()=>{});
 }
 
 function presenceHidden(){ return typeof document!=='undefined' && document.visibilityState==='hidden'; }
 function startHeartbeat(){
   if(presenceHeartbeat)return;
   presenceHeartbeat=setInterval(()=>{
-    if(presenceRef && !presenceHidden())presenceRef.child('lastSeen').set(firebase.database.ServerValue.TIMESTAMP);
+    if(presenceRef && !presenceHidden()){
+      const now=firebase.database.ServerValue.TIMESTAMP;
+      presenceRef.child('lastSeen').set(now);
+      const sr=seenRef(); if(sr)sr.set(now);
+    }
   },60000);
 }
 function stopHeartbeat(){ if(presenceHeartbeat){clearInterval(presenceHeartbeat);presenceHeartbeat=null;} }
@@ -281,6 +286,8 @@ export function startPresence(own){
     if(snap.val()===true){
       // onDisconnect bei jeder (Wieder-)Verbindung neu scharf schalten.
       presenceRef.onDisconnect().remove();
+      // „zuletzt online" beim Verbindungsverlust serverseitig mit dem Abmelde-Zeitpunkt füllen.
+      try{firebase.database().ref('spieler/'+own.id+'/lastSeen').onDisconnect().set(firebase.database.ServerValue.TIMESTAMP)}catch(e){}
       // Nur als online melden, wenn der Tab sichtbar ist (Hintergrund-Tab zaehlt nicht).
       if(!presenceHidden())writePresence(own);
     }
@@ -291,6 +298,7 @@ export function startPresence(own){
     if(presenceHidden()){
       stopHeartbeat();
       try{presenceRef.remove()}catch(e){}
+      try{const sr=seenRef();if(sr)sr.set(firebase.database.ServerValue.TIMESTAMP)}catch(e){}
     }else{
       try{presenceRef.onDisconnect().remove()}catch(e){}
       writePresence(own);

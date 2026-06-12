@@ -379,25 +379,42 @@ export async function adminPresence(){
     const cont=document.getElementById('adminModalContent');
     if(cont)cont.innerHTML=header(title)+'<div class="card" style="color:var(--tx3);font-size:13px">'+escHtml(msg)+'</div>';
   }
-  // map = Spieler-Datensaetze; online sind die mit frischem online.lastSeen.
+  // map = Spieler-Datensaetze. Wir zeigen ALLE Spieler, nach „zuletzt online" sortiert.
+  function agoText(ts,now){
+    if(!ts)return null;
+    const s=Math.max(0,Math.round((now-ts)/1000));
+    if(s<60)return 'vor '+s+' s';
+    const m=Math.round(s/60); if(m<60)return 'vor '+m+' min';
+    const h=Math.round(m/60); if(h<24)return 'vor '+h+' h';
+    const d=Math.round(h/24); if(d<7)return 'vor '+d+' Tag'+(d>1?'en':'');
+    return 'am '+new Date(ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+  }
   function render(map){
     firstResponse=true;
     const now=Date.now();
+    const ONLINE=150000;
     const list=Object.entries(map||{})
       .map(([id,s])=>({id,...s}))
-      .filter(s=>s.online&&s.online.lastSeen&&(now-s.online.lastSeen)<150000) // Stale-Schutz
-      .sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    let h=header('🟢 Gerade online ('+list.length+')');
-    h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Nutzer mit Profil, deren App aktuell geöffnet ist. Aktualisiert sich live.</div>';
+      .filter(s=>s.name) // alle Profile (mit Name)
+      .map(s=>{
+        const onTs=s.online&&s.online.lastSeen?s.online.lastSeen:0;
+        const online=onTs&&(now-onTs)<ONLINE;
+        const seen=Math.max(onTs||0,s.lastSeen||0);
+        return {...s,_online:online,_onTs:onTs,_seen:seen};
+      })
+      .sort((a,b)=>(b._seen||0)-(a._seen||0)||(a.name||'').localeCompare(b.name||''));
+    const onlineCount=list.filter(s=>s._online).length;
+    let h=header('👥 Spieler ('+onlineCount+' online)');
+    h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:10px">Alle Profile, nach „zuletzt online" sortiert. Grün = App aktuell geöffnet. Aktualisiert sich live.</div>';
     h+='<div class="card" style="padding:4px 0">';
-    if(!list.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Niemand online.</div>';
-    list.forEach(s=>{
-      const secs=Math.max(0,Math.round((now-s.online.lastSeen)/1000));
-      const ago=secs<60?'vor '+secs+' s':'vor '+Math.round(secs/60)+' min';
-      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bdr)">';
-      h+='<span style="width:8px;height:8px;border-radius:50%;background:var(--grn);flex-shrink:0"></span>';
+    if(!list.length)h+='<div style="padding:12px;color:var(--tx3);font-size:13px">Keine Profile.</div>';
+    list.forEach((s,i)=>{
+      const dot=s._online?'var(--grn)':'var(--tx3)';
+      const status=s._online?('aktiv '+agoText(s._onTs,now)):(s._seen?('zuletzt online '+agoText(s._seen,now)):'noch nie online');
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;'+(i<list.length-1?'border-bottom:1px solid var(--bdr)':'')+'">';
+      h+='<span style="width:8px;height:8px;border-radius:50%;background:'+dot+';flex-shrink:0;'+(s._online?'':'opacity:.5')+'"></span>';
       h+='<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-all">'+escHtml(s.name||'(ohne Name)')+(s.short?' <span style="color:var(--tx3);font-weight:400">· '+escHtml(s.short)+'</span>':'')+'</div>';
-      h+='<div style="font-size:11px;color:var(--tx3)">zuletzt aktiv '+ago+'</div></div></div>';
+      h+='<div style="font-size:11px;color:var(--tx3)">'+status+'</div></div></div>';
     });
     h+='</div>';
     const cont=document.getElementById('adminModalContent');
