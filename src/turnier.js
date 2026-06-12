@@ -4,6 +4,7 @@ import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
 import { state, save, getAllPlayers, invalidateEingabeCache } from './main.js';
 import { showToast, showConfirm, showPrompt } from './ui.js';
+import { logChange, renderHistory } from './audit.js';
 
 const FIREBASE_CONFIG={
   apiKey:"AIzaSyDWDsuVcm21LzrMfkmUcarwS4da6z02Gf8",
@@ -497,9 +498,13 @@ export async function openMeineSpiele(){
   }catch(e){console.error('openMeineSpiele error:',e);showToast('Fehler beim Laden.','error')}
 }
 
-export function renderTurnierSetup(){
+export async function renderTurnierSetup(){
   const el=document.getElementById('turnierSetupContent');
   if(!el)return;
+  // Globale Admins verwalten ALLE Turniere, sonst nur eigene.
+  const ga=await isAdmin().catch(()=>false);
+  const verwaltenLabel=ga?'Alle Turniere verwalten':'Meine Turniere verwalten';
+  const verwaltenShort=ga?'Alle Turniere':'Meine Turniere';
   // Config nachladen für Host-Anzeige
   if(state.turnier&&state.turnier.isHost&&!turnierConfigCache&&initFirebase()){
     firebase.database().ref('turniere/DK'+state.turnier.code+'/config').get().then(cs=>{
@@ -513,7 +518,7 @@ export function renderTurnierSetup(){
       +'<button class="btn btn-primary" style="flex:1" onclick="openCreateTurnier()">Erstellen</button>'
       +'<button class="btn btn-secondary" style="flex:1" onclick="openJoinTurnier()">Beitreten</button>'
       +'</div>';
-    html+='<div style="margin-top:8px"><button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="openMyTurniere()">Meine Turniere verwalten</button></div>';
+    html+='<div style="margin-top:8px"><button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="openMyTurniere()">'+verwaltenLabel+'</button></div>';
     if(archiv.length){
       html+='<div style="margin-top:8px"><button style="background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;padding:0" onclick="showTurnierArchiv()">'+archiv.length+' vergangene'+(archiv.length===1?'s':'')+' Turnier'+(archiv.length>1?'e':'')+'</button></div>';
     }
@@ -556,7 +561,7 @@ export function renderTurnierSetup(){
   }else{
     html+='<button class="btn btn-secondary" style="flex:1" onclick="leaveTurnier()">Verlassen</button>';
   }
-  html+='<button class="btn btn-secondary" style="flex:1" onclick="openMyTurniere()">Meine Turniere</button>';
+  html+='<button class="btn btn-secondary" style="flex:1" onclick="openMyTurniere()">'+verwaltenShort+'</button>';
   html+='</div>';
   // Konfigurationsübersicht für Spielleiter
   if(t.isHost&&turnierConfigCache){
@@ -2182,9 +2187,9 @@ export async function loadAllTurniere(){
   try{
     const snap=await firebase.database().ref('turniere').get();
     const data=snap.val()||{};
-    // Geteilte Einzelspiele (turniere/SG…) und Ligen (turniere/LG…) sind keine Turniere → herausfiltern.
+    // Nur echte Turniere (Schlüssel DK…). SG (geteilte Spiele), LG (Ligen) und _log (Historie) raus.
     return Object.entries(data)
-      .filter(([key,t])=>!key.startsWith('SG')&&!key.startsWith('LG')&&!(t&&t.kind==='sharedGame')&&!(t&&t.kind==='liga'))
+      .filter(([key,t])=>key.startsWith('DK')&&!(t&&t.kind==='sharedGame')&&!(t&&t.kind==='liga'))
       .map(([key,t])=>({code:key.replace(/^DK/,''),key,...t}));
   }catch(e){console.error('loadAllTurniere:',e);return[]}
 }
@@ -2241,8 +2246,19 @@ function turnierRow(t,opts){
     h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px" onclick="turnierRestore(\''+t.code+'\')">Wiederherstellen</button>';
   if(opts.role==='admin'&&t.status==='deleted')
     h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:120px;color:var(--red);border-color:var(--red)" onclick="turnierHardDelete(\''+t.code+'\')">Endgültig löschen</button>';
+  h+='<button class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px;min-width:90px" onclick="openTurnierHistory(\''+t.code+'\')">🕓 Historie</button>';
   h+='</div></div>';
   return h;
+}
+
+// Historie eines Turniers (mit Rückgängig für Admins/Ersteller/Co-Host).
+export async function openTurnierHistory(code){
+  if(!initFirebase())return;
+  document.getElementById('turnierModal').classList.add('show');
+  const own=await getOwnSpieler().catch(()=>null);
+  let data; try{data=(await firebase.database().ref('turniere/DK'+code).get()).val();}catch(e){data=null;}
+  const canUndo=spielerIsAdmin(own)||(own&&data&&(data.createdBy===own.id||(data.hosts&&data.hosts[own.id])));
+  renderHistory('DK'+code,{title:'Historie · DK-'+code,container:'turnierModalContent',canUndo:!!canUndo,backOnclick:'openMyTurniere()'});
 }
 
 // Gemeinsamer Builder fuer Host (eigene) und Admin (alle, gruppiert). Schreibt in opts.containerId.
@@ -2312,7 +2328,9 @@ export async function turnierSoftDelete(code){
   if(!initFirebase())return;
   if(!await showConfirm('Turnier DK-'+code+' archivieren? Es verschwindet aus den aktiven Listen, die Daten bleiben erhalten und lassen sich wiederherstellen.','Archivieren',true))return;
   try{
+    const oldStatus=(await firebase.database().ref('turniere/DK'+code+'/status').get()).val()||'active';
     await firebase.database().ref('turniere/DK'+code+'/status').set('deleted');
+    await logChange('DK'+code,'Turnier archiviert','status',oldStatus);
     removeDiscovery(code);
     if(state.turnier&&state.turnier.code===code){
       if(turnierListener){firebase.database().ref('turniere/DK'+code+'/tische').off('value',turnierListener);turnierListener=null;}
@@ -2332,7 +2350,9 @@ export async function turnierRestore(code){
   const allowed=spielerIsAdmin(own)||(own&&(data.createdBy===own.id||(data.hosts&&data.hosts[own.id])));
   if(!allowed){showToast('Kein Zugriff.','error');return}
   try{
+    const oldStatus=data.status||'deleted';
     await firebase.database().ref('turniere/DK'+code+'/status').set('active');
+    await logChange('DK'+code,'Turnier wiederhergestellt','status',oldStatus);
     showToast('Turnier wiederhergestellt.','info');
     refreshTurnierList();
   }catch(e){showToast('Fehler: '+e.message,'error')}
@@ -2344,7 +2364,9 @@ export async function turnierHardDelete(code){
   if(!spielerIsAdmin(await getOwnSpieler())){showToast('Kein Zugriff.','error');return}
   if(!await showConfirm('Turnier DK-'+code+' UNWIDERRUFLICH löschen? Alle Tische und Wertungen gehen verloren.','Endgültig löschen',true))return;
   try{
+    const before=(await firebase.database().ref('turniere/DK'+code).get()).val();
     await firebase.database().ref('turniere/DK'+code).remove();
+    await logChange('DK'+code,'Turnier endgültig gelöscht','',before);
     removeDiscovery(code);
     if(state.turnier&&state.turnier.code===code){state.turnier=null;save();renderTurnierSetup();renderTurnierIndicator();}
     showToast('Turnier gelöscht.','info');
@@ -2359,15 +2381,16 @@ export async function openMyTurniere(){
   const el=document.getElementById('turnierModalContent');
   el.innerHTML='<div style="text-align:center;padding:32px;color:var(--tx3)">Lade...</div>';
   const own=await getOwnSpieler();
+  const ga=spielerIsAdmin(own);
   const list=await loadAllTurniere();
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;z-index:5;border-bottom:1px solid var(--bdr)">'
-    +'<h3 style="margin:0">Meine Turniere</h3>'
+    +'<h3 style="margin:0">'+(ga?'Alle Turniere':'Meine Turniere')+'</h3>'
     +'<button onclick="closeTurnierDashboard()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">„Öffnen / Bearbeiten" wechselt ins Turnier (voller Spielleiter-Zugriff). „Archivieren" nimmt es aus den aktiven Listen – die Daten bleiben erhalten und lassen sich jederzeit wiederherstellen.</div>';
+  html+='<div style="font-size:12px;color:var(--tx3);margin:12px 0">'+(ga?'Als Admin siehst du alle Turniere. ':'')+'„Öffnen / Bearbeiten" wechselt ins Turnier (voller Spielleiter-Zugriff). „Archivieren" nimmt es aus den aktiven Listen – die Daten bleiben erhalten und lassen sich jederzeit wiederherstellen.</div>';
   html+='<div id="turnierListBody"></div>';
   el.innerHTML=html;
-  renderTurnierList(list,{role:'host',ownSpielerId:own?own.id:null,ownDeviceId:getDeviceId(),containerId:'turnierListBody'});
+  renderTurnierList(list,{role:ga?'admin':'host',ownSpielerId:own?own.id:null,ownDeviceId:getDeviceId(),containerId:'turnierListBody'});
 }
 
 let coHostSelected=[];
