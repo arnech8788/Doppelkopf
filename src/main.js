@@ -54,7 +54,7 @@ export const ACHIEVEMENTS={
 };
 
 // ── Geteilter State ──
-export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,sharedGame:null,cloudBackup:false,uiCollapsed:{},dokoGame:null,dokoTotals:null,dokoDealer:0,dokoMitNeunen:true,dokoAuto:false,ligen:[]};
+export let state={myPlayer:'',players:[],rounds:[],knownNames:[],bockEnabled:false,bockCount:4,bockSolo:false,bockQueue:0,soloTypesEnabled:false,soloTypes:JSON.parse(JSON.stringify(DEFAULT_SOLOS)),gameStartTime:null,kursleiterCupSeen:false,dokoRundeSeen:false,archiveMax:10,turnier:null,sharedGame:null,cloudBackup:false,uiCollapsed:{},dokoGame:null,dokoTotals:null,dokoDealer:0,dokoMitNeunen:true,dokoAuto:false,ligen:[],ligaAskOnEnd:true,ligaDefaultCode:''};
 export let currentPts='';
 export let pendingRound=null;
 export let lastUndo=null;
@@ -214,6 +214,13 @@ export function openSettings(){
   // Archiv
   let archivBody='<div class="settings-row"><span>Max. archivierte Spiele</span><input type="number" id="archiveMax" value="'+(state.archiveMax||10)+'" min="1" max="50" onchange="state.archiveMax=parseInt(this.value)||10;save()"></div>';
   html+=renderCollapsibleCard('settings','archive','Archiv',archivBody);
+
+  // Liga – Spielende-Verhalten
+  let ligaBody='<div class="toggle-row" style="padding:4px 0"><span class="toggle-label">Beim Spielende fragen, ob in eine Liga aufnehmen</span><button class="toggle'+(state.ligaAskOnEnd!==false?' on':'')+'" onclick="this.classList.toggle(\'on\');state.ligaAskOnEnd=this.classList.contains(\'on\');save()"></button></div>';
+  const ligaOpts=(state.ligen||[]).map(l=>'<option value="'+l.code+'"'+(state.ligaDefaultCode===l.code?' selected':'')+'>'+((l.name||('LG-'+l.code)).replace(/</g,'&lt;'))+'</option>').join('');
+  ligaBody+='<div class="settings-row"><span>Standard-Liga (Vorschlag)</span><select onchange="state.ligaDefaultCode=this.value;save()"><option value=""'+(!state.ligaDefaultCode?' selected':'')+'>— jedes Mal fragen —</option>'+ligaOpts+'</select></div>';
+  ligaBody+='<div style="font-size:11px;color:var(--tx3);padding:4px 0">Ist die Frage aus, kannst du Spiele später über die Liga oder das Spiele-Archiv („In Liga") aufnehmen.</div>';
+  html+=renderCollapsibleCard('settings','liga','Liga',ligaBody);
 
   // Darstellung
   const isLight=document.documentElement.getAttribute('data-theme')==='light';
@@ -409,11 +416,11 @@ export function renderMehrScreen(){
   html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+=renderCollapsibleCard('mehr','liga','Liga','<div id="ligaSetupContent"></div>');
   html+='<div class="card" style="cursor:pointer" onclick="openFeedbackModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg><div><div style="font-weight:500">Feedback &amp; Bugs</div><div style="font-size:11px;color:var(--tx3)">Rückmeldung senden</div></div></div></div>';
-  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.34</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.35</div></div></div></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
-  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.34 · 12.06.2026 16:53</div>';
+  html+='<div id="versionLabel" style="text-align:center;margin-top:24px;font-size:10px;color:var(--tx3);opacity:.5;cursor:default;-webkit-user-select:none;user-select:none" onclick="handleVersionTap()">v6.35 · 12.06.2026 17:05</div>';
   el.innerHTML=html;
   renderArchiveList();
   renderTurnierSetup();
@@ -509,6 +516,7 @@ export function openChangelogModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Changelog</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="card">';
   const log=[
+    {v:'6.35',d:'12.06.2026 17:05',t:'Liga: In den Einstellungen lässt sich nun festlegen, ob beim Spielende gefragt wird, ob das Spiel in eine Liga soll – und welche Liga vorgeschlagen wird. Ist die Frage aus, kannst du Spiele später über die Liga oder direkt im Spiele-Archiv („In Liga") aufnehmen. Außerdem behoben: „Alle Ligen verwalten" zeigte keine Ligen – die Liste wird jetzt zuverlässig aus mehreren Quellen zusammengeführt.'},
     {v:'6.34',d:'12.06.2026 16:53',t:'Liga: „Alle Ligen verwalten" funktioniert wieder. „Spiel aus Archiv aufnehmen" zeigt jetzt eine Auswahlliste mit Datum, Spielern, Rundenzahl und Sieger (neuestes oben). Außerdem kurze Erklärzeilen: Turnier = ein Live-Spielabend (mehrere Tische/Rotation), Liga = dauerhafte Gesamttabelle über viele Abende.'},
     {v:'6.33',d:'12.06.2026 14:44',t:'Liga & Turniere: Neue Änderungs-Historie („wer hat wann was geändert") mit Rückgängig-Funktion für Liga-Admins bzw. Turnier-Ersteller/Admins. In der Liga und beim Turnier gibt es dafür den Knopf „🕓 Historie". Außerdem konsistente Verwaltung: Als globaler Admin verwaltest du ALLE Turniere und ALLE Ligen, als normaler Nutzer nur deine eigenen (wo du Ersteller/Admin bist).'},
     {v:'6.32',d:'12.06.2026 15:30',t:'Liga: Beitreten jetzt auch per QR-Code (wie beim Turnier). Manuelle Termine lassen sich antippen, im Detail ansehen und (als Liga-Admin) bearbeiten. App-Spiele kann man antippen und Runde für Runde ansehen. Neu: ein Spiel lässt sich auch nachträglich aus dem Geräte-Archiv in die Liga aufnehmen. Behoben: Aufnehmen schlug bei Spielernamen mit Sonderzeichen (z. B. Punkt) fehl.'},

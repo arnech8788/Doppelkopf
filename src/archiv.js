@@ -71,6 +71,7 @@ export function renderArchiveList(){
     body+='<div class="archive-item-title">'+dateStr+'</div>';
     body+='<div class="archive-item-meta">'+g.players.length+' Spieler \u00b7 '+g.rounds.length+' Runden'+(winner!=='\u2013'?' \u00b7 Sieger: '+winner:'')+'</div>';
     body+='</div>';
+    if((state.ligen||[]).length)body+='<button class="archive-item-delete" title="In Liga aufnehmen" onclick="event.stopPropagation();ligaAddGameToLeagueFromArchive('+g.id+')" style="font-size:11px;width:auto;padding:0 8px">In Liga</button>';
     body+='<button class="archive-item-delete" onclick="event.stopPropagation();deleteArchived('+g.id+')">'+ICO.trash+'</button>';
     body+='</div>';
   });

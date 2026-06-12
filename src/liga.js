@@ -117,6 +117,7 @@ export async function ligaCreate() {
       await ligaRef(code).child('admins/' + own.id).set(true);
       await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '', joinedAt: firebase.database.ServerValue.TIMESTAMP });
     }
+    try { await firebase.database().ref('turniere/_ligaIndex/' + code).set({ name, created: firebase.database.ServerValue.TIMESTAMP }); } catch (e) { /* Index best effort */ }
     addLocalLiga(code, name);
     showToast('Liga „' + name + '" angelegt (LG-' + code + ').', 'info');
     showLigaModal();
@@ -154,6 +155,7 @@ export async function ligaJoin(code) {
   if (!data || data.kind !== 'liga') { showToast('Liga LG-' + code + ' nicht gefunden.', 'error'); return; }
   const own = await getOwnSpieler().catch(() => null);
   try { if (own) await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '', joinedAt: firebase.database.ServerValue.TIMESTAMP }); } catch (e) { /* ignore */ }
+  try { await firebase.database().ref('turniere/_ligaIndex/' + code).update({ name: data.name || '' }); } catch (e) { /* Index best effort */ }
   addLocalLiga(code, data.name || '');
   showToast('Liga „' + (data.name || ('LG-' + code)) + '" beigetreten.', 'info');
   await ligaSuggestClaim(code, data, own);
@@ -706,8 +708,14 @@ async function pushGameToLiga(code, snapshot) {
 export async function addCurrentGameToLiga(snapshot) {
   const ligen = state.ligen || [];
   if (!ligen.length || !initFirebase()) return;
+  if (state.ligaAskOnEnd === false) return; // Frage in den Einstellungen abgeschaltet → nur manuell
   let code;
-  if (ligen.length === 1) {
+  const def = state.ligaDefaultCode && ligen.find(l => l.code === state.ligaDefaultCode);
+  if (def) {
+    const ok = await showConfirm('Dieses Spiel in die Liga „' + (def.name || ('LG-' + def.code)) + '" aufnehmen?', 'In Liga aufnehmen');
+    if (!ok) return;
+    code = def.code;
+  } else if (ligen.length === 1) {
     const ok = await showConfirm('Dieses Spiel in die Liga „' + (ligen[0].name || ('LG-' + ligen[0].code)) + '" aufnehmen?', 'In Liga aufnehmen');
     if (!ok) return;
     code = ligen[0].code;
@@ -716,6 +724,18 @@ export async function addCurrentGameToLiga(snapshot) {
     if (!code) return;
   }
   await pushGameToLiga(code, snapshot);
+}
+// Aus dem Spiele-Archiv heraus ein Spiel in eine Liga aufnehmen (Liga-Auswahl).
+export async function ligaAddGameToLeagueFromArchive(archiveId) {
+  const ligen = state.ligen || [];
+  if (!ligen.length) { showToast('Du bist in keiner Liga.', 'info'); return; }
+  if (!initFirebase()) { showToast('Keine Datenbank-Verbindung.', 'error'); return; }
+  const g = loadArchive().find(x => String(x.id) === String(archiveId));
+  if (!g) { showToast('Spiel nicht gefunden.', 'error'); return; }
+  let code;
+  if (ligen.length === 1) code = ligen[0].code;
+  else { code = await chooseLiga(); if (!code) return; }
+  await pushGameToLiga(code, { date: g.date, gameStartTime: g.gameStartTime, players: g.players || [], rounds: g.rounds || [] });
 }
 // Nachträglich ein Spiel aus dem lokalen Geräte-Archiv aufnehmen – Auswahlliste, neuestes oben.
 export async function ligaAddArchivedGame(code) {
