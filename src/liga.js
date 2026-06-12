@@ -8,6 +8,7 @@ import { state, save } from './main.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
 import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
 import { computeStandings, loadArchive } from './archiv.js';
+import { logChange, renderHistory } from './audit.js';
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const ligaRef = code => firebase.database().ref('turniere/LG' + code);
@@ -72,11 +73,12 @@ export async function renderLigaSetup() {
     + '<button class="btn btn-primary" style="flex:1" onclick="ligaCreate()">Erstellen</button>'
     + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaJoin()">Beitreten</button></div>';
   el.innerHTML = h;
-  // Globale Admins bekommen zusätzlich „Alle Ligen verwalten".
+  // Verwalten: globale Admins → alle Ligen; sonst nur eigene (Ersteller/Liga-Admin).
   try {
-    if (await isAdmin()) {
-      el.innerHTML += '<div style="margin-top:8px"><button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="ligaAdminAll()">Alle Ligen verwalten</button></div>';
-    }
+    const verwalten = (await isAdmin())
+      ? '<button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="ligaAdminAll()">Alle Ligen verwalten</button>'
+      : '<button class="btn btn-secondary" style="width:100%;font-size:13px" onclick="ligaMyLeagues()">Meine Ligen verwalten</button>';
+    el.innerHTML += '<div style="margin-top:8px">' + verwalten + '</div>';
   } catch (e) { /* ignore */ }
 }
 
@@ -330,6 +332,7 @@ export async function openLigaDetail(code) {
   h += '<div style="display:flex;gap:8px;margin-top:16px">'
     + '<button class="btn btn-secondary" style="flex:1" onclick="openLigaDetail(\'' + code + '\')">Aktualisieren</button>'
     + '<button class="btn btn-secondary" style="flex:1" onclick="renderLigaHome()">Übersicht</button></div>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="openLigaHistory(\'' + code + '\')">🕓 Historie' + (admin ? ' (mit Rückgängig)' : '') + '</button>';
   if (joined) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaLeave(\'' + code + '\')">Liga verlassen</button>';
   if (isCreator) h += '<button class="btn btn-secondary danger" style="width:100%;margin-top:8px;color:var(--neg,#d23);border-color:var(--neg,#d23)" onclick="ligaDeleteLeague(\'' + code + '\')">Liga löschen</button>';
   el.innerHTML = h;
@@ -362,19 +365,31 @@ export function renderLigaHome() {
 export async function ligaAddPlayer(code) {
   const name = await showPrompt('Name des Spielers:', 'z. B. Arne', 'Hinzufügen');
   if (!name) return;
-  try { await ligaRef(code).child('players').push().set({ name: name.trim() }); openLigaDetail(code); }
-  catch (e) { console.error('ligaAddPlayer:', e); showToast('Hinzufügen fehlgeschlagen.', 'error'); }
+  try {
+    const ref = ligaRef(code).child('players').push();
+    await ref.set({ name: name.trim() });
+    await logChange('LG' + code, 'Spieler „' + name.trim() + '" hinzugefügt', 'players/' + ref.key, null);
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaAddPlayer:', e); showToast('Hinzufügen fehlgeschlagen.', 'error'); }
 }
 export async function ligaRenamePlayer(code, pid) {
   const name = await showPrompt('Neuer Name:', '', 'Umbenennen');
   if (!name) return;
-  try { await ligaRef(code).child('players/' + pid + '/name').set(name.trim()); openLigaDetail(code); }
-  catch (e) { showToast('Umbenennen fehlgeschlagen.', 'error'); }
+  try {
+    const old = (await ligaRef(code).child('players/' + pid + '/name').get()).val();
+    await ligaRef(code).child('players/' + pid + '/name').set(name.trim());
+    await logChange('LG' + code, 'Spieler umbenannt: „' + (old || '?') + '" → „' + name.trim() + '"', 'players/' + pid + '/name', old == null ? null : old);
+    openLigaDetail(code);
+  } catch (e) { showToast('Umbenennen fehlgeschlagen.', 'error'); }
 }
 export async function ligaDeletePlayer(code, pid) {
   if (!await showConfirm('Diesen Spieler aus der Liga entfernen? (Termin-Einträge zu ihm bleiben, zählen aber nicht mehr.)', 'Löschen', true)) return;
-  try { await ligaRef(code).child('players/' + pid).remove(); openLigaDetail(code); }
-  catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+  try {
+    const before = (await ligaRef(code).child('players/' + pid).get()).val();
+    await ligaRef(code).child('players/' + pid).remove();
+    await logChange('LG' + code, 'Spieler „' + ((before && before.name) || '?') + '" entfernt', 'players/' + pid, before);
+    openLigaDetail(code);
+  } catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
 }
 // Verknüpfung Roster-Spieler ↔ Mitglied setzen/lösen.
 export async function ligaSetClaim(code, pid) {
@@ -385,9 +400,11 @@ export async function ligaSetClaim(code, pid) {
   labels.push('— Verknüpfung lösen —');
   const idx = await chooseFromList('Mit welchem Mitglied verknüpfen?', labels);
   if (idx < 0) return;
+  const before = (data.players || {})[pid] || null;
   try {
     if (idx === members.length) await ligaRef(code).child('players/' + pid).update({ claimedBy: null, claimedByName: null });
     else { const [mid, m] = members[idx]; await ligaRef(code).child('players/' + pid).update({ claimedBy: mid, claimedByName: m.name || '' }); }
+    await logChange('LG' + code, 'Verknüpfung geändert: „' + ((before && before.name) || '?') + '"', 'players/' + pid, before);
     openLigaDetail(code);
   } catch (e) { showToast('Verknüpfen fehlgeschlagen.', 'error'); }
 }
@@ -476,10 +493,14 @@ export async function ligaSaveTermin(code, id) {
   const own = await getOwnSpieler().catch(() => null);
   try {
     if (id) {
+      const before = (data.termine || {})[id] || null;
       await ligaRef(code).child('termine/' + id).update({ date, label: label || null, points });
+      await logChange('LG' + code, 'Termin bearbeitet (' + date + ')', 'termine/' + id, before);
       showToast('Termin aktualisiert.', 'info');
     } else {
-      await ligaRef(code).child('termine').push().set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
+      const ref = ligaRef(code).child('termine').push();
+      await ref.set({ date, label: label || null, points, addedBy: own ? own.id : null, addedAt: firebase.database.ServerValue.TIMESTAMP });
+      await logChange('LG' + code, 'Termin eingetragen (' + date + ')', 'termine/' + ref.key, null);
       showToast('Termin gespeichert.', 'info');
     }
     openLigaDetail(code);
@@ -487,18 +508,30 @@ export async function ligaSaveTermin(code, id) {
 }
 export async function ligaDeleteTermin(code, id) {
   if (!await showConfirm('Diesen Termin löschen?', 'Löschen', true)) return;
-  try { await ligaRef(code).child('termine/' + id).remove(); openLigaDetail(code); }
-  catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+  try {
+    const before = (await ligaRef(code).child('termine/' + id).get()).val();
+    await ligaRef(code).child('termine/' + id).remove();
+    await logChange('LG' + code, 'Termin gelöscht' + (before && before.date ? ' (' + before.date + ')' : ''), 'termine/' + id, before);
+    openLigaDetail(code);
+  } catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
 }
 
 // ── Rollen ──
 export async function ligaPromote(code, mid) {
-  try { await ligaRef(code).child('admins/' + mid).set(true); showToast('Ist jetzt Liga-Admin.', 'info'); openLigaDetail(code); }
-  catch (e) { showToast('Fehler.', 'error'); }
+  try {
+    const nm = ((await ligaRef(code).child('members/' + mid + '/name').get()).val()) || mid;
+    await ligaRef(code).child('admins/' + mid).set(true);
+    await logChange('LG' + code, '„' + nm + '" zum Liga-Admin ernannt', 'admins/' + mid, null);
+    showToast('Ist jetzt Liga-Admin.', 'info'); openLigaDetail(code);
+  } catch (e) { showToast('Fehler.', 'error'); }
 }
 export async function ligaDemote(code, mid) {
-  try { await ligaRef(code).child('admins/' + mid).remove(); showToast('Liga-Admin entzogen.', 'info'); openLigaDetail(code); }
-  catch (e) { showToast('Fehler.', 'error'); }
+  try {
+    const nm = ((await ligaRef(code).child('members/' + mid + '/name').get()).val()) || mid;
+    await ligaRef(code).child('admins/' + mid).remove();
+    await logChange('LG' + code, '„' + nm + '" Liga-Admin entzogen', 'admins/' + mid, true);
+    showToast('Liga-Admin entzogen.', 'info'); openLigaDetail(code);
+  } catch (e) { showToast('Fehler.', 'error'); }
 }
 
 // ── Teilen / Spiele / Verlassen / Löschen ──
@@ -512,8 +545,12 @@ export function ligaCopyLink(code) {
 }
 export async function ligaDeleteGame(code, gameId) {
   if (!await showConfirm('Diesen Spiel-Eintrag aus der Liga löschen?', 'Löschen', true)) return;
-  try { await ligaRef(code).child('spiele/' + gameId).remove(); showToast('Eintrag gelöscht.', 'info'); openLigaDetail(code); }
-  catch (e) { console.error('ligaDeleteGame:', e); showToast('Löschen fehlgeschlagen.', 'error'); }
+  try {
+    const before = (await ligaRef(code).child('spiele/' + gameId).get()).val();
+    await ligaRef(code).child('spiele/' + gameId).remove();
+    await logChange('LG' + code, 'App-Spiel-Eintrag gelöscht', 'spiele/' + gameId, before);
+    showToast('Eintrag gelöscht.', 'info'); openLigaDetail(code);
+  } catch (e) { console.error('ligaDeleteGame:', e); showToast('Löschen fehlgeschlagen.', 'error'); }
 }
 export async function ligaLeave(code) {
   if (!await showConfirm('Diese Liga auf diesem Gerät verlassen? Die Liga-Daten bleiben für andere bestehen.', 'Verlassen', true)) return;
@@ -551,6 +588,45 @@ export async function ligaAdminAll() {
   }
   h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="renderLigaHome()">Zurück</button>';
   el.innerHTML = h;
+}
+
+// ── Meine Ligen verwalten (nur die, wo ich Ersteller/Liga-Admin bin) ──
+export async function ligaMyLeagues() {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  showLigaModal();
+  el.innerHTML = modalHeader('Meine Ligen') + '<div style="padding:30px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  const own = await getOwnSpieler().catch(() => null);
+  const myId = own ? own.id : null;
+  const globalAdmin = await isAdmin().catch(() => false);
+  const items = [];
+  for (const l of (state.ligen || [])) {
+    let d; try { d = (await ligaRef(l.code).get()).val(); } catch (e) { d = null; }
+    if (d && d.kind === 'liga' && isLigaAdmin(d, myId, globalAdmin)) items.push({ code: l.code, data: d });
+  }
+  let h = modalHeader('Meine Ligen verwalten');
+  if (!items.length) h += '<div style="font-size:13px;color:var(--tx3);padding:8px 2px;line-height:1.5">Du verwaltest aktuell keine Liga. Hier erscheinen nur Ligen, in denen du Ersteller oder Liga-Admin bist.</div>';
+  else {
+    h += '<div class="card" style="padding:4px 0">';
+    items.forEach(({ code, data: d }, i) => {
+      const np = d.players ? Object.keys(d.players).length : 0;
+      const nm = d.members ? Object.keys(d.members).length : 0;
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;' + (i < items.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '" onclick="openLigaDetail(\'' + code + '\')">';
+      h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(d.name || ('LG-' + code)) + '</div><div style="font-size:11px;color:var(--tx3)">LG-' + esc(code) + ' · ' + np + ' Spieler · ' + nm + ' Mitglieder</div></div>';
+      h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--tx3)"><polyline points="9 18 15 12 9 6"/></svg></div>';
+    });
+    h += '</div>';
+  }
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="renderLigaHome()">Zurück</button>';
+  el.innerHTML = h;
+}
+
+// ── Historie der Liga (mit Rückgängig für Liga-Admins) ──
+export async function openLigaHistory(code) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  const own = await getOwnSpieler().catch(() => null);
+  const admin = isLigaAdmin(data || {}, own ? own.id : null, await isAdmin().catch(() => false));
+  renderHistory('LG' + code, { title: 'Historie · LG-' + code, container: 'ligaModalContent', canUndo: admin, backOnclick: "openLigaDetail('" + code + "')" });
 }
 
 // ── App-Spiel-Detail (Runden ansehen) ──
@@ -607,7 +683,8 @@ async function pushGameToLiga(code, snapshot) {
     const snap = await ligaRef(code).child('spiele').get();
     const existing = snap.val() || {};
     if (Object.values(existing).some(g => g && g.sig === sig)) { showToast('Dieses Spiel ist schon in der Liga.', 'info'); return false; }
-    await ligaRef(code).child('spiele').push().set({
+    const ref = ligaRef(code).child('spiele').push();
+    await ref.set({
       date: snapshot.date || new Date().toISOString(),
       players: snapshot.players || [],
       roundsJson: JSON.stringify(snapshot.rounds || []),
@@ -616,6 +693,7 @@ async function pushGameToLiga(code, snapshot) {
       addedAt: firebase.database.ServerValue.TIMESTAMP,
       sig
     });
+    await logChange('LG' + code, 'App-Spiel aufgenommen', 'spiele/' + ref.key, null);
     showToast('Spiel in die Liga aufgenommen.', 'info');
     return true;
   } catch (e) {
