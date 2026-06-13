@@ -438,6 +438,11 @@ export async function openLigaDetail(code) {
         h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + r.pid + '\')" title="Mit anderem Spieler zusammenführen" style="' + btn + '">Zusammenf.</button>';
         h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + ICO.trash + '</button>';
         h += '</div>';
+      } else if (admin && r.mid) {
+        // Mitglied (anderer Name als ein Tabellen-Spieler) → manuell mit einem Spieler verbinden.
+        h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
+        h += '<button onclick="ligaClaimMemberToPlayer(\'' + code + '\',\'' + r.mid + '\')" style="' + btn + '">Mit Spieler verknüpfen</button>';
+        h += '</div>';
       }
       h += '</div>';
     });
@@ -587,6 +592,24 @@ export async function ligaSetClaim(code, pid) {
     await logChange('LG' + code, 'Verknüpfung geändert: „' + ((before && before.name) || '?') + '"', 'players/' + pid, before);
     openLigaDetail(code);
   } catch (e) { showToast('Verknüpfen fehlgeschlagen.', 'error'); }
+}
+// Von der Mitglieder-Seite her: ein Mitglied mit einem vorhandenen Tabellen-Spieler verbinden
+// (auch bei abweichendem Namen). So verschwindet das doppelte Mitglied aus der Auswahl.
+export async function ligaClaimMemberToPlayer(code, mid) {
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { return; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const member = (data.members || {})[mid];
+  const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  if (!players.length) { showToast('Noch keine Tabellen-Spieler vorhanden.', 'info'); return; }
+  const idx = await chooseFromList('„' + ((member && member.name) || 'Mitglied') + '" mit welchem Tabellen-Spieler verbinden?', players.map(([, p]) => p.name || '?'));
+  if (idx < 0) return;
+  const [pid, p] = players[idx];
+  try {
+    await ligaRef(code).child('players/' + pid).update({ claimedBy: mid, claimedByName: (member && member.name) || '' });
+    await logChange('LG' + code, 'Mitglied „' + ((member && member.name) || '?') + '" mit Spieler „' + (p.name || '?') + '" verknüpft', 'players/' + pid + '/claimedBy', null);
+    showToast('Verknüpft.', 'info');
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaClaimMemberToPlayer:', e); showToast('Verknüpfen fehlgeschlagen.', 'error'); }
 }
 
 async function chooseFromList(title, labels) {
