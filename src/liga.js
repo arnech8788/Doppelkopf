@@ -321,6 +321,36 @@ function ligaStandings(data) {
 // Mitglied (App-Profil) ↔ Tabellen-Spieler automatisch verbinden: für jedes Mitglied ohne
 // verknüpften Spieler einen namensgleichen, noch freien Spieler verknüpfen (still, nur exakter
 // Name). So zählt dieselbe Person als eine – ohne manuelles „Verknüpfen". Liefert true bei Änderung.
+// Macht jeden in App-Spielen vorkommenden Spielernamen zu einem echten Tabellen-Spieler:
+// noch nicht zugeordnete Namen werden (einmalig) als Roster-Spieler angelegt und im mapJson
+// des Spiels eingetragen. So gibt es keine „nicht zugeordnet"-Zeilen mehr und jede Person ist
+// verwaltbar. Liefert true bei Änderung.
+async function ligaBackfillGameNames(code, data) {
+  const players = { ...(data.players || {}) };
+  const games = data.spiele || {};
+  const nameIdx = {};
+  Object.entries(players).forEach(([pid, p]) => { if (p && p.name) nameIdx[normalizeName(p.name)] = pid; });
+  let changed = false;
+  for (const [gid, g] of Object.entries(games)) {
+    const map = gameMap(g);
+    const names = snapshotNames({ players: g.players, rounds: gameRounds(g) });
+    let gChanged = false;
+    for (const n of names) {
+      if (map[n] && players[map[n]]) continue; // schon einem vorhandenen Spieler zugeordnet
+      const nn = normalizeName(n);
+      let pid = nameIdx[nn];
+      if (!pid) {
+        const ref = ligaRef(code).child('players').push();
+        await ref.set({ name: String(n).trim() });
+        pid = ref.key; players[pid] = { name: String(n).trim() }; nameIdx[nn] = pid; changed = true;
+      }
+      if (map[n] !== pid) { map[n] = pid; gChanged = true; }
+    }
+    if (gChanged) { await ligaRef(code).child('spiele/' + gid + '/mapJson').set(JSON.stringify(map)); changed = true; }
+  }
+  return changed;
+}
+
 async function ligaAutoLinkMembers(code, data) {
   const players = data.players || {}, members = data.members || {};
   const claimed = new Set(Object.values(players).filter(p => p && p.claimedBy).map(p => p.claimedBy));
@@ -353,8 +383,18 @@ export async function openLigaDetail(code) {
   const myId = own ? own.id : null;
   const globalAdmin = await isAdmin().catch(() => false);
   const admin = isLigaAdmin(data, myId, globalAdmin);
-  // Mitglieder still mit namensgleichen Spielern verbinden (eine Person, kein manuelles Verknüpfen).
-  if (admin) { try { if (await ligaAutoLinkMembers(code, data)) { const s2 = await ligaRef(code).get(); data = s2.val() || data; } } catch (e) { /* ignore */ } }
+  // Selbstheilung (Admin): jeden Spielernamen aus App-Spielen zu einem echten Tabellen-Spieler
+  // machen und Mitglieder mit namensgleichen Spielern verbinden – damit jede Person in der
+  // Gesamttabelle ein verwaltbarer Spieler ist (umbenennen/zusammenführen/löschen/auswählen).
+  if (admin) {
+    try {
+      let ch = false;
+      if (await ligaBackfillGameNames(code, data)) ch = true;
+      if (ch) data = (await ligaRef(code).get()).val() || data;
+      if (await ligaAutoLinkMembers(code, data)) ch = true;
+      if (ch) data = (await ligaRef(code).get()).val() || data;
+    } catch (e) { /* ignore */ }
+  }
   const isCreator = globalAdmin || (data.createdBy && data.createdBy === myId);
   const joined = (state.ligen || []).some(l => l.code === code);
   const url = location.origin + location.pathname + '?liga=LG' + code;
@@ -374,45 +414,35 @@ export async function openLigaDetail(code) {
     + (joined ? '' : '<button class="btn btn-primary" onclick="ligaJoin(\'' + code + '\')">Beitreten</button>')
     + '</div></div>';
 
-  // Gesamttabelle (alles kombiniert)
+  // Gesamttabelle (alles kombiniert) – Spieler werden hier direkt verwaltet (Admin).
   const { rows, payMode } = ligaStandings(data);
-  h += '<div class="section-label">Gesamttabelle</div>';
+  h += '<div class="section-label">Gesamttabelle' + (admin ? ' <span style="font-weight:400;color:var(--tx3);font-size:11px">· tippe ✏️/🗑 zum Verwalten</span>' : '') + '</div>';
   if (!rows.length) {
     h += '<div class="card" style="font-size:13px;color:var(--tx3)">Noch keine Punkte. ' + (admin ? 'Lege Spieler an und trage Termin-Punkte ein oder nimm App-Spiele auf.' : 'Es wurden noch keine Stände eingetragen.') + '</div>';
   } else {
+    const btn = 'background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:26px;border-radius:var(--r-sm);font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px';
     h += '<div class="card">';
     rows.forEach((r, i) => {
       const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
       h += '<div style="padding:10px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(r.name) + (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(r.name) + (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + (r.mid && !r.pid ? ' <span style="font-size:10px;color:var(--tx3)">· Mitglied</span>' : '') + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px 12px;font-size:11px;color:var(--tx3);margin-left:26px">';
       h += '<span>Abende: ' + r.abende + '</span>';
       if (r.runden) h += '<span>Runden: ' + r.runden + '</span><span>Siege: ' + Math.round(r.siege / r.runden * 100) + '%</span>';
       if (r.soloTotal) h += '<span>Soli: ' + r.soloWins + '/' + r.soloTotal + '</span>';
       if (payMode) h += '<span style="color:var(--neg,#d23);font-weight:600">zu zahlen: ' + r.payment + '</span>';
-      h += '</div></div>';
+      h += '</div>';
+      if (admin && r.pid) {
+        h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
+        h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + ICO.edit + '&nbsp;Umbenennen</button>';
+        h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + r.pid + '\')" title="Mit anderem Spieler zusammenführen" style="' + btn + '">Zusammenf.</button>';
+        h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + ICO.trash + '</button>';
+        h += '</div>';
+      }
+      h += '</div>';
     });
     h += '</div>';
   }
-
-  // Spieler (Roster)
-  h += '<div class="section-label" style="margin-top:20px">Spieler' + (admin ? ' <span style="font-weight:400;color:var(--tx3);font-size:11px">· Roster verwalten</span>' : '') + '</div>';
-  h += '<div class="card" style="padding:4px 0">';
-  const pEntries = Object.entries(players);
-  if (!pEntries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Spieler.</div>';
-  pEntries.sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '')).forEach(([pid, p], i) => {
-    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;' + (i < pEntries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-    h += '<div style="flex:1;min-width:0"><div style="font-weight:500;word-break:break-word">' + esc(p.name || '?') + '</div>';
-    h += '<div style="font-size:11px;color:var(--tx3)">' + (p.claimedByName ? 'verknüpft mit ' + esc(p.claimedByName) : 'nicht verknüpft') + '</div></div>';
-    if (admin) {
-      h += '<button onclick="ligaSetClaim(\'' + code + '\',\'' + pid + '\')" title="Verknüpfen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Verknüpfen</button>';
-      h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + pid + '\')" title="Mit anderem Spieler zusammenführen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);padding:0 8px;font-size:11px">Zusammenf.</button>';
-      h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + pid + '\')" title="Umbenennen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.edit + '</button>';
-      h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + pid + '\')" title="Löschen" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:28px;height:28px;border-radius:var(--r-sm);display:inline-flex;align-items:center;justify-content:center;padding:0">' + ICO.trash + '</button>';
-    }
-    h += '</div>';
-  });
-  h += '</div>';
   if (admin) h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler hinzufügen</button>';
 
   // Termine (manuelle Punkte)
