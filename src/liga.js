@@ -11,6 +11,8 @@ import { loadArchive } from './archiv.js';
 import { logChange, renderHistory } from './audit.js';
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// SVG-Icon mit fester Größe versehen (die ICO-Strings haben sonst keine width/height → unsichtbar).
+const icoSized = (ico, s) => String(ico || '').replace('<svg ', '<svg width="' + s + '" height="' + s + '" style="flex-shrink:0" ');
 const ligaRef = code => firebase.database().ref('turniere/LG' + code);
 // Runden eines App-Spiels: bevorzugt als JSON-String (roundsJson) gespeichert, da Spielernamen
 // als Objekt-Schlüssel in scores sonst Firebase-verbotene Zeichen (. # $ [ ] /) enthalten können.
@@ -138,6 +140,7 @@ function ligaRenderEntry(e) {
     case 'all': return ligaAdminAll();
     case 'history': return openLigaHistory(e.code);
     case 'game': return openLigaGameDetail(e.code, e.gameId);
+    case 'player': return openLigaPlayerDetail(e.code, e.id);
     case 'gamemap': return ligaGameMapForm(e.code, e.gameId || null);
     case 'termin': return openLigaTerminDetail(e.code, e.id);
     case 'terminForm': return ligaTerminForm(e.code, e.id);
@@ -416,16 +419,21 @@ export async function openLigaDetail(code) {
 
   // Gesamttabelle (alles kombiniert) – Spieler werden hier direkt verwaltet (Admin).
   const { rows, payMode } = ligaStandings(data);
-  h += '<div class="section-label">Gesamttabelle' + (admin ? ' <span style="font-weight:400;color:var(--tx3);font-size:11px">· tippe ✏️/🗑 zum Verwalten</span>' : '') + '</div>';
+  h += '<div class="section-label">Gesamttabelle' + (admin ? ' <span style="font-weight:400;color:var(--tx3);font-size:11px">· Spieler antippen für Details</span>' : '') + '</div>';
   if (!rows.length) {
     h += '<div class="card" style="font-size:13px;color:var(--tx3)">Noch keine Punkte. ' + (admin ? 'Lege Spieler an und trage Termin-Punkte ein oder nimm App-Spiele auf.' : 'Es wurden noch keine Stände eingetragen.') + '</div>';
   } else {
-    const btn = 'background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:26px;border-radius:var(--r-sm);font-size:11px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px';
+    const btn = 'background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;height:28px;border-radius:var(--r-sm);font-size:11px;display:inline-flex;align-items:center;gap:4px;justify-content:center;padding:0 10px';
     h += '<div class="card">';
     rows.forEach((r, i) => {
       const rc = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+      const badges = (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + (r.mid && !r.pid ? ' <span style="font-size:10px;color:var(--tx3)">· Mitglied</span>' : '');
+      const nameInner = esc(r.name) + badges;
+      const nameHtml = r.pid
+        ? '<span style="cursor:pointer;border-bottom:1px dotted var(--tx3)" onclick="openLigaPlayerDetail(\'' + code + '\',\'' + r.pid + '\')">' + nameInner + '</span>'
+        : nameInner;
       h += '<div style="padding:10px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
-      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + esc(r.name) + (r.claimedByName ? ' <span style="font-size:10px;color:var(--tx3)">✓</span>' : '') + (r.mid && !r.pid ? ' <span style="font-size:10px;color:var(--tx3)">· Mitglied</span>' : '') + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + nameHtml + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px 12px;font-size:11px;color:var(--tx3);margin-left:26px">';
       h += '<span>Abende: ' + r.abende + '</span>';
       if (r.runden) h += '<span>Runden: ' + r.runden + '</span><span>Siege: ' + Math.round(r.siege / r.runden * 100) + '%</span>';
@@ -433,15 +441,15 @@ export async function openLigaDetail(code) {
       if (payMode) h += '<span style="color:var(--neg,#d23);font-weight:600">zu zahlen: ' + r.payment + '</span>';
       h += '</div>';
       if (admin && r.pid) {
-        h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
-        h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + ICO.edit + '&nbsp;Umbenennen</button>';
-        h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + r.pid + '\')" title="Mit anderem Spieler zusammenführen" style="' + btn + '">Zusammenf.</button>';
-        h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + ICO.trash + '</button>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px 26px">';
+        h += '<button onclick="ligaRenamePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + icoSized(ICO.edit, 13) + 'Umbenennen</button>';
+        h += '<button onclick="ligaMergePlayer(\'' + code + '\',\'' + r.pid + '\')" title="Mit anderem Spieler zusammenführen" style="' + btn + '">' + icoSized(ICO.merge, 13) + 'Zusammenf.</button>';
+        h += '<button onclick="ligaDeletePlayer(\'' + code + '\',\'' + r.pid + '\')" style="' + btn + '">' + icoSized(ICO.trash, 13) + 'Löschen</button>';
         h += '</div>';
       } else if (admin && r.mid) {
         // Mitglied (anderer Name als ein Tabellen-Spieler) → manuell mit einem Spieler verbinden.
         h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
-        h += '<button onclick="ligaClaimMemberToPlayer(\'' + code + '\',\'' + r.mid + '\')" style="' + btn + '">Mit Spieler verknüpfen</button>';
+        h += '<button onclick="ligaClaimMemberToPlayer(\'' + code + '\',\'' + r.mid + '\')" style="' + btn + '">' + icoSized(ICO.link, 13) + 'Mit Spieler verknüpfen</button>';
         h += '</div>';
       }
       h += '</div>';
@@ -852,6 +860,58 @@ export async function openLigaHistory(code) {
   const own = await getOwnSpieler().catch(() => null);
   const admin = isLigaAdmin(data || {}, own ? own.id : null, await isAdmin().catch(() => false));
   renderHistory('LG' + code, { title: 'Historie · LG-' + code, container: 'ligaModalContent', canUndo: admin, backOnclick: 'ligaBack()' });
+}
+
+// ── Spieler-Detail: Punkte je Spiel/Termin (mit Datum) ──
+export async function openLigaPlayerDetail(code, pid) {
+  const el = document.getElementById('ligaModalContent');
+  if (!el) return;
+  showLigaModal();
+  ligaNav({ t: 'player', code, id: pid });
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = data.players || {};
+  const p = players[pid];
+  if (!p) { showToast('Spieler nicht gefunden.', 'error'); openLigaDetail(code); return; }
+  const nameIdx = {};
+  Object.entries(players).forEach(([id, pl]) => { if (pl && pl.name) nameIdx[String(pl.name).toLowerCase()] = id; });
+  const resolve = (g, rawName) => { const m = gameMap(g); if (m[rawName] && players[m[rawName]]) return m[rawName]; const bn = nameIdx[String(rawName).toLowerCase()]; if (bn) return bn; return '~' + rawName; };
+  const entries = []; // {date, label, points, sub?}
+  // Manuelle Termine
+  Object.values(data.termine || {}).forEach(t => {
+    const v = (t.points || {})[pid];
+    if (v != null) entries.push({ date: t.date, label: t.label || 'Termin (manuell)', points: Number(v) || 0, sub: 'Termin' });
+  });
+  // App-Spiele
+  Object.values(data.spiele || {}).forEach(g => {
+    const rounds = gameRounds(g);
+    const names = snapshotNames({ players: g.players, rounds });
+    const mine = names.filter(n => resolve(g, n) === pid);
+    if (!mine.length) return;
+    let sum = 0, runden = 0, siege = 0;
+    rounds.forEach(r => (r.playing || []).forEach(pl => {
+      if (mine.includes(pl)) { sum += (r.scores && r.scores[pl]) || 0; runden += 1; if ((r.winners || []).includes(pl)) siege += 1; }
+    }));
+    entries.push({ date: g.date, label: rounds.length + ' Runden', points: sum, sub: 'Spiel · ' + siege + '/' + runden + ' gewonnen' });
+  });
+  entries.sort((a, b) => (new Date(b.date) - new Date(a.date)) || 0);
+  const total = entries.reduce((s, e) => s + e.points, 0);
+
+  let h = modalHeader('👤 ' + esc(p.name || '?'));
+  if (p.claimedByName) h += '<div style="font-size:12px;color:var(--tx3);margin-bottom:8px">verknüpft mit ' + esc(p.claimedByName) + '</div>';
+  h += '<div class="card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500">Gesamt</span><span class="' + (total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700;font-size:18px">' + (total > 0 ? '+' : '') + total + '</span></div>';
+  h += '<div class="section-label" style="margin-top:16px">Verlauf (' + entries.length + ')</div>';
+  h += '<div class="card" style="padding:4px 0">';
+  if (!entries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Punkte für diesen Spieler.</div>';
+  entries.forEach((e, i) => {
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;' + (i < entries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    h += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + (fmtDate(e.date) || '—') + ' · ' + esc(e.label) + '</div>';
+    h += '<div style="font-size:11px;color:var(--tx3)">' + esc(e.sub || '') + '</div></div>';
+    h += '<span class="' + (e.points >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (e.points > 0 ? '+' : '') + e.points + '</span></div>';
+  });
+  h += '</div>';
+  h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';
+  el.innerHTML = h;
 }
 
 // ── App-Spiel-Detail (Runden ansehen) ──
