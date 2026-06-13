@@ -218,7 +218,12 @@ export async function ligaJoin(code) {
   try { await firebase.database().ref('turniere/_ligaIndex/' + code).update({ name: data.name || '' }); } catch (e) { /* Index best effort */ }
   addLocalLiga(code, data.name || '');
   showToast('Liga „' + (data.name || ('LG-' + code)) + '" beigetreten.', 'info');
-  await ligaSuggestClaim(code, data, own);
+  // Frische Daten (inkl. eigener Mitgliedschaft): namensgleichen Spieler still verbinden,
+  // sonst (anderer Name) wie bisher vorschlagen.
+  let fresh = data; try { fresh = (await ligaRef(code).get()).val() || data; } catch (e) { /* ignore */ }
+  try { await ligaAutoLinkMembers(code, fresh); } catch (e) { /* ignore */ }
+  try { fresh = (await ligaRef(code).get()).val() || fresh; } catch (e) { /* ignore */ }
+  await ligaSuggestClaim(code, fresh, own);
   openLigaDetail(code);
 }
 // Beim Beitritt: ähnlich benannten, noch nicht zugeordneten Roster-Spieler vorschlagen.
@@ -298,8 +303,38 @@ function ligaStandings(data) {
       if (payMode && n < 0) r.payment += -n;
     });
   });
+  // Mitglieder, die (noch) keinem Tabellen-Spieler entsprechen, als 0-Zeile mit aufnehmen.
+  const members = data.members || {};
+  const claimed = new Set(Object.values(players).filter(p => p && p.claimedBy).map(p => p.claimedBy));
+  const nameSet = new Set(Object.values(players).map(p => normalizeName(p && p.name)));
+  Object.entries(members).forEach(([mid, m]) => {
+    if (claimed.has(mid)) return;
+    const nm = normalizeName(m && m.name);
+    if (nm && nameSet.has(nm)) return; // gleicher Name existiert schon als Spieler
+    const key = '@' + mid;
+    if (!acc[key]) acc[key] = { key, pid: null, mid, name: (m && m.name) || '(Mitglied)', claimedByName: null, total: 0, payment: 0, abende: 0, runden: 0, siege: 0, soloWins: 0, soloTotal: 0 };
+  });
   const rows = Object.values(acc).sort((a, b) => b.total - a.total || (a.name || '').localeCompare(b.name || ''));
   return { rows, payMode };
+}
+
+// Mitglied (App-Profil) ↔ Tabellen-Spieler automatisch verbinden: für jedes Mitglied ohne
+// verknüpften Spieler einen namensgleichen, noch freien Spieler verknüpfen (still, nur exakter
+// Name). So zählt dieselbe Person als eine – ohne manuelles „Verknüpfen". Liefert true bei Änderung.
+async function ligaAutoLinkMembers(code, data) {
+  const players = data.players || {}, members = data.members || {};
+  const claimed = new Set(Object.values(players).filter(p => p && p.claimedBy).map(p => p.claimedBy));
+  let changed = false;
+  for (const [mid, m] of Object.entries(members)) {
+    if (claimed.has(mid)) continue;
+    const nm = normalizeName(m && m.name);
+    if (!nm) continue;
+    const hit = Object.entries(players).find(([, p]) => !p.claimedBy && normalizeName(p.name) === nm);
+    if (hit) {
+      try { await ligaRef(code).child('players/' + hit[0]).update({ claimedBy: mid, claimedByName: m.name || '' }); claimed.add(mid); changed = true; } catch (e) { /* ignore */ }
+    }
+  }
+  return changed;
 }
 
 // ── Detailansicht einer Liga ──
@@ -318,6 +353,8 @@ export async function openLigaDetail(code) {
   const myId = own ? own.id : null;
   const globalAdmin = await isAdmin().catch(() => false);
   const admin = isLigaAdmin(data, myId, globalAdmin);
+  // Mitglieder still mit namensgleichen Spielern verbinden (eine Person, kein manuelles Verknüpfen).
+  if (admin) { try { if (await ligaAutoLinkMembers(code, data)) { const s2 = await ligaRef(code).get(); data = s2.val() || data; } } catch (e) { /* ignore */ } }
   const isCreator = globalAdmin || (data.createdBy && data.createdBy === myId);
   const joined = (state.ligen || []).some(l => l.code === code);
   const url = location.origin + location.pathname + '?liga=LG' + code;
@@ -563,7 +600,17 @@ export async function ligaTerminForm(code, id) {
   ligaNav({ t: 'terminForm', code, id: id || '' });
   let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
   if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
-  const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  const playerEntries = Object.entries(data.players || {});
+  const members = data.members || {};
+  // Eine gemeinsame Personenliste: Tabellen-Spieler + beigetretene Mitglieder, die noch keinem
+  // Spieler entsprechen (gleicher Name oder schon verknüpft). Mitglieder werden beim Speichern
+  // automatisch als Spieler angelegt und verbunden.
+  const claimed = new Set(playerEntries.filter(([, p]) => p.claimedBy).map(([, p]) => p.claimedBy));
+  const nameSet = new Set(playerEntries.map(([, p]) => normalizeName(p.name)));
+  const persons = [
+    ...playerEntries.map(([pid, p]) => ({ kind: 'p', id: pid, name: p.name || '?' })),
+    ...Object.entries(members).filter(([mid, m]) => !claimed.has(mid) && !(m.name && nameSet.has(normalizeName(m.name)))).map(([mid, m]) => ({ kind: 'm', id: mid, name: m.name || '(Mitglied)' }))
+  ].sort((a, b) => a.name.localeCompare(b.name));
   const t = id ? (data.termine || {})[id] : null;
   const pts = t && t.points || {};
   const dateVal = (t && t.date) || new Date().toISOString().slice(0, 10);
@@ -572,19 +619,19 @@ export async function ligaTerminForm(code, id) {
   h += '<div class="card"><div style="display:flex;gap:8px;margin-bottom:10px">'
     + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Datum</label><input type="date" id="ltDate" value="' + dateVal + '" style="width:100%;box-sizing:border-box;padding:8px"></div>'
     + '<div style="flex:1"><label style="font-size:11px;color:var(--tx2)">Bezeichnung (optional)</label><input type="text" id="ltLabel" value="' + esc(labelVal) + '" placeholder="z. B. Spieltag 5" style="width:100%;box-sizing:border-box;padding:8px"></div></div>';
-  if (!players.length) {
-    h += '<div style="font-size:13px;color:var(--tx3);padding:6px 0">Noch keine Spieler – bitte zuerst Spieler anlegen.</div>';
+  if (!persons.length) {
+    h += '<div style="font-size:13px;color:var(--tx3);padding:6px 0">Noch keine Personen – bitte zuerst einen Spieler anlegen.</div>';
   } else {
-    h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Punkte je Spieler (leer = 0):</div>';
-    players.forEach(([pid, p]) => {
-      const v = pts[pid] != null ? pts[pid] : '';
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><div style="flex:1;word-break:break-word">' + esc(p.name || '?') + '</div>'
-        + '<input type="number" id="lt_' + pid + '" value="' + v + '" inputmode="numeric" placeholder="0" style="width:90px;padding:8px;text-align:right"></div>';
+    h += '<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Punkte je Person (leer = 0):</div>';
+    persons.forEach(pr => {
+      const v = pr.kind === 'p' && pts[pr.id] != null ? pts[pr.id] : '';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><div style="flex:1;word-break:break-word">' + esc(pr.name) + (pr.kind === 'm' ? ' <span style="font-size:10px;color:var(--tx3)">· Mitglied</span>' : '') + '</div>'
+        + '<input type="number" id="lt_' + pr.kind + '_' + pr.id + '" value="' + v + '" inputmode="numeric" placeholder="0" style="width:90px;padding:8px;text-align:right"></div>';
     });
   }
   h += '</div>';
   h += '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-secondary" style="flex:1" onclick="ligaAddPlayer(\'' + code + '\')">+ Spieler</button>';
-  if (players.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\'' + (id ? ',\'' + id + '\'' : '') + ')">Speichern</button>';
+  if (persons.length) h += '<button class="btn btn-primary" style="flex:1" onclick="ligaSaveTermin(\'' + code + '\'' + (id ? ',\'' + id + '\'' : '') + ')">Speichern</button>';
   h += '</div>';
   h += '<button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="ligaBack()">Abbrechen</button>';
   el.innerHTML = h;
@@ -596,12 +643,21 @@ export async function ligaSaveTermin(code, id) {
   const label = ((document.getElementById('ltLabel') || {}).value || '').trim();
   const points = {};
   Object.keys(data.players || {}).forEach(pid => {
-    const inp = document.getElementById('lt_' + pid);
+    const inp = document.getElementById('lt_p_' + pid);
     if (inp && inp.value !== '' && !isNaN(parseInt(inp.value, 10))) points[pid] = parseInt(inp.value, 10);
   });
-  if (!Object.keys(points).length) { showToast('Keine Punkte eingegeben.', 'info'); return; }
   const own = await getOwnSpieler().catch(() => null);
   try {
+    // Mitglieder ohne eigenen Tabellen-Spieler: bei Eingabe automatisch Spieler anlegen + verknüpfen.
+    for (const [mid, m] of Object.entries(data.members || {})) {
+      const inp = document.getElementById('lt_m_' + mid);
+      if (inp && inp.value !== '' && !isNaN(parseInt(inp.value, 10))) {
+        const ref = ligaRef(code).child('players').push();
+        await ref.set({ name: (m.name || '').trim() || 'Mitglied', claimedBy: mid, claimedByName: m.name || '' });
+        points[ref.key] = parseInt(inp.value, 10);
+      }
+    }
+    if (!Object.keys(points).length) { showToast('Keine Punkte eingegeben.', 'info'); return; }
     if (id) {
       const before = (data.termine || {})[id] || null;
       await ligaRef(code).child('termine/' + id).update({ date, label: label || null, points });
