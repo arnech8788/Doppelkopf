@@ -2,7 +2,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
-import { state, save, getAllPlayers, invalidateEingabeCache, APP_VERSION } from './main.js';
+import { state, save, getAllPlayers, invalidateEingabeCache, APP_VERSION, setSpecialNames, cacheSpecialNames } from './main.js';
 import { showToast, showConfirm, showPrompt } from './ui.js';
 import { logChange, renderHistory } from './audit.js';
 
@@ -39,6 +39,34 @@ export function initFirebase(){
     console.error('Firebase init failed:',e);
     return false;
   }
+}
+
+// ── Besondere Namen (Kursleiter/Spielleiter + Doko-Stammrunde) ──
+// Liegen im offenen Pfad turniere/_specialNames (wie _ligaIndex). Als JSON-Strings gespeichert,
+// damit Namen mit Sonderzeichen keine Firebase-Schlüsselverbote auslösen.
+const SPECIAL_NAMES_REF='turniere/_specialNames';
+export async function loadSpecialNames(){
+  if(!initFirebase())return null;
+  try{
+    const snap=await firebase.database().ref(SPECIAL_NAMES_REF).get();
+    const v=snap.val();
+    if(!v)return null;
+    const cfg={};
+    if(v.kursleiterJson){try{cfg.kursleiter=JSON.parse(v.kursleiterJson);}catch(e){}}
+    if(v.dokoRundeJson){try{cfg.dokoRunde=JSON.parse(v.dokoRundeJson);}catch(e){}}
+    setSpecialNames(cfg);
+    cacheSpecialNames(cfg);
+    return cfg;
+  }catch(e){console.warn('loadSpecialNames:',e);return null;}
+}
+export async function saveSpecialNames(cfg){
+  if(!initFirebase())throw new Error('Keine Datenbank-Verbindung.');
+  await firebase.database().ref(SPECIAL_NAMES_REF).set({
+    kursleiterJson:JSON.stringify(cfg.kursleiter||[]),
+    dokoRundeJson:JSON.stringify(cfg.dokoRunde||[])
+  });
+  setSpecialNames(cfg);
+  cacheSpecialNames(cfg);
 }
 
 export function getDeviceId(){

@@ -5,8 +5,9 @@
 
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
-import { initFirebase, isAdmin, loadSpielerDB, spielerIsAdmin, BOOTSTRAP_ADMINS, loadAllTurniere, renderTurnierList, getOwnSpieler, startPresenceWatch, stopPresenceWatch } from './turnier.js';
+import { initFirebase, isAdmin, loadSpielerDB, spielerIsAdmin, BOOTSTRAP_ADMINS, loadAllTurniere, renderTurnierList, getOwnSpieler, startPresenceWatch, stopPresenceWatch, loadSpecialNames, saveSpecialNames } from './turnier.js';
 import { showToast, showConfirm, showPrompt, ICO } from './ui.js';
+import { getSpecialNames, SPECIAL_NAME_DEFAULTS } from './main.js';
 
 // Bekannte Top-Level-Knoten – dienen als Einstieg, falls der Root per
 // Firebase-Regeln nicht lesbar ist (permission_denied at /).
@@ -131,6 +132,7 @@ function renderAdmin(){
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminManageAdmins()">👥 Admins</button>';
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminManageTurniere()">🏆 Turniere</button>';
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminPresence()">🟢 Online</button>';
+    h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminSpecialNames()">✨ Besondere Namen</button>';
   }
   if(!atRoot&&v!==null&&typeof v==='object')
     h+='<button class="btn btn-secondary" style="width:auto;padding:7px 12px;font-size:12px" onclick="adminAddKey()">+ Schlüssel</button>';
@@ -429,4 +431,102 @@ export async function adminPresence(){
   });
   // Sicherheitsnetz: nie dauerhaft auf "Lädt…" haengen bleiben.
   setTimeout(()=>{if(!firstResponse)showMessage('🟢 Gerade online','Keine Daten – niemand online oder keine Verbindung.')},6000);
+}
+
+// ── Besondere Namen verwalten (Kursleiter/Spielleiter + Doko-Stammrunde) ──
+// Arbeitskopie der Konfiguration; wird beim Hinzufügen/Entfernen/Speichern aus den Feldern gelesen.
+let adminSpecial={kursleiter:[],dokoRunde:[]};
+function specialHeader(){
+  return '<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)">'
+    +'<h3 style="margin:0">✨ Besondere Namen</h3>'
+    +'<button onclick="adminRefresh()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Zurück">'+ICO.x+'</button></div>';
+}
+export async function adminSpecialNames(){
+  const el=document.getElementById('adminModalContent');
+  el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3)">Lädt…</div>';
+  // Aktuelle Konfiguration aus Firebase laden (fällt sonst auf die aktiven/Default-Listen zurück).
+  try{await loadSpecialNames();}catch(e){/* offline → aktive Listen */}
+  adminSpecial=getSpecialNames();
+  renderAdminSpecial();
+}
+// Liest die aktuellen Feldwerte in die Arbeitskopie (vor strukturellen Änderungen / Speichern).
+function adminSpecialSync(){
+  adminSpecial.kursleiter.forEach((k,i)=>{
+    const n=document.getElementById('spkN'+i), e=document.getElementById('spkE'+i);
+    if(n)k.name=n.value; if(e)k.emoji=e.value;
+  });
+  adminSpecial.dokoRunde.forEach((d,i)=>{
+    const n=document.getElementById('spdN'+i);
+    if(n)adminSpecial.dokoRunde[i]=n.value;
+  });
+}
+function renderAdminSpecial(){
+  const el=document.getElementById('adminModalContent');
+  const inp='width:100%;box-sizing:border-box;font-size:14px;padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--bdr);background:var(--bg);color:var(--tx)';
+  let h=specialHeader();
+  h+='<div style="font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.5">Diese Namen lösen die Easter-Eggs aus (Theme & Begrüßung). Änderungen gelten für alle Geräte. Groß-/Kleinschreibung egal.</div>';
+
+  // Kursleiter / Spielleiter
+  h+='<div class="section-label">🎓 Kursleiter / Spielleiter</div>';
+  h+='<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Vollmodus (Theme + Vokabular), wenn genau diese vier zusammen spielen. Emoji optional.</div>';
+  h+='<div class="card" style="padding:4px 0">';
+  if(!adminSpecial.kursleiter.length)h+='<div style="padding:10px 12px;color:var(--tx3);font-size:13px">Keine Einträge.</div>';
+  adminSpecial.kursleiter.forEach((k,i)=>{
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;'+(i<adminSpecial.kursleiter.length-1?'border-bottom:1px solid var(--bdr)':'')+'">';
+    h+='<input id="spkN'+i+'" value="'+escHtml(k.name||'').replace(/"/g,'&quot;')+'" placeholder="Name" style="'+inp+';flex:1">';
+    h+='<input id="spkE'+i+'" value="'+escHtml(k.emoji||'').replace(/"/g,'&quot;')+'" placeholder="Emoji" maxlength="4" style="'+inp+';width:64px;flex:none;text-align:center">';
+    h+='<button onclick="adminSpecialDel(\'kursleiter\','+i+')" title="Entfernen" style="background:none;border:none;color:var(--red);cursor:pointer;width:30px;height:30px;flex-shrink:0">'+ICO.trash+'</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="adminSpecialAdd(\'kursleiter\')">+ Name hinzufügen</button>';
+
+  // Doppelkopf-Stammrunde
+  h+='<div class="section-label" style="margin-top:20px">🃏 Doppelkopf-Stammrunde</div>';
+  h+='<div style="font-size:11px;color:var(--tx3);margin-bottom:6px">Begrüßung + Konfetti, wenn mindestens vier Spieler – und ausschließlich Namen aus dieser Liste – mitspielen.</div>';
+  h+='<div class="card" style="padding:4px 0">';
+  if(!adminSpecial.dokoRunde.length)h+='<div style="padding:10px 12px;color:var(--tx3);font-size:13px">Keine Einträge.</div>';
+  adminSpecial.dokoRunde.forEach((d,i)=>{
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;'+(i<adminSpecial.dokoRunde.length-1?'border-bottom:1px solid var(--bdr)':'')+'">';
+    h+='<input id="spdN'+i+'" value="'+escHtml(d||'').replace(/"/g,'&quot;')+'" placeholder="Name" style="'+inp+';flex:1">';
+    h+='<button onclick="adminSpecialDel(\'dokoRunde\','+i+')" title="Entfernen" style="background:none;border:none;color:var(--red);cursor:pointer;width:30px;height:30px;flex-shrink:0">'+ICO.trash+'</button>';
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<button class="btn btn-secondary" style="width:100%;margin-top:8px;font-size:13px" onclick="adminSpecialAdd(\'dokoRunde\')">+ Name hinzufügen</button>';
+
+  h+='<div style="display:flex;gap:8px;margin-top:20px">';
+  h+='<button class="btn btn-secondary" style="flex:1" onclick="adminSpecialReset()">Standard</button>';
+  h+='<button class="btn btn-primary" style="flex:1" onclick="adminSpecialSave()">Speichern</button></div>';
+  el.innerHTML=h;
+}
+export function adminSpecialAdd(which){
+  adminSpecialSync();
+  if(which==='kursleiter')adminSpecial.kursleiter.push({name:'',emoji:''});
+  else adminSpecial.dokoRunde.push('');
+  renderAdminSpecial();
+}
+export function adminSpecialDel(which,i){
+  adminSpecialSync();
+  if(which==='kursleiter')adminSpecial.kursleiter.splice(i,1);
+  else adminSpecial.dokoRunde.splice(i,1);
+  renderAdminSpecial();
+}
+export async function adminSpecialReset(){
+  if(!await showConfirm('Beide Listen auf die Standardwerte zurücksetzen? (Erst beim Speichern wirksam.)','Zurücksetzen'))return;
+  adminSpecial=JSON.parse(JSON.stringify(SPECIAL_NAME_DEFAULTS));
+  renderAdminSpecial();
+}
+export async function adminSpecialSave(){
+  adminSpecialSync();
+  // Leere Namen verwerfen, normalisieren.
+  const cfg={
+    kursleiter:adminSpecial.kursleiter.map(k=>({name:String(k.name||'').trim(),emoji:String(k.emoji||'').trim()})).filter(k=>k.name),
+    dokoRunde:adminSpecial.dokoRunde.map(d=>String(d||'').trim()).filter(Boolean)
+  };
+  try{
+    await saveSpecialNames(cfg);
+    showToast('Besondere Namen gespeichert.','info');
+    adminRefresh();
+  }catch(e){console.error('adminSpecialSave:',e);showToast('Speichern fehlgeschlagen: '+(e&&e.message||e),'error');}
 }
