@@ -6,7 +6,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/database';
 import { state, save } from './main.js';
 import { showToast, showConfirm, showPrompt, showChoice, ICO } from './ui.js';
-import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen } from './turnier.js';
+import { initFirebase, getOwnSpieler, getDeviceId, isAdmin, generateQR, loadAllLigen, createSpieler } from './turnier.js';
 import { loadArchive } from './archiv.js';
 import { logChange, renderHistory } from './audit.js';
 
@@ -216,7 +216,13 @@ export async function ligaJoin(code) {
   let data;
   try { const snap = await ligaRef(code).get(); data = snap.val(); } catch (e) { showToast('Beitritt fehlgeschlagen.', 'error'); return; }
   if (!data || data.kind !== 'liga') { showToast('Liga LG-' + code + ' nicht gefunden.', 'error'); return; }
-  const own = await getOwnSpieler().catch(() => null);
+  let own = await getOwnSpieler().catch(() => null);
+  // Kein Cloud-Profil? Mit dem bereits gesetzten Namen automatisch eins anlegen – kein extra
+  // Namens-Dialog beim Beitreten.
+  if (!own) {
+    const localName = (state.myPlayer || '').trim() || ((state.players || [])[0] || '').trim();
+    if (localName) { try { own = await createSpieler(localName); } catch (e) { /* ignore */ } }
+  }
   try { if (own) await ligaRef(code).child('members/' + own.id).set({ name: own.name || '', short: own.short || '', joinedAt: firebase.database.ServerValue.TIMESTAMP }); } catch (e) { /* ignore */ }
   try { await firebase.database().ref('turniere/_ligaIndex/' + code).update({ name: data.name || '' }); } catch (e) { /* Index best effort */ }
   addLocalLiga(code, data.name || '');
@@ -586,14 +592,44 @@ export async function ligaRenamePlayer(code, pid) {
     openLigaDetail(code);
   } catch (e) { showToast('Umbenennen fehlgeschlagen.', 'error'); }
 }
+// Spieler dauerhaft löschen: entfernt ihn aus der Tabelle, aus allen Terminen UND aus allen
+// App-Spielen (Runden/Zuordnung) – so wird er nicht durch die Selbstheilung neu angelegt.
 export async function ligaDeletePlayer(code, pid) {
-  if (!await showConfirm('Diesen Spieler aus der Liga entfernen? (Termin-Einträge zu ihm bleiben, zählen aber nicht mehr.)', 'Löschen', true)) return;
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { data = null; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = data.players || {};
+  const p = players[pid];
+  const pname = (p && p.name) || '?';
+  if (!await showConfirm('„' + pname + '" dauerhaft löschen? Wird aus der Tabelle, allen Terminen und allen App-Spielen entfernt – die betroffenen Runden verlieren diesen Spieler.', 'Endgültig löschen', true)) return;
   try {
-    const before = (await ligaRef(code).child('players/' + pid).get()).val();
+    const nameIdx = {};
+    Object.entries(players).forEach(([id, pl]) => { if (pl && pl.name) nameIdx[String(pl.name).toLowerCase()] = id; });
+    const resolve = (g, raw) => { const m = gameMap(g); if (m[raw] && players[m[raw]]) return m[raw]; const bn = nameIdx[String(raw).toLowerCase()]; return bn || ('~' + raw); };
+    // App-Spiele: alle Namen dieses Spielers aus Runden, Spielerliste und mapJson entfernen.
+    for (const [gid, g] of Object.entries(data.spiele || {})) {
+      const rounds = gameRounds(g);
+      const names = snapshotNames({ players: g.players, rounds });
+      const mine = new Set(names.filter(n => resolve(g, n) === pid));
+      if (!mine.size) continue;
+      const newRounds = rounds.map(r => ({
+        ...r,
+        playing: (r.playing || []).filter(x => !mine.has(x)),
+        winners: (r.winners || []).filter(x => !mine.has(x)),
+        scores: Object.fromEntries(Object.entries(r.scores || {}).filter(([k]) => !mine.has(k)))
+      }));
+      const newPlayers = (g.players || []).filter(x => !mine.has(x));
+      const m = gameMap(g); mine.forEach(n => { delete m[n]; });
+      await ligaRef(code).child('spiele/' + gid).update({ roundsJson: JSON.stringify(newRounds), players: newPlayers, mapJson: JSON.stringify(m) });
+    }
+    // Termine: Punkte dieses Spielers entfernen.
+    for (const [tid, t] of Object.entries(data.termine || {})) {
+      if (t.points && t.points[pid] != null) await ligaRef(code).child('termine/' + tid + '/points/' + pid).remove();
+    }
     await ligaRef(code).child('players/' + pid).remove();
-    await logChange('LG' + code, 'Spieler „' + ((before && before.name) || '?') + '" entfernt', 'players/' + pid, before);
+    await logChange('LG' + code, 'Spieler „' + pname + '" dauerhaft gelöscht', 'players/' + pid, p);
+    showToast('Spieler gelöscht.', 'info');
     openLigaDetail(code);
-  } catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+  } catch (e) { console.error('ligaDeletePlayer:', e); showToast('Löschen fehlgeschlagen: ' + (e && e.message || e), 'error'); }
 }
 // Verknüpfung Roster-Spieler ↔ Mitglied setzen/lösen.
 export async function ligaSetClaim(code, pid) {
