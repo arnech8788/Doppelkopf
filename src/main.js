@@ -19,8 +19,8 @@ import * as liga from './liga.js';
 import * as audit from './audit.js';
 
 // Zentrale App-Version (zuverlässige Quelle, auch wenn das #versionLabel noch nicht im DOM ist).
-export const APP_VERSION='v6.45';
-const APP_VERSION_DATE='13.06.2026 08:20';
+export const APP_VERSION='v6.46';
+const APP_VERSION_DATE='13.06.2026 08:30';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -454,7 +454,7 @@ export function renderMehrScreen(){
   html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+=renderCollapsibleCard('mehr','liga','Liga','<div id="ligaSetupContent"></div>');
   html+='<div class="card" style="cursor:pointer" onclick="openFeedbackModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg><div><div style="font-weight:500">Feedback &amp; Bugs</div><div style="font-size:11px;color:var(--tx3)">Rückmeldung senden</div></div></div></div>';
-  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.45</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.46</div></div></div></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
@@ -561,6 +561,7 @@ export function openChangelogModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Changelog</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="card">';
   const log=[
+    {v:'6.46',d:'13.06.2026 08:30',t:'Liga: Ein Mitglied mit abweichendem Namen lässt sich jetzt direkt aus der Gesamttabelle mit einem vorhandenen Tabellen-Spieler verbinden („Mit Spieler verknüpfen"). Damit verschwindet das doppelte Erscheinen desselben Mitglieds beim manuellen Spiel.'},
     {v:'6.45',d:'13.06.2026 08:20',t:'Liga: Spieler lassen sich jetzt direkt in der Gesamttabelle verwalten (umbenennen, zusammenführen, löschen) – die separate Roster-Liste entfällt. Außerdem werden Spieler aus älteren App-Spielen automatisch zu echten Tabellen-Spielern (keine „nicht zugeordnet"-Einträge mehr); dadurch lassen sie sich verwalten und beim manuellen Spiel auswählen.'},
     {v:'6.44',d:'13.06.2026 08:10',t:'Liga vereinfacht: Mitglied und Tabellen-Spieler sind jetzt EINE Person – wer beitritt, wird automatisch mit dem gleichnamigen Tabellen-Spieler verbunden (kein manuelles „Verknüpfen" mehr nötig), und Mitglieder erscheinen in der Gesamttabelle. Beim manuellen Spiel (Termin) gibt es eine gemeinsame Personenliste aus Tabellen-Spielern und Mitgliedern; wählt man ein Mitglied aus, wird es automatisch als Spieler angelegt.'},
     {v:'6.43',d:'13.06.2026 07:30',t:'Admin: Die „besonderen Namen" (Kursleiter/Spielleiter und Doppelkopf-Stammrunde), die die Easter-Eggs auslösen, lassen sich jetzt im Admin-Bereich (Datenbank → „✨ Besondere Namen") einsehen, bearbeiten, hinzufügen und entfernen. Änderungen gelten für alle Geräte.'},
