@@ -257,6 +257,8 @@ function ligaStandings(data) {
   const acc = {};
   const row = key => acc[key] || (acc[key] = {
     key, pid: players[key] ? key : null,
+    unassigned: String(key).charAt(0) === '~',
+    raw: String(key).charAt(0) === '~' ? String(key).slice(1) : null,
     name: players[key] ? (players[key].name || '?') : (String(key).charAt(0) === '~' ? String(key).slice(1) + ' (nicht zugeordnet)' : String(key)),
     claimedByName: players[key] ? (players[key].claimedByName || null) : null,
     total: 0, payment: 0, abende: 0, runden: 0, siege: 0, soloWins: 0, soloTotal: 0
@@ -269,11 +271,13 @@ function ligaStandings(data) {
     if (byName) return byName;
     return '~' + rawName;
   };
-  // Manuelle Termine (je Termin ein Abend)
+  // Manuelle Termine (je Termin ein Abend). Punkte gelöschter Spieler (pid nicht mehr vorhanden)
+  // werden ignoriert – sie tauchen sonst als „nicht zugeordnet" auf.
   Object.values(termine).forEach(t => {
     const pts = t.points || {};
     Object.entries(pts).forEach(([pid, v]) => {
-      const r = row(players[pid] ? pid : ('~' + pid));
+      if (!players[pid]) return;
+      const r = row(pid);
       const val = Number(v) || 0;
       r.total += val; r.abende += 1;
       if (payMode && val < 0) r.payment += -val;
@@ -431,7 +435,9 @@ export async function openLigaDetail(code) {
       const nameInner = esc(r.name) + badges;
       const nameHtml = r.pid
         ? '<span style="cursor:pointer;border-bottom:1px dotted var(--tx3)" onclick="openLigaPlayerDetail(\'' + code + '\',\'' + r.pid + '\')">' + nameInner + '</span>'
-        : nameInner;
+        : (admin && r.unassigned)
+          ? '<span style="cursor:pointer;border-bottom:1px dotted var(--tx3)" onclick="ligaAssignUnassigned(\'' + code + '\',\'' + encodeURIComponent(r.raw) + '\')">' + nameInner + '</span>'
+          : nameInner;
       h += '<div style="padding:10px 0;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
       h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:500"><span class="rank ' + rc + '" style="display:inline-flex;width:20px;height:20px;font-size:11px;margin-right:6px">' + (i + 1) + '</span>' + nameHtml + '</span><span class="' + (r.total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (r.total > 0 ? '+' : '') + r.total + '</span></div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px 12px;font-size:11px;color:var(--tx3);margin-left:26px">';
@@ -450,6 +456,11 @@ export async function openLigaDetail(code) {
         // Mitglied (anderer Name als ein Tabellen-Spieler) → manuell mit einem Spieler verbinden.
         h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
         h += '<button onclick="ligaClaimMemberToPlayer(\'' + code + '\',\'' + r.mid + '\')" style="' + btn + '">' + icoSized(ICO.link, 13) + 'Mit Spieler verknüpfen</button>';
+        h += '</div>';
+      } else if (admin && r.unassigned) {
+        // Aus älteren Spielen, noch keinem Tabellen-Spieler zugeordnet → zuordnen.
+        h += '<div style="display:flex;gap:6px;margin:8px 0 2px 26px">';
+        h += '<button onclick="ligaAssignUnassigned(\'' + code + '\',\'' + encodeURIComponent(r.raw) + '\')" style="' + btn + '">' + icoSized(ICO.link, 13) + 'Einem Spieler zuordnen</button>';
         h += '</div>';
       }
       h += '</div>';
@@ -618,6 +629,38 @@ export async function ligaClaimMemberToPlayer(code, mid) {
     showToast('Verknüpft.', 'info');
     openLigaDetail(code);
   } catch (e) { console.error('ligaClaimMemberToPlayer:', e); showToast('Verknüpfen fehlgeschlagen.', 'error'); }
+}
+// Einen noch nicht zugeordneten Spielnamen (aus App-Spielen) einem vorhandenen Tabellen-Spieler
+// zuordnen: in allen Spielen, in denen dieser Name vorkommt, mapJson auf die Ziel-pid setzen.
+export async function ligaAssignUnassigned(code, rawEnc) {
+  const raw = decodeURIComponent(rawEnc || '');
+  let data; try { data = (await ligaRef(code).get()).val(); } catch (e) { return; }
+  if (!data) { showToast('Liga nicht gefunden.', 'error'); return; }
+  const players = Object.entries(data.players || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+  const labels = players.map(([, p]) => p.name || '?');
+  labels.push('➕ neu als Spieler anlegen: ' + raw);
+  const idx = await chooseFromList('„' + raw + '" welchem Spieler zuordnen?', labels);
+  if (idx < 0) return;
+  try {
+    let pid, pname;
+    if (idx === players.length) { // neu anlegen
+      const ref = ligaRef(code).child('players').push();
+      await ref.set({ name: raw.trim() || 'Spieler' });
+      pid = ref.key; pname = raw.trim();
+    } else { pid = players[idx][0]; pname = players[idx][1].name || '?'; }
+    const games = data.spiele || {};
+    for (const [gid, g] of Object.entries(games)) {
+      const names = snapshotNames({ players: g.players, rounds: gameRounds(g) });
+      if (!names.includes(raw)) continue;
+      const m = gameMap(g);
+      if (m[raw] && data.players[m[raw]]) continue; // schon zugeordnet
+      m[raw] = pid;
+      await ligaRef(code).child('spiele/' + gid + '/mapJson').set(JSON.stringify(m));
+    }
+    await logChange('LG' + code, '„' + raw + '" dem Spieler „' + pname + '" zugeordnet', 'spiele', null);
+    showToast('Zugeordnet.', 'info');
+    openLigaDetail(code);
+  } catch (e) { console.error('ligaAssignUnassigned:', e); showToast('Zuordnen fehlgeschlagen: ' + (e && e.message || e), 'error'); }
 }
 
 async function chooseFromList(title, labels) {
@@ -896,10 +939,13 @@ export async function openLigaPlayerDetail(code, pid) {
   });
   entries.sort((a, b) => (new Date(b.date) - new Date(a.date)) || 0);
   const total = entries.reduce((s, e) => s + e.points, 0);
+  const payMode = !!(data.settings && data.settings.payMode);
+  const payment = entries.reduce((s, e) => e.points < 0 ? s + (-e.points) : s, 0); // negative Abende summiert
 
   let h = modalHeader('👤 ' + esc(p.name || '?'));
   if (p.claimedByName) h += '<div style="font-size:12px;color:var(--tx3);margin-bottom:8px">verknüpft mit ' + esc(p.claimedByName) + '</div>';
   h += '<div class="card" style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500">Gesamt</span><span class="' + (total >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700;font-size:18px">' + (total > 0 ? '+' : '') + total + '</span></div>';
+  if (payMode) h += '<div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span style="font-weight:500">Zu zahlen <span style="font-weight:400;color:var(--tx3);font-size:11px">(Minus-Abende)</span></span><span style="color:var(--neg,#d23);font-family:\'Space Mono\',monospace;font-weight:700;font-size:18px">' + payment + '</span></div>';
   h += '<div class="section-label" style="margin-top:16px">Verlauf (' + entries.length + ')</div>';
   h += '<div class="card" style="padding:4px 0">';
   if (!entries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Punkte für diesen Spieler.</div>';
