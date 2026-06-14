@@ -1010,7 +1010,8 @@ export async function openLigaGameDetail(code, gameId) {
   const g = (data.spiele || {})[gameId];
   if (!g) { showToast('Spiel nicht gefunden.', 'error'); openLigaDetail(code); return; }
   const rounds = gameRounds(g);
-  const players = (g.players && g.players.length) ? g.players.slice() : (() => { const s = new Set(); rounds.forEach(r => r.playing.forEach(p => s.add(p))); return [...s]; })();
+  // Alle tatsächlich beteiligten Spieler (players[] + Runden-Namen), damit niemand fehlt.
+  const players = (() => { const s = new Set(g.players || []); rounds.forEach(r => (r.playing || []).forEach(p => s.add(p))); return [...s]; })();
   const d = g.date ? new Date(g.date) : null;
   const dateStr = d && !isNaN(d) ? d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
   const tot = {}; players.forEach(p => tot[p] = 0);
@@ -1149,10 +1150,11 @@ export async function ligaConfirmArchivedGame(code, archiveId) {
 }
 
 // ── Spieler-Zuordnung beim Aufnehmen / Korrigieren (Kreuztabelle) ──
-// Sammelt alle Spielernamen eines Snapshots (players[] bzw. aus den Runden abgeleitet).
+// Sammelt ALLE Spielernamen eines Snapshots: players[] UND die in den Runden vorkommenden Namen
+// (Vereinigung). So fehlt niemand, auch wenn die gespeicherte Spielerliste unvollständig ist
+// (z. B. 5-Personen-Abend, bei dem players[] nur 4 enthielt).
 function snapshotNames(snapshot) {
-  if (snapshot.players && snapshot.players.length) return snapshot.players.slice();
-  const s = new Set();
+  const s = new Set(snapshot.players || []);
   (snapshot.rounds || []).forEach(r => (r.playing || []).forEach(p => s.add(p)));
   return [...s];
 }
