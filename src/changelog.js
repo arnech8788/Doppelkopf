@@ -1,6 +1,7 @@
 // changelog.js – Changelog-Daten (Versionshistorie). Einzige Quelle; genutzt von
 // openChangelogModal (Anzeige) und notify.js (Benachrichtigungen).
 export const CHANGELOG = [
+  {v:'6.54',d:'14.06.2026 10:20',t:'Doppelkopf-Spiel: Bei der Vorbehalt-Abfrage siehst du jetzt die Reihenfolge mit deiner Position („Du bist an Position X von 4") und ob die Spieler vor dir bereits einen Vorbehalt geäußert haben (gesund/Vorbehalt) – der genaue Solo-Typ bleibt bis zur Auflösung verdeckt.'},
   {v:'6.53',d:'14.06.2026 10:05',t:'Neu: Benachrichtigungen (🔔-Symbol oben rechts). Du wirst über Änderungen an deinen Ligen informiert (z. B. neues Spiel, Termin, Spieler-Änderungen) und über neue App-Versionen seit deiner letzten. Ungelesene werden mit einem Punkt markiert. Unter Einstellungen → Benachrichtigungen kannst du wählen, worüber du benachrichtigt wirst. Hinweis: Push-Benachrichtigungen bei geschlossener App gibt es noch nicht.'},
   {v:'6.52',d:'14.06.2026 09:45',t:'Liga: In der Spiel-Detailansicht und beim Spieler-Zuordnen werden jetzt ALLE tatsächlich beteiligten Spieler angezeigt – auch wenn die gespeicherte Spielerliste unvollständig war (z. B. bei einem Abend mit fünf Personen). Vorher konnte ein Mitspieler (z. B. Alex) im Spiel-Detail fehlen.'},
   {v:'6.51',d:'14.06.2026 09:35',t:'Liga: Im Punkte-Verlauf eines Spielers kann man jetzt auf einen Eintrag tippen, um das Spiel bzw. den Termin direkt anzusehen.'},
