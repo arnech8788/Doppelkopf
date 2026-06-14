@@ -183,7 +183,13 @@ export function chooseCard(state, idx) {
   }
 
   // Gegner (oder unbekannt → vorsichtig wie Gegner) führt.
-  const worth = trickAugen >= 10 || state.trickIndex >= state.handSize - 3;
+  // Sitzt hinter mir noch ein Gegner (oder Unbekannter)? Dann kann die Gegenpartei den Stich
+  // noch „aufladen" (z. B. ein Ass schmieren) – einen billig gewinnbaren Stich also nicht
+  // herschenken, sonst wird er für die Gegner viel zu wertvoll. (Vorher zählte nur das aktuell
+  // sichtbare Augen-Niveau, das die noch folgende Schmier-Karte unterschlägt.)
+  let oppBehind = false;
+  for (let k = 1; k <= 3 - trick.length; k++) { if (view.side((idx + k) % 4) !== mySide) { oppBehind = true; break; } }
+  const worth = trickAugen >= 10 || state.trickIndex >= state.handSize - 3 || oppBehind;
   if (winners.length && worth) return cheapestWinner(winners, ctx).id;
   return lowSafe(legal).id;
 }

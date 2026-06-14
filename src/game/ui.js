@@ -276,7 +276,7 @@ function hochzeitBanner() {
   const bride = G.players[h.brideIdx].name;
   let text;
   if (!h.clarified) {
-    text = `💍 Hochzeit von ${bride} · Partner wird gesucht (bis Stich 3)`;
+    text = `💍 Hochzeit von ${bride} · Partner = wer als Erste(r) (außer ${bride}) einen Stich holt – Fehl- oder Trumpfstich, bis Stich 3; sonst Stilles Solo`;
   } else if (h.partnerIdx == null) {
     text = `💍 Hochzeit hängen gelassen → Stilles Solo von ${bride}`;
   } else {
