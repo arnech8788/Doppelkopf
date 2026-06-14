@@ -955,15 +955,15 @@ export async function openLigaPlayerDetail(code, pid) {
   const nameIdx = {};
   Object.entries(players).forEach(([id, pl]) => { if (pl && pl.name) nameIdx[String(pl.name).toLowerCase()] = id; });
   const resolve = (g, rawName) => { const m = gameMap(g); if (m[rawName] && players[m[rawName]]) return m[rawName]; const bn = nameIdx[String(rawName).toLowerCase()]; if (bn) return bn; return '~' + rawName; };
-  const entries = []; // {date, label, points, sub?}
+  const entries = []; // {date, label, points, sub?, kind, id}
   // Manuelle Termine
-  Object.values(data.termine || {}).forEach(t => {
+  Object.entries(data.termine || {}).forEach(([id, t]) => {
     const v = (t.points || {})[pid];
-    if (v != null) entries.push({ date: t.date, label: t.label || 'Termin (manuell)', points: Number(v) || 0, sub: 'Termin' });
+    if (v != null) entries.push({ date: t.date, label: t.label || 'Termin (manuell)', points: Number(v) || 0, sub: 'Termin', kind: 'termin', id });
   });
   // App-Spiele – exakt wie ligaStandings direkt über rd.playing auflösen (nicht über g.players,
   // das von den Runden-Namen abweichen kann → sonst leerer Verlauf trotz Punkten in der Tabelle).
-  Object.values(data.spiele || {}).forEach(g => {
+  Object.entries(data.spiele || {}).forEach(([gid, g]) => {
     const rounds = gameRounds(g);
     let sum = 0, runden = 0, siege = 0;
     rounds.forEach(r => (r.playing || []).forEach(pl => {
@@ -973,7 +973,7 @@ export async function openLigaPlayerDetail(code, pid) {
       if ((r.winners || []).includes(pl)) siege += 1;
     }));
     if (!runden) return;
-    entries.push({ date: g.date, label: rounds.length + ' Runden', points: sum, sub: 'Spiel · ' + siege + '/' + runden + ' gewonnen' });
+    entries.push({ date: g.date, label: rounds.length + ' Runden', points: sum, sub: 'Spiel · ' + siege + '/' + runden + ' gewonnen', kind: 'game', id: gid });
   });
   entries.sort((a, b) => (new Date(b.date) - new Date(a.date)) || 0);
   const total = entries.reduce((s, e) => s + e.points, 0);
@@ -988,10 +988,12 @@ export async function openLigaPlayerDetail(code, pid) {
   h += '<div class="card" style="padding:4px 0">';
   if (!entries.length) h += '<div style="padding:10px 12px;font-size:13px;color:var(--tx3)">Noch keine Punkte für diesen Spieler.</div>';
   entries.forEach((e, i) => {
-    h += '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;' + (i < entries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
+    const onclick = e.kind === 'game' ? 'openLigaGameDetail(\'' + code + '\',\'' + e.id + '\')' : 'openLigaTerminDetail(\'' + code + '\',\'' + e.id + '\')';
+    h += '<div onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;' + (i < entries.length - 1 ? 'border-bottom:1px solid var(--bdr)' : '') + '">';
     h += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">' + (fmtDate(e.date) || '—') + ' · ' + esc(e.label) + '</div>';
     h += '<div style="font-size:11px;color:var(--tx3)">' + esc(e.sub || '') + '</div></div>';
-    h += '<span class="' + (e.points >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (e.points > 0 ? '+' : '') + e.points + '</span></div>';
+    h += '<span class="' + (e.points >= 0 ? 'pos' : 'neg') + '" style="font-family:\'Space Mono\',monospace;font-weight:700">' + (e.points > 0 ? '+' : '') + e.points + '</span>';
+    h += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--tx3);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg></div>';
   });
   h += '</div>';
   h += '<button class="btn btn-secondary" style="width:100%;margin-top:12px" onclick="ligaBack()">Zurück</button>';

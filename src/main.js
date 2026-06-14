@@ -19,8 +19,8 @@ import * as liga from './liga.js';
 import * as audit from './audit.js';
 
 // Zentrale App-Version (zuverlässige Quelle, auch wenn das #versionLabel noch nicht im DOM ist).
-export const APP_VERSION='v6.50';
-const APP_VERSION_DATE='14.06.2026 09:25';
+export const APP_VERSION='v6.51';
+const APP_VERSION_DATE='14.06.2026 09:35';
 
 // ── Debug-Logging (console.error/warn abfangen) ──
 const _debugLogs=[];
@@ -454,7 +454,7 @@ export function renderMehrScreen(){
   html+=renderCollapsibleCard('mehr','turnier','Turnier','<div id="turnierSetupContent"></div>');
   html+=renderCollapsibleCard('mehr','liga','Liga','<div id="ligaSetupContent"></div>');
   html+='<div class="card" style="cursor:pointer" onclick="openFeedbackModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg><div><div style="font-weight:500">Feedback &amp; Bugs</div><div style="font-size:11px;color:var(--tx3)">Rückmeldung senden</div></div></div></div>';
-  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.50</div></div></div></div>';
+  html+='<div class="card" style="cursor:pointer" onclick="openChangelogModal()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><div><div style="font-weight:500">Changelog</div><div style="font-size:11px;color:var(--tx3)">Versionshistorie · v6.51</div></div></div></div>';
   html+='<div class="card" style="cursor:pointer" onclick="checkForUpdate()"><div style="display:flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--acc2)"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><div><div style="font-weight:500">Nach Updates suchen</div><div style="font-size:11px;color:var(--tx3)">Neueste Version sofort laden</div></div></div></div>';
   html+='<div id="adminEntrySlot"></div>';
   html+='<div id="gameEntrySlot"></div>';
@@ -561,6 +561,7 @@ export function openChangelogModal(){
   let html='<div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg2);padding:0 0 12px;margin:0 0 4px;z-index:5;border-bottom:1px solid var(--bdr)"><h3 style="margin:0">Changelog</h3><button onclick="closeInfoModal()" style="background:var(--bg3);border:1px solid var(--bdr);color:var(--tx2);cursor:pointer;width:32px;height:32px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;padding:0" aria-label="Schließen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
   html+='<div class="card">';
   const log=[
+    {v:'6.51',d:'14.06.2026 09:35',t:'Liga: Im Punkte-Verlauf eines Spielers kann man jetzt auf einen Eintrag tippen, um das Spiel bzw. den Termin direkt anzusehen.'},
     {v:'6.50',d:'14.06.2026 09:25',t:'Liga: Tippt man in der Gesamttabelle auf einen Spieler, wird der Punkte-Verlauf jetzt korrekt angezeigt. Vorher konnte er leer sein, obwohl in der Tabelle Punkte standen – das passierte bei Spielern, deren Name unterschiedlich geschrieben war (z. B. „Alex" vs. „Alexandra Reinelt").'},
     {v:'6.49',d:'13.06.2026 09:00',t:'Liga: Spieler lassen sich jetzt dauerhaft löschen – sie werden auch aus allen App-Spielen und Terminen entfernt und kommen nicht wieder. Außerdem braucht man beim Beitreten keinen Namen mehr einzugeben: Wer schon einen Namen in der App hat, bekommt automatisch ein Profil.'},
     {v:'6.48',d:'13.06.2026 08:50',t:'Liga: „Nicht zugeordnet"-Einträge bereinigt – Punkte gelöschter Spieler erscheinen nicht mehr in der Tabelle. Verbliebene nicht zugeordnete Namen (aus älteren Spielen) lassen sich jetzt antippen und einem Spieler zuordnen (oder neu anlegen). In der Spieler-Übersicht wird bei aktivem Zahlbetrag-Modus nun auch „Zu zahlen" angezeigt.'},
