@@ -411,11 +411,29 @@ function vorbehaltOverlay() {
   if (G.phase !== 'vorbehalt') return '';
   const v = G.vorbehalt;
   const waitingHuman = v.order[v.current] === 0;
-  const done = v.order.slice(0, v.current).map(i => {
-    const d = v.declarations[i];
-    const t = d.type === 'gesund' ? 'Gesund' : d.type === 'hochzeit' ? 'Hochzeit!' : d.type === 'schmeissen' ? 'Wirft!' : 'Vorbehalt!';
-    return `<div style="font-size:12px;color:var(--tx3)">${G.players[i].name}: ${t}</div>`;
+  const myIdx = v.order.indexOf(0);
+  // Reihenfolge der Vorbehalt-Abfrage mit Position + Status (vorherige zeigen gesund/Vorbehalt,
+  // der Solo-Typ bleibt verdeckt). „Du" hervorgehoben.
+  const orderList = v.order.map((pi, idx) => {
+    const me = pi === 0;
+    let status, scol = 'var(--tx3)';
+    if (idx < v.current) {
+      const d = v.declarations[pi] || {};
+      if (d.type === 'gesund') { status = 'gesund'; }
+      else if (d.type === 'hochzeit') { status = 'Hochzeit!'; scol = 'var(--acc)'; }
+      else if (d.type === 'schmeissen') { status = 'wirft das Blatt'; scol = 'var(--acc)'; }
+      else { status = 'Vorbehalt!'; scol = 'var(--acc)'; }
+    } else if (idx === v.current) { status = me ? 'du bist dran' : 'überlegt…'; scol = 'var(--tx2)'; }
+    else { status = 'danach'; }
+    const nm = me ? 'Du' : G.players[pi].name;
+    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 8px;border-radius:var(--r-sm);${idx === v.current ? 'background:var(--bg3)' : ''}">`
+      + `<span style="font-size:12px;${me ? 'font-weight:700' : ''}">${idx + 1}. ${nm}${me ? ' ◀' : ''}</span>`
+      + `<span style="font-size:12px;color:${scol}">${status}</span></div>`;
   }).join('');
+  const posLine = myIdx >= 0
+    ? `<div style="font-size:12px;color:var(--tx2);margin-bottom:8px">Du bist an Position <b>${myIdx + 1}</b> von ${v.order.length}.</div>`
+    : '';
+  const done = posLine + `<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">${orderList}</div>`;
   let body;
   if (waitingHuman) {
     const canHz = E.canDeclareHochzeit(G, 0);
