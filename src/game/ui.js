@@ -16,7 +16,8 @@ let G = null;             // aktueller Engine-State
 let busy = false;         // KI denkt / Stich-Pause läuft
 let showingTrick = null;  // fertiger Stich, der gerade angezeigt wird
 let pendingContinue = null; // Fortsetzung bei „Auto-Weiter" aus
-let vorbExpanded = false; // Vorbehalt-Untermenü offen
+let vorbStage = 'declare'; // 'declare' = binär (Gesund/Vorbehalt), 'reveal' = Typ wählen (Mensch)
+let hzModeAsk = false;     // Hochzeit gewählt → Klärungs-Modus (Fehl/Trumpf) abfragen
 let ansageOpen = false;   // Ansage-Popup offen
 let peekTrick = false;    // „Letzter Stich"-Popup offen
 let debugOpen = false;    // Debug-/Bot-Feedback-Panel offen
@@ -35,7 +36,7 @@ export function startNewDokoGame() {
   const mitNeunen = state.dokoMitNeunen !== false;
   const dealer = ((state.dokoDealer || 0)) % 4;
   G = E.createGame({ names: NAMES, dealer, mitNeunen, seed: (Date.now() ^ (Math.random() * 1e9)) | 0 });
-  busy = false; showingTrick = null; pendingContinue = null; vorbExpanded = false; redealCount = 0;
+  busy = false; showingTrick = null; pendingContinue = null; vorbStage = 'declare'; hzModeAsk = false; redealCount = 0;
   state.dokoDealer = (dealer + 1) % 4;
   persistGame();
   advanceVorbehalt();
@@ -50,16 +51,25 @@ export function dokoResume() {
 export function dokoDiscardSaved() { state.dokoGame = null; G = null; save(); render(); }
 
 // ── Vorbehalt-Phase ──
+// Zweistufig: Runde 1 meldet jeder nur „Gesund" oder „Vorbehalt" (Platzhalter {type:'vorbehalt'}).
+// Erst wenn alle gemeldet haben und der Mensch einen Vorbehalt hat, wählt er den konkreten Typ
+// (Solo/Hochzeit/Schmeißen). Aufgelöst wird per Vorrang in E.resolveVorbehalt.
 function advanceVorbehalt() {
   const v = G.vorbehalt;
   while (v.current < v.order.length) {
     const idx = v.order[v.current];
-    if (idx === 0) { render(); return; }          // Mensch ist dran → warten
-    v.declarations[idx] = AI.decideVorbehalt(G, idx);
+    if (idx === 0) { persistGame(); render(); return; } // Mensch ist dran → Gesund/Vorbehalt
+    v.declarations[idx] = AI.decideVorbehalt(G, idx);    // KI: volle Entscheidung (Anzeige binär)
     v.current++;
   }
+  // Alle haben (binär) gemeldet. Hat der Mensch „Vorbehalt" gesagt → jetzt Typ wählen.
+  if (v.declarations[0] && v.declarations[0].type === 'vorbehalt') { vorbStage = 'reveal'; persistGame(); render(); return; }
+  finishVorbehalt();
+}
+function finishVorbehalt() {
   E.resolveVorbehalt(G);
   if (G.phase === 'redeal') { doRedeal(); return; }
+  vorbStage = 'declare'; hzModeAsk = false;
   persistGame(); render(); continuePlay();
 }
 // Schmeißen → neu geben (gleicher Geber, neues Blatt). Sicherheitsstopp gegen Endlos-Neugaben.
@@ -69,22 +79,37 @@ function doRedeal() {
   const mitNeunen = G.mitNeunen, dealer = G.dealer;
   G = E.createGame({ names: NAMES, dealer, mitNeunen, seed: (Date.now() ^ (Math.random() * 1e9)) | 0 });
   if (redealCount >= 6) G.noThrow = true;
-  busy = false; showingTrick = null; pendingContinue = null; vorbExpanded = false;
+  busy = false; showingTrick = null; pendingContinue = null; vorbStage = 'declare'; hzModeAsk = false;
   showToast(`${thrower} wirft das Blatt – neu gegeben`, 'info');
   persistGame(); render();
   advanceVorbehalt();
 }
+// Runde 1 (binär): Mensch sagt nur Gesund oder Vorbehalt.
 export function dokoVorbehalt(kind) {
-  if (G.phase !== 'vorbehalt') return;
-  if (kind === 'gesund') { G.vorbehalt.declarations[0] = { type: 'gesund' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
-  else if (kind === 'hochzeit') { G.vorbehalt.declarations[0] = { type: 'hochzeit' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
-  else if (kind === 'schmeissen') { G.vorbehalt.declarations[0] = { type: 'schmeissen' }; vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt(); }
-  else if (kind === 'expand') { vorbExpanded = true; render(); }
+  if (G.phase !== 'vorbehalt' || vorbStage !== 'declare') return;
+  if (kind === 'gesund') G.vorbehalt.declarations[0] = { type: 'gesund' };
+  else if (kind === 'vorbehalt') G.vorbehalt.declarations[0] = { type: 'vorbehalt' }; // Platzhalter, Typ folgt
+  else return;
+  G.vorbehalt.current++;
+  advanceVorbehalt();
+}
+// Runde 2 (Typ): nur erreichbar, wenn der Mensch „Vorbehalt" gesagt hat.
+export function dokoVorbType(kind) {
+  if (G.phase !== 'vorbehalt' || vorbStage !== 'reveal') return;
+  if (kind === 'hochzeit') { hzModeAsk = true; render(); return; }
+  if (kind === 'schmeissen') { G.vorbehalt.declarations[0] = { type: 'schmeissen' }; finishVorbehalt(); return; }
+  if (kind === 'gesund') { G.vorbehalt.declarations[0] = { type: 'gesund' }; finishVorbehalt(); return; } // Vorbehalt doch zurücknehmen
+}
+// Hochzeit: Braut legt fest, ob über ersten Fehl- oder Trumpf-Stich geklärt wird.
+export function dokoVorbHochzeit(mode) {
+  if (G.phase !== 'vorbehalt' || vorbStage !== 'reveal') return;
+  G.vorbehalt.declarations[0] = { type: 'hochzeit', clarifyMode: mode === 'trumpf' ? 'trumpf' : 'fehl' };
+  finishVorbehalt();
 }
 export function dokoChooseSolo(soloType) {
-  if (G.phase !== 'vorbehalt') return;
+  if (G.phase !== 'vorbehalt' || vorbStage !== 'reveal') return;
   G.vorbehalt.declarations[0] = { type: 'solo', soloType };
-  vorbExpanded = false; G.vorbehalt.current++; advanceVorbehalt();
+  finishVorbehalt();
 }
 
 // ── Spielablauf ──
@@ -276,7 +301,8 @@ function hochzeitBanner() {
   const bride = G.players[h.brideIdx].name;
   let text;
   if (!h.clarified) {
-    text = `💍 Hochzeit von ${bride} · Partner = wer als Erste(r) (außer ${bride}) einen Stich holt – Fehl- oder Trumpfstich, bis Stich 3; sonst Stilles Solo`;
+    const art = h.mode === 'trumpf' ? 'Trumpf-Stich' : 'Fehl-Stich';
+    text = `💍 Hochzeit von ${bride} · Partner = wer den ersten ${art} (außer ${bride}) holt, bis Stich 3; sonst Stilles Solo`;
   } else if (h.partnerIdx == null) {
     text = `💍 Hochzeit hängen gelassen → Stilles Solo von ${bride}`;
   } else {
@@ -410,23 +436,24 @@ function handArea() {
 function vorbehaltOverlay() {
   if (G.phase !== 'vorbehalt') return '';
   const v = G.vorbehalt;
-  const waitingHuman = v.order[v.current] === 0;
+  const reveal = vorbStage === 'reveal';                 // Mensch wählt jetzt den Typ
+  const myTurn = !reveal && v.order[v.current] === 0;    // Mensch ist in Runde 1 dran
   const myIdx = v.order.indexOf(0);
-  // Reihenfolge der Vorbehalt-Abfrage mit Position + Status (vorherige zeigen gesund/Vorbehalt,
-  // der Solo-Typ bleibt verdeckt). „Du" hervorgehoben.
+  // Reihenfolge mit Position + Status. Während der Abfrage bleibt der genaue Vorbehalt verdeckt:
+  // gemeldet wird nur „gesund" oder „Vorbehalt!". „Du" ist hervorgehoben.
+  const declaredCount = reveal ? v.order.length : v.current;
   const orderList = v.order.map((pi, idx) => {
     const me = pi === 0;
     let status, scol = 'var(--tx3)';
-    if (idx < v.current) {
+    if (idx < declaredCount) {
       const d = v.declarations[pi] || {};
-      if (d.type === 'gesund') { status = 'gesund'; }
-      else if (d.type === 'hochzeit') { status = 'Hochzeit!'; scol = 'var(--acc)'; }
-      else if (d.type === 'schmeissen') { status = 'wirft das Blatt'; scol = 'var(--acc)'; }
-      else { status = 'Vorbehalt!'; scol = 'var(--acc)'; }
-    } else if (idx === v.current) { status = me ? 'du bist dran' : 'überlegt…'; scol = 'var(--tx2)'; }
+      if (d.type === 'gesund') status = 'gesund';
+      else { status = 'Vorbehalt!'; scol = 'var(--acc)'; } // Typ verdeckt
+    } else if (!reveal && idx === v.current) { status = me ? 'du bist dran' : 'überlegt…'; scol = 'var(--tx2)'; }
     else { status = 'danach'; }
     const nm = me ? 'Du' : G.players[pi].name;
-    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 8px;border-radius:var(--r-sm);${idx === v.current ? 'background:var(--bg3)' : ''}">`
+    const hl = (!reveal && idx === v.current) || (reveal && me);
+    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 8px;border-radius:var(--r-sm);${hl ? 'background:var(--bg3)' : ''}">`
       + `<span style="font-size:12px;${me ? 'font-weight:700' : ''}">${idx + 1}. ${nm}${me ? ' ◀' : ''}</span>`
       + `<span style="font-size:12px;color:${scol}">${status}</span></div>`;
   }).join('');
@@ -434,29 +461,37 @@ function vorbehaltOverlay() {
     ? `<div style="font-size:12px;color:var(--tx2);margin-bottom:8px">Du bist an Position <b>${myIdx + 1}</b> von ${v.order.length}.</div>`
     : '';
   const done = posLine + `<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">${orderList}</div>`;
-  let body;
-  if (waitingHuman) {
+  let title = 'Vorbehalt?', hint = 'Halte deine Karten? „Gesund" = normales Spiel. <b>Deine Karten siehst du unten.</b>', body;
+  if (reveal) {
     const canHz = E.canDeclareHochzeit(G, 0);
     const canThrow = E.canThrow(G.players[0].hand);
-    if (!vorbExpanded) {
-      body = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">`
-        + `<button class="btn btn-primary" onclick="dokoVorbehalt('gesund')">Gesund</button>`
-        + `<button class="btn btn-secondary" onclick="dokoVorbehalt('expand')">Vorbehalt…</button>`
-        + (canThrow ? `<button class="btn btn-secondary" style="font-size:12px" onclick="dokoVorbehalt('schmeissen')">Schmeißen (Blatt zu schwach)</button>` : '')
-        + `</div>`;
+    if (hzModeAsk) {
+      title = 'Hochzeit – Klärung wählen';
+      hint = 'Wodurch wird dein Partner bestimmt? Es zählt nur <b>eines</b> von beiden – der erste Stich (außer von dir gewonnen) der gewählten Art (bis Stich 3), sonst Stilles Solo.';
+      body = `<div style="display:flex;flex-direction:column;gap:8px">`
+        + `<button class="btn btn-primary" onclick="dokoVorbHochzeit('fehl')">Erster Fehl-Stich</button>`
+        + `<button class="btn btn-primary" onclick="dokoVorbHochzeit('trumpf')">Erster Trumpf-Stich</button></div>`;
     } else {
+      title = 'Dein Vorbehalt – was ist es?';
+      hint = 'Du hast „Vorbehalt" gesagt. Wähle deinen Vorbehalt (Vorrang: Solo → Schmeißen → Hochzeit).';
       const solos = SOLO_LIST.map(([t, l]) => `<button class="btn btn-secondary" style="font-size:12px" onclick="dokoChooseSolo('${t}')">${l}</button>`).join('');
       body = `<div style="display:flex;flex-direction:column;gap:8px">`
-        + (canHz ? `<button class="btn btn-primary" onclick="dokoVorbehalt('hochzeit')">Hochzeit (beide Kreuz-Damen)</button>` : '')
+        + (canHz ? `<button class="btn btn-primary" onclick="dokoVorbType('hochzeit')">Hochzeit (beide Kreuz-Damen)</button>` : '')
+        + (canThrow ? `<button class="btn btn-secondary" onclick="dokoVorbType('schmeissen')">Schmeißen (Blatt zu schwach)</button>` : '')
         + `<div style="font-size:12px;color:var(--tx3)">Solo wählen:</div>`
         + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${solos}</div>`
-        + `<button class="btn btn-secondary" onclick="dokoVorbehalt('gesund')">Doch gesund</button></div>`;
+        + `<button class="btn btn-secondary" style="font-size:12px;opacity:.8" onclick="dokoVorbType('gesund')">Doch gesund (Vorbehalt zurücknehmen)</button></div>`;
     }
+  } else if (myTurn) {
+    hint = 'Sag zunächst nur an: „Gesund" oder „Vorbehalt". Den genauen Vorbehalt wählst du, sobald alle gemeldet haben. <b>Deine Karten siehst du unten.</b>';
+    body = `<div style="display:flex;gap:8px;justify-content:center">`
+      + `<button class="btn btn-primary" onclick="dokoVorbehalt('gesund')">Gesund</button>`
+      + `<button class="btn btn-secondary" onclick="dokoVorbehalt('vorbehalt')">Vorbehalt</button></div>`;
   } else {
     body = `<div style="text-align:center;color:var(--tx3);font-size:13px">${G.players[v.order[v.current]].name} überlegt…</div>`;
   }
-  return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:6px">Vorbehalt?</div>`
-    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">Halte deine Karten? „Gesund" = normales Spiel. <b>Deine Karten siehst du unten.</b></div>`
+  return overlay(`<div style="font-weight:700;font-size:16px;margin-bottom:6px">${title}</div>`
+    + `<div style="font-size:12px;color:var(--tx3);margin-bottom:12px">${hint}</div>`
     + done + `<div style="margin-top:14px">${body}</div>`);
 }
 

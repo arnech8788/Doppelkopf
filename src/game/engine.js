@@ -176,12 +176,19 @@ export function resolveParties(state) {
 }
 
 // ── Hochzeit-Klärung nach jedem Stich ──
+// Die Braut legt bei der Ansage fest, ob über den ersten Fehl- ODER den ersten Trumpf-Stich
+// geklärt wird (mode: 'fehl' | 'trumpf', Default 'fehl'). Partner = Gewinner (≠ Braut) des ersten
+// Stichs des gewählten Typs innerhalb der ersten 3 Stiche; sonst hängend → Stilles Solo.
 export function clarifyHochzeit(state) {
   const h = state.hochzeit;
   if (!h || h.clarified) return;
-  // Erster von einem Fremdspieler gewonnener Stich innerhalb der ersten 3 → dessen Gewinner = Partner.
+  const ctx = trumpCtx(state);
+  const mode = h.mode === 'trumpf' ? 'trumpf' : 'fehl';
   for (const tr of state.tricks) {
-    if (tr.winner !== h.brideIdx) { h.partnerIdx = tr.winner; h.clarified = true; h.byTrick = tr; return; }
+    if (tr.winner === h.brideIdx) continue;
+    const lead = (tr.cards || []).find(c => c.idx === tr.leadIdx);
+    const leadTrump = lead ? isTrump(lead.card, ctx) : false;
+    if (mode === 'trumpf' ? leadTrump : !leadTrump) { h.partnerIdx = tr.winner; h.clarified = true; h.byTrick = tr; return; }
   }
   if (state.tricks.length >= 3) { h.partnerIdx = null; h.clarified = true; } // hängend → Solo
 }
@@ -383,7 +390,7 @@ export function resolveVorbehalt(state) {
     const d = decls[idx];
     if (d && d.type === 'hochzeit') {
       state.gameType = 'hochzeit';
-      state.hochzeit = { brideIdx: idx, partnerIdx: null, clarified: false, byTrick: null };
+      state.hochzeit = { brideIdx: idx, partnerIdx: null, clarified: false, byTrick: null, mode: d.clarifyMode === 'trumpf' ? 'trumpf' : 'fehl' };
       state.phase = 'play';
       return;
     }
