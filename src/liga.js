@@ -961,16 +961,18 @@ export async function openLigaPlayerDetail(code, pid) {
     const v = (t.points || {})[pid];
     if (v != null) entries.push({ date: t.date, label: t.label || 'Termin (manuell)', points: Number(v) || 0, sub: 'Termin' });
   });
-  // App-Spiele
+  // App-Spiele – exakt wie ligaStandings direkt über rd.playing auflösen (nicht über g.players,
+  // das von den Runden-Namen abweichen kann → sonst leerer Verlauf trotz Punkten in der Tabelle).
   Object.values(data.spiele || {}).forEach(g => {
     const rounds = gameRounds(g);
-    const names = snapshotNames({ players: g.players, rounds });
-    const mine = names.filter(n => resolve(g, n) === pid);
-    if (!mine.length) return;
     let sum = 0, runden = 0, siege = 0;
     rounds.forEach(r => (r.playing || []).forEach(pl => {
-      if (mine.includes(pl)) { sum += (r.scores && r.scores[pl]) || 0; runden += 1; if ((r.winners || []).includes(pl)) siege += 1; }
+      if (resolve(g, pl) !== pid) return;
+      sum += (r.scores && r.scores[pl]) || 0;
+      runden += 1;
+      if ((r.winners || []).includes(pl)) siege += 1;
     }));
+    if (!runden) return;
     entries.push({ date: g.date, label: rounds.length + ' Runden', points: sum, sub: 'Spiel · ' + siege + '/' + runden + ' gewonnen' });
   });
   entries.sort((a, b) => (new Date(b.date) - new Date(a.date)) || 0);
